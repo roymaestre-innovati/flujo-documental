@@ -21,7 +21,7 @@ Dependencias del sistema: `libreoffice` (writer y calc) y Python 3.12 con `uv`. 
 - [x] **T04 — Inventario.** Recorrido recursivo, descarte de archivos de sistema (por nombre y por contenido), SHA-256, duplicados por orden de ruta e `id_documento`. Requisitos R1 a R5.
 - [x] **T05 — Tipo real.** `tipos.py` con la tabla del plan. Incluye la extensión falsa y los no soportados. Requisito R6.
 - [x] **T06 — Revisión del PDF.** Abrir, reparar una vez, detectar contraseña y restricciones, contar páginas. Requisitos R11 a R13 y R16.
-- [ ] **T07 — Conversión.** LibreOffice con perfil temporal y macros bloqueadas, con tiempo máximo y un reintento; imágenes con img2pdf, incluido el TIFF de varias páginas; Excel convertido y conservado como anexo. Requisitos R7 a R10.
+- [x] **T07 — Conversión.** LibreOffice con perfil temporal y macros bloqueadas, con tiempo máximo y un reintento; imágenes con img2pdf, incluido el TIFF de varias páginas; Excel convertido y conservado como anexo. Requisitos R7 a R10.
 - [ ] **T08 — Firma digital.** Firmante, fecha, integridad, formato y `leida`. Casos: íntegro, modificado después de firmar, sin firma. Requisito R15.
 - [ ] **T09 — Lectura.** Texto, caracteres, cobertura de imagen (grilla de 200 × 200), rotación, tipo de página, origen del texto y archivo de palabras. Requisitos R14 y R18 a R20, R22 y R23.
 - [ ] **T10 — Anclas.** `linea_firma`, `casilla` y `tabla_si_no`, según el plan. Requisito R21.
@@ -126,4 +126,21 @@ Contrato escrito en `contracts/modulo3-normalizacion/v0/`, con los ejemplos vali
 - **Avisos:** `error_documento(codigo, documento)` arma el `detalle` con el sujeto que corresponde ("El PDF pide contraseña…", "El archivo pide contraseña…").
 - **Registro de la reparación:** un mensaje con `logging`, sin nombre ni texto del documento. El formato JSON con los identificadores llega en T11.
 
-**Duda para T09 y T11.** Un PDF puede abrir y contar sus páginas, pero fallar después, al leer una página (un objeto roto adentro). La revisión no lo detecta. Si pdfplumber falla al leer, ¿el documento queda `DANADO` o se lee lo que se pueda y la página fallida queda `vacia`? Mientras tanto, esa falla sería una excepción (clase 4).
+**Duda resuelta con el usuario, para T09.** Si un PDF abre y cuenta sus páginas pero falla al leer una página (un objeto roto adentro), se lee lo que se pueda: la página que falla queda `vacia`, con texto vacío y sin anclas, y el registro anota el número de página sin datos del documento. El documento no queda `DANADO`.
+
+### T07 — Conversión (2026-11-04)
+
+`conversion.convertir(ruta, tipo)` devuelve el PDF convertido, el anexo (el original, solo en hojas de cálculo) y el error, si lo hay. Word y hojas de cálculo van por LibreOffice; imágenes, por img2pdf. Los Word y Excel con contraseña quedan `CONTRASENA` y los no soportados, `NO_SOPORTADO`, sin intentar la conversión. `img2pdf` y `Pillow` son ahora dependencias del paquete. 231 pruebas en verde (sin LibreOffice: 202 y 29 saltadas).
+
+**Decisiones que el plan no fijaba:**
+
+- **PDF reproducible.** LibreOffice pone en cada PDF la fecha, una suma de control (`/DocChecksum`) y un identificador al azar, así que convertir dos veces daba bytes distintos y la lectura cambiaría de `hash_pdf` entre corridas (R25). Después de convertir se quitan esas tres cosas y los metadatos XMP, y el identificador se recalcula a partir del contenido. Lo mismo con img2pdf. Comprobado: dos conversiones del mismo DOCX, XLSX, TIFF o PNG dan los mismos bytes.
+- **LibreOffice en su propio grupo de procesos.** Si se pasa del tiempo, se mata el grupo entero, porque `soffice` lanza otros procesos que, si no, quedarían vivos. Cada conversión usa una carpeta temporal y un perfil propios, que se borran al terminar.
+- **El archivo se copia como `entrada.<ext>`** antes de convertir, para que el nombre del oferente (que puede traer nombres de personas) no aparezca en la lista de procesos ni en los registros.
+- **Imágenes con transparencia** (PNG de capturas de pantalla): img2pdf no las acepta. Se aplanan sobre fondo blanco y se guardan como PNG, sin pérdida. Las demás imágenes pasan tal cual: el JPEG queda adentro del PDF sin recomprimir.
+- **Una imagen que Pillow no abre queda `DANADO`** (el plan no decía qué código). Cualquier excepción de Pillow en esa validación cuenta como imagen dañada, porque Pillow lanza muchos tipos distintos con archivos corruptos. Si img2pdf falla después, queda `CONVERSION_FALLIDA`.
+- **Rotación EXIF:** img2pdf respeta la orientación que trae la foto (`Rotation.ifvalid`).
+- **Sin LibreOffice instalado** se lanza `RuntimeError`: es un bug de despliegue (clase 4), no un error del documento.
+- **Casos nuevos en la fábrica:** PNG con transparencia y ODT con macro.
+
+**Limitación de la prueba de macros.** El ODT de la fábrica trae una macro que, al abrirse el documento, escribe un archivo marca. Con el perfil seguro la macro no se ejecuta, y la prueba lo comprueba. Pero tampoco se ejecutó con la seguridad de macros en mínimo: LibreOffice parece no disparar los eventos de apertura al convertir sin interfaz. Así que la prueba no demuestra que sea el perfil el que la bloquea; sirve como regresión. Aparte, otra prueba comprueba que cada conversión recibe un perfil propio con `MacroSecurityLevel = 3` y `DisableMacrosExecution = true`.

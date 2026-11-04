@@ -42,6 +42,8 @@ ESPERADOS = {
     "ods": TipoReal(ODS),
     "jpg": TipoReal(IMAGEN, "jpeg"),
     "png": TipoReal(IMAGEN, "png"),
+    "png_transparente": TipoReal(IMAGEN, "png"),
+    "odt_con_macro": TipoReal(ODT),
     "tiff_tres_paginas": TipoReal(IMAGEN, "tiff"),
     "extension_falsa": TipoReal(DOCX),
 }

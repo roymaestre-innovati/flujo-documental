@@ -255,6 +255,19 @@ wheels = [
 ]
 
 [[package]]
+name = "img2pdf"
+version = "0.6.3"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "pikepdf" },
+    { name = "pillow" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/8e/97/ca44c467131b93fda82d2a2f21b738c8bcf63b5259e3b8250e928b8dd52a/img2pdf-0.6.3.tar.gz", hash = "sha256:219518020f5bd242bdc46493941ea3f756f664c2e86f2454721e74353f58cd95", size = 120350, upload-time = "2025-11-05T20:51:57.558Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/4d/dc/91e3a4a11c25ae183bd5a71b84ecb298db76405ff70013f76b10877bdfe3/img2pdf-0.6.3-py3-none-any.whl", hash = "sha256:44d12d235752edd17c43c04ff39952cdc5dd4c6aba90569c4902bd445085266b", size = 49701, upload-time = "2025-11-05T20:51:55.469Z" },
+]
+
+[[package]]
 name = "iniconfig"
 version = "2.3.1"
 source = { registry = "https://pypi.org/simple" }
@@ -362,8 +375,10 @@ wheels = [
 name = "normalizacion"
 source = { editable = "." }
 dependencies = [
+    { name = "img2pdf" },
     { name = "olefile" },
     { name = "pikepdf" },
+    { name = "pillow" },
 ]
 
 [package.dev-dependencies]
@@ -372,7 +387,6 @@ dev = [
     { name = "jsonschema" },
     { name = "msoffcrypto-tool" },
     { name = "openpyxl" },
-    { name = "pillow" },
     { name = "pyhanko" },
     { name = "pytest" },
     { name = "python-docx" },
@@ -381,8 +395,10 @@ dev = [
 
 [package.metadata]
 requires-dist = [
+    { name = "img2pdf", specifier = ">=0.6.3" },
     { name = "olefile", specifier = ">=0.47" },
     { name = "pikepdf", specifier = ">=10.17.0" },
+    { name = "pillow", specifier = ">=13.0.0" },
 ]
 
 [package.metadata.requires-dev]
@@ -391,7 +407,6 @@ dev = [
     { name = "jsonschema", specifier = ">=4.23" },
     { name = "msoffcrypto-tool", specifier = ">=6.1.0" },
     { name = "openpyxl", specifier = ">=3.1.5" },
-    { name = "pillow", specifier = ">=13.0.0" },
     { name = "pyhanko", specifier = ">=0.38.1" },
     { name = "pytest", specifier = ">=8" },
     { name = "python-docx", specifier = ">=1.2.0" },

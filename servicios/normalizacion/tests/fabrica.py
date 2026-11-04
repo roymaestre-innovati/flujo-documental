@@ -321,6 +321,68 @@ def doc(carpeta: Path) -> list[Path]:
     return _desde_docx(carpeta, "doc:MS Word 97", "carta_presentacion.doc")
 
 
+MARCA_MACRO = "macro_ejecutada.txt"
+
+
+def odt_con_macro(carpeta: Path) -> list[Path]:
+    """ODT con una macro Basic que, al abrirse el documento, escribe el archivo
+    `MARCA_MACRO` en la misma carpeta. Si la marca aparece, la macro se ejecutó.
+    Necesita LibreOffice."""
+    (odt_base,) = _desde_docx(carpeta / ".base", "odt", "base.odt")
+    with zipfile.ZipFile(odt_base) as zip_:
+        partes = {nombre: zip_.read(nombre) for nombre in zip_.namelist()}
+    shutil.rmtree(carpeta / ".base")
+    marca = (carpeta / MARCA_MACRO).resolve()
+
+    oyente = (
+        '<office:scripts><office:event-listeners><script:event-listener script:language="ooo:script" '
+        'script:event-name="dom:load" xlink:type="simple" '
+        'xlink:href="vnd.sun.star.script:Standard.Module1.Main?language=Basic&amp;location=document"/>'
+        "</office:event-listeners></office:scripts>"
+    )
+    partes["content.xml"] = partes["content.xml"].replace(b"<office:scripts/>", oyente.encode(), 1)
+    partes["Basic/script-lc.xml"] = (
+        b'<?xml version="1.0" encoding="UTF-8"?>'
+        b'<library:libraries xmlns:library="http://openoffice.org/2000/library" '
+        b'xmlns:xlink="http://www.w3.org/1999/xlink">'
+        b'<library:library library:name="Standard" library:link="false"/></library:libraries>'
+    )
+    partes["Basic/Standard/script-lb.xml"] = (
+        b'<?xml version="1.0" encoding="UTF-8"?>'
+        b'<library:library xmlns:library="http://openoffice.org/2000/library" library:name="Standard" '
+        b'library:readonly="false" library:passwordprotected="false">'
+        b'<library:element library:name="Module1"/></library:library>'
+    )
+    partes["Basic/Standard/Module1.xml"] = (
+        '<?xml version="1.0" encoding="UTF-8"?>'
+        '<script:module xmlns:script="http://openoffice.org/2000/script" script:name="Module1" '
+        f'script:language="StarBasic">Sub Main\nOpen "{marca}" For Output As #1\n'
+        'Print #1, "macro"\nClose #1\nEnd Sub\n</script:module>'
+    ).encode()
+    entradas = "".join(
+        f'<manifest:file-entry manifest:full-path="{nombre}" manifest:media-type="text/xml"/>'
+        for nombre in ("Basic/script-lc.xml", "Basic/Standard/script-lb.xml", "Basic/Standard/Module1.xml")
+    )
+    partes["META-INF/manifest.xml"] = partes["META-INF/manifest.xml"].replace(
+        b"</manifest:manifest>", entradas.encode() + b"</manifest:manifest>"
+    )
+    salida = io.BytesIO()
+    with zipfile.ZipFile(salida, "w") as zip_:
+        zip_.writestr("mimetype", partes.pop("mimetype"), compress_type=zipfile.ZIP_STORED)
+        for nombre, datos in partes.items():
+            zip_.writestr(nombre, datos, compress_type=zipfile.ZIP_DEFLATED)
+    return [_guardar(carpeta / "formulario_con_macro.odt", salida.getvalue())]
+
+
+def png_transparente(carpeta: Path) -> list[Path]:
+    """PNG con canal alfa, como una captura de pantalla: img2pdf no lo acepta tal cual."""
+    imagen = _imagen_escaneo(425, 550).convert("RGBA")
+    imagen.putalpha(200)
+    salida = io.BytesIO()
+    imagen.save(salida, format="PNG")
+    return [_guardar(carpeta / "captura_rut.png", salida.getvalue())]
+
+
 def xlsx_bytes() -> bytes:
     """Hoja de cálculo con 40 columnas: al pasarla a PDF se corta en varias páginas."""
     from openpyxl import Workbook
@@ -500,9 +562,11 @@ CASOS = {
     "xls": xls,
     "ods": ods,
     "docx_con_contrasena": docx_con_contrasena,
+    "odt_con_macro": odt_con_macro,
     "xlsx_con_contrasena": xlsx_con_contrasena,
     "jpg": jpg,
     "png": png,
+    "png_transparente": png_transparente,
     "tiff_tres_paginas": tiff_tres_paginas,
     "archivos_de_sistema": archivos_de_sistema,
     "appledouble_sin_prefijo": appledouble_sin_prefijo,
@@ -512,4 +576,4 @@ CASOS = {
     "pdf_anclas": pdf_anclas,
 }
 
-CASOS_CON_LIBREOFFICE = {"odt", "doc", "xls", "ods"}
+CASOS_CON_LIBREOFFICE = {"odt", "doc", "xls", "ods", "odt_con_macro"}
