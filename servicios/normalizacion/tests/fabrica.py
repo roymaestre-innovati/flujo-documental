@@ -243,6 +243,17 @@ def pdf_firmado(carpeta: Path) -> list[Path]:
     return [_guardar(carpeta / "certificacion_experiencia_firmada.pdf", pdf_firmado_bytes())]
 
 
+def pdf_firma_ilegible(carpeta: Path) -> list[Path]:
+    """Un firmado cuyo formato dice `adbe.pkcs7.sha1`, como los certificados de la
+    Cámara de Comercio. Se simula cambiando el subfiltro en el mismo espacio: pyHanko
+    no lista esas firmas, igual que con las reales."""
+    viejo = b"/SubFilter /adbe.pkcs7.detached"
+    nuevo = b"/SubFilter /adbe.pkcs7.sha1".ljust(len(viejo))
+    datos = pdf_firmado_bytes()
+    assert datos.count(viejo) == 1
+    return [_guardar(carpeta / "certificado_camara_comercio.pdf", datos.replace(viejo, nuevo))]
+
+
 def pdf_modificado_despues_de_firmar(carpeta: Path) -> list[Path]:
     """El firmado, más una actualización incremental que dibuja sobre la página."""
     from pyhanko.pdf_utils import generic
@@ -555,6 +566,7 @@ CASOS = {
     "pdf_danado_irreparable": pdf_danado_irreparable,
     "pdf_firmado": pdf_firmado,
     "pdf_modificado_despues_de_firmar": pdf_modificado_despues_de_firmar,
+    "pdf_firma_ilegible": pdf_firma_ilegible,
     "docx": docx,
     "odt": odt,
     "doc": doc,

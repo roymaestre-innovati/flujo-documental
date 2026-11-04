@@ -22,7 +22,7 @@ Dependencias del sistema: `libreoffice` (writer y calc) y Python 3.12 con `uv`. 
 - [x] **T05 — Tipo real.** `tipos.py` con la tabla del plan. Incluye la extensión falsa y los no soportados. Requisito R6.
 - [x] **T06 — Revisión del PDF.** Abrir, reparar una vez, detectar contraseña y restricciones, contar páginas. Requisitos R11 a R13 y R16.
 - [x] **T07 — Conversión.** LibreOffice con perfil temporal y macros bloqueadas, con tiempo máximo y un reintento; imágenes con img2pdf, incluido el TIFF de varias páginas; Excel convertido y conservado como anexo. Requisitos R7 a R10.
-- [ ] **T08 — Firma digital.** Firmante, fecha, integridad, formato y `leida`. Casos: íntegro, modificado después de firmar, sin firma. Requisito R15.
+- [x] **T08 — Firma digital.** Firmante, fecha, integridad, formato y `leida`. Casos: íntegro, modificado después de firmar, sin firma. Requisito R15.
 - [ ] **T09 — Lectura.** Texto, caracteres, cobertura de imagen (grilla de 200 × 200), rotación, tipo de página, origen del texto y archivo de palabras. Requisitos R14 y R18 a R20, R22 y R23.
 - [ ] **T10 — Anclas.** `linea_firma`, `casilla` y `tabla_si_no`, según el plan. Requisito R21.
 - [ ] **T11 — Entrega completa.** `entrega.py` une todo y escribe manifiesto, PDF, anexos, lecturas y palabras en el almacén. Aislamiento de errores (R17), errores de clase 4 relanzados al final, idempotencia y `--forzar`, y registros sin datos personales. Prueba de punta a punta con una entrega sintética que trae todos los casos, validada contra el contrato. Prueba de determinismo (R24 y R25, criterio A2).
@@ -85,7 +85,7 @@ Contrato escrito en `contracts/modulo3-normalizacion/v0/`, con los ejemplos vali
 - **Dependencias:** reportlab, python-docx, openpyxl, cryptography, pikepdf, pyhanko, Pillow y olefile quedan en el grupo `dev`. pikepdf, pyhanko, Pillow y olefile pasan a dependencias del paquete cuando el código los use (T04 a T08).
 - **Nombres de archivo:** varios casos usan nombres parecidos (`carta_presentacion.*`). La entrega completa de T11 debe poner cada caso en su propia subcarpeta.
 
-**Duda para T08:** R15 pide anotar una firma que no se puede leer (`leida: false`, p. ej. `adbe.pkcs7.sha1`), pero la tabla de pruebas del plan no trae ese caso y pyHanko no firma en ese formato. Opciones: cambiar el `/SubFilter` de un PDF ya firmado, o fabricar a mano la firma en ese formato. Se decide en T08.
+**Duda para T08, resuelta en T08:** el caso de firma que no se puede leer se fabrica cambiando el `/SubFilter` de un PDF ya firmado a `adbe.pkcs7.sha1`, en el mismo espacio (`pdf_firma_ilegible`).
 
 ### T04 — Inventario (2026-11-04)
 
@@ -144,3 +144,20 @@ Contrato escrito en `contracts/modulo3-normalizacion/v0/`, con los ejemplos vali
 - **Casos nuevos en la fábrica:** PNG con transparencia y ODT con macro.
 
 **Limitación de la prueba de macros.** El ODT de la fábrica trae una macro que, al abrirse el documento, escribe un archivo marca. Con el perfil seguro la macro no se ejecuta, y la prueba lo comprueba. Pero tampoco se ejecutó con la seguridad de macros en mínimo: LibreOffice parece no disparar los eventos de apertura al convertir sin interfaz. Así que la prueba no demuestra que sea el perfil el que la bloquea; sirve como regresión. Aparte, otra prueba comprueba que cada conversión recibe un perfil propio con `MacroSecurityLevel = 3` y `DisableMacrosExecution = true`.
+
+### T08 — Firma digital (2026-11-04)
+
+`firma.leer_firmas(datos)` devuelve una `FirmaDigital` por firma (`firmante`, `fecha`, `integro`, `formato`, `leida`), en el orden del formulario, o una lista vacía si el PDF no tiene firmas. `pyhanko` es ahora dependencia del paquete. La fábrica suma `pdf_firma_ilegible`. 250 pruebas en verde.
+
+**Hallazgo.** pyHanko no lista las firmas `adbe.pkcs7.sha1`: si solo se le preguntara a pyHanko, el manifiesto diría "sin firma" justo en los certificados de la Cámara de Comercio. Por eso las firmas se buscan en dos pasos: pikepdf recorre los campos de firma del formulario (también los anidados) y anota su formato; pyHanko valida los que puede. Un campo que pyHanko no lee, o cuya validación falla, queda con `leida: false` y su formato.
+
+**Decisiones que el plan no fijaba:**
+
+- **`integro`** es `true` si la parte firmada está intacta, la firma es matemáticamente válida y los cambios posteriores, si los hay, están permitidos (por ejemplo, una segunda firma). Una actualización que cambia el contenido de la página la deja en `false`. No se mira la confianza del certificado: sin autoridades raíz y sin consultas a la red.
+- **`firmante`** es el CN del certificado; si no tiene CN, el nombre completo del titular. **`fecha`** es la hora de firma que declara la firma; si no la trae, la `/M` del diccionario de firma.
+- **Una firma leída sin firmante o sin fecha queda como `leida: false`**, porque el contrato exige los dos en una firma leída. Es raro, pero si pasa en la muestra habría que revisar el contrato.
+- **Campos de firma vacíos** (el formulario tiene el campo, pero nadie firmó) no cuentan como firma.
+- **PDF con solo restricciones y firmado:** pyHanko lo abre con la contraseña vacía y la firma se valida normal.
+- **Registros:** pyHanko escribe en el registro los datos del certificado (el nombre de quien firma) cuando algo le parece raro, por ejemplo un certificado autofirmado. Se silencian los registros de `pyhanko` y `pyhanko_certvalidator` para que esos nombres no lleguen a los registros del servicio (principio 6).
+
+**Para T11:** las firmas se leen del PDF original del oferente, no de la copia reparada, porque reescribir el archivo invalida la firma. En un PDF dañado que se reparó, lo más probable es que la firma quede `leida: false`.

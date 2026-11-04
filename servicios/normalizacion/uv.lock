@@ -379,6 +379,7 @@ dependencies = [
     { name = "olefile" },
     { name = "pikepdf" },
     { name = "pillow" },
+    { name = "pyhanko" },
 ]
 
 [package.dev-dependencies]
@@ -387,7 +388,6 @@ dev = [
     { name = "jsonschema" },
     { name = "msoffcrypto-tool" },
     { name = "openpyxl" },
-    { name = "pyhanko" },
     { name = "pytest" },
     { name = "python-docx" },
     { name = "reportlab" },
@@ -399,6 +399,7 @@ requires-dist = [
     { name = "olefile", specifier = ">=0.47" },
     { name = "pikepdf", specifier = ">=10.17.0" },
     { name = "pillow", specifier = ">=13.0.0" },
+    { name = "pyhanko", specifier = ">=0.38.1" },
 ]
 
 [package.metadata.requires-dev]
@@ -407,7 +408,6 @@ dev = [
     { name = "jsonschema", specifier = ">=4.23" },
     { name = "msoffcrypto-tool", specifier = ">=6.1.0" },
     { name = "openpyxl", specifier = ">=3.1.5" },
-    { name = "pyhanko", specifier = ">=0.38.1" },
     { name = "pytest", specifier = ">=8" },
     { name = "python-docx", specifier = ">=1.2.0" },
     { name = "reportlab", specifier = ">=5.1.0" },
