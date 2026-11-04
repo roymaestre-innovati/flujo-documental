@@ -32,6 +32,7 @@ ESPERADOS = {
     "pdf_danado_reparable": TipoReal(PDF),
     "pdf_danado_irreparable": TipoReal(PDF),
     "pdf_firmado": TipoReal(PDF),
+    "pdf_firma_ilegible": TipoReal(PDF),
     "pdf_modificado_despues_de_firmar": TipoReal(PDF),
     "pdf_anclas": TipoReal(PDF),
     "docx": TipoReal(DOCX),
