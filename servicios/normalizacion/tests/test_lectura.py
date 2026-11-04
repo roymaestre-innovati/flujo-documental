@@ -310,3 +310,26 @@ def test_si_pdfplumber_no_abre_todas_quedan_vacias(monkeypatch, caplog):
         resultado = _valida(_leer(fabrica.pdf_texto_bytes(paginas=2)))
     assert [p["tipo"] for p in resultado.lectura["paginas"]] == [VACIA, VACIA]
     assert "Documento sin leer" in caplog.text
+
+
+# Cajas fuera de la página ---------------------------------------------------------------
+
+
+def test_las_cajas_se_recortan_al_borde_de_la_pagina():
+    """Texto que se sale de la página (como una celda ancha de un Excel convertido):
+    el contrato pide cajas desde 0."""
+    salida, lienzo = fabrica._lienzo()
+    lienzo.setFont("Helvetica", 11)
+    lienzo.drawString(-20, 700, "Recortada adentro")  # empieza fuera, termina adentro
+    lienzo.drawString(-300, 650, "Afuera")  # entera fuera de la página
+    lienzo.drawString(560, 600, "Derecha recortada")  # se sale por la derecha
+    lienzo.rect(-5, 100, 10, 10)  # casilla que se sale por la izquierda
+    lienzo.showPage()
+    lienzo.save()
+    resultado = _valida(_leer(salida.getvalue()))
+    palabras = {p["t"]: p["caja"] for p in resultado.palabras["paginas"][0]["palabras"]}
+    assert "Afuera" not in palabras
+    assert palabras["Recortada"][0] == 0.0
+    assert palabras["recortada"][2] == fabrica.ANCHO
+    for ancla in resultado.lectura["paginas"][0]["anclas"]:
+        assert ancla["caja"][0] >= 0
