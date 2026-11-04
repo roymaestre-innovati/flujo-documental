@@ -16,7 +16,7 @@ Dependencias del sistema: `libreoffice` (writer y calc) y Python 3.12 con `uv`. 
 ## Tareas
 
 - [x] **T01 — Contrato.** Escribir `contracts/modulo3-normalizacion/v0/`: `README.md`, `manifiesto.schema.json`, `lectura.schema.json` y `palabras.schema.json` (JSON Schema 2020-12), más ejemplos: una entrega con un normalizado, un duplicado, un error y un descartado, y una lectura con una página de cada tipo. Validar los ejemplos contra los esquemas, como en `contracts/modulo3-extraccion/v0/README.md`. **Detenerse aquí para revisión del usuario** antes de seguir (principio 5).
-- [ ] **T02 — Esqueleto.** `servicios/normalizacion/` con `pyproject.toml` (uv, pytest), `__init__.py` con `VERSION = "0.1.0"`, `parametros.py`, `almacen.py` (interfaz y `AlmacenLocal`) y el comando `normalizar` que por ahora solo lista la entrega. Agregar la prueba que valida los ejemplos del contrato.
+- [x] **T02 — Esqueleto.** `servicios/normalizacion/` con `pyproject.toml` (uv, pytest), `__init__.py` con `VERSION = "0.1.0"`, `parametros.py`, `almacen.py` (interfaz y `AlmacenLocal`) y el comando `normalizar` que por ahora solo lista la entrega. Agregar la prueba que valida los ejemplos del contrato.
 - [ ] **T03 — Fábrica de pruebas.** `tests/fabrica.py` con todos los casos de la tabla de pruebas del plan. Una prueba por caso que solo confirma que el archivo se fabricó.
 - [ ] **T04 — Inventario.** Recorrido recursivo, descarte de archivos de sistema (por nombre y por contenido), SHA-256, duplicados por orden de ruta e `id_documento`. Requisitos R1 a R5.
 - [ ] **T05 — Tipo real.** `tipos.py` con la tabla del plan. Incluye la extensión falsa y los no soportados. Requisito R6.
@@ -33,7 +33,7 @@ Dependencias del sistema: `libreoffice` (writer y calc) y Python 3.12 con `uv`. 
 
 ### T01 — Contrato (2026-11-04)
 
-Contrato escrito en `contracts/modulo3-normalizacion/v0/`, con los ejemplos validados. Queda a la espera de la revisión del usuario antes de T02.
+Contrato escrito en `contracts/modulo3-normalizacion/v0/`, con los ejemplos validados. Revisado y fusionado en `main`.
 
 **Dudas que el plan no resuelve.** El contrato las deja abiertas o sigue la lectura más literal del plan; hay que confirmarlas en la revisión:
 
@@ -54,3 +54,18 @@ Contrato escrito en `contracts/modulo3-normalizacion/v0/`, con los ejemplos vali
 - `rotacion` solo admite 0, 90, 180 o 270. `texto` es una cadena vacía cuando la página no tiene texto.
 - El archivo de palabras trae todas las páginas, también las que no tienen palabras.
 - Como los esquemas se refieren entre sí, el comando de validación del README los carga en un registro de `referencing`. T02 debe hacer lo mismo en su prueba.
+
+### T02 — Esqueleto (2026-11-04)
+
+`servicios/normalizacion/` con `pyproject.toml` (uv, hatchling, pytest), `uv.lock`, `__init__.py` (`VERSION = "0.1.0"` y la versión del contrato), `parametros.py`, `almacen.py`, `inventario.py` y `cli.py`. 52 pruebas en verde con Python 3.12.
+
+**Decisiones que el plan no fijaba:**
+
+- **El comando cuenta, no lista.** La tarea pide que `normalizar` "solo liste la entrega", pero el plan prohíbe sacar nombres de archivo (pueden traer nombres de personas). Imprime solo cuántos archivos trae la entrega. El recorrido, que sí devuelve las rutas, está en `inventario.recorrer()`, y T04 lo amplía.
+- **Enlaces simbólicos.** El recorrido no los sigue, para no leer archivos fuera de la entrega.
+- **Parámetros como un objeto inmutable** (`PARAMETROS`), con todos los umbrales del plan. "Casi cuadrado" en la casilla no tenía número: se fijó una tolerancia de 20 % entre lados (`tolerancia_cuadrado_casilla`), que T10 puede ajustar subiendo la versión de parámetros.
+- **`AlmacenLocal`** escribe con un temporal y un cambio de nombre, para no dejar archivos a medias, y rechaza URI que no sean `file://` locales o que salgan de su carpeta.
+- **Python fijado en 3.12** (`>=3.12,<3.13`), el mismo de la imagen del job (T12).
+- **Validadores del contrato en `tests/contrato.py`**, para que la prueba de punta a punta (T11) los reuse. Además de validar los ejemplos, las pruebas comprueban que los esquemas rechazan casos mal formados y que los ejemplos usan las versiones del paquete.
+
+**Dudas para T10:** el plan dice "sin importar mayúsculas ni tildes" solo para la palabra "firma". Para la tabla SI/NO no lo dice; el oferente puede escribir "SÍ" con tilde.
