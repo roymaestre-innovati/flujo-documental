@@ -26,7 +26,7 @@ Dependencias del sistema: `libreoffice` (writer y calc) y Python 3.12 con `uv`. 
 - [x] **T09 — Lectura.** Texto, caracteres, cobertura de imagen (grilla de 200 × 200), rotación, tipo de página, origen del texto y archivo de palabras. Requisitos R14 y R18 a R20, R22 y R23.
 - [x] **T10 — Anclas.** `linea_firma`, `casilla` y `tabla_si_no`, según el plan. Requisito R21.
 - [x] **T11 — Entrega completa.** `entrega.py` une todo y escribe manifiesto, PDF, anexos, lecturas y palabras en el almacén. Aislamiento de errores (R17), errores de clase 4 relanzados al final, idempotencia y `--forzar`, y registros sin datos personales. Prueba de punta a punta con una entrega sintética que trae todos los casos, validada contra el contrato. Prueba de determinismo (R24 y R25, criterio A2).
-- [ ] **T12 — Imagen del job.** `Dockerfile` (Python 3.12 slim, LibreOffice writer y calc, uv) que corre `normalizar`. Comprobar que las pruebas pasan dentro de la imagen.
+- [x] **T12 — Imagen del job.** `Dockerfile` (Python 3.12 slim, LibreOffice writer y calc, uv) que corre `normalizar`. Comprobar que las pruebas pasan dentro de la imagen.
 - [ ] **T13 — Script de la muestra.** `scripts/medir_muestra.py <carpeta>`: corre `normalizar` sobre cada oferente de una carpeta e imprime solo conteos (páginas únicas, duplicados, restricciones, firmas, descartados, proporción de tipos de página y tiempo por oferente), para los criterios A3 a A5. No se corre en la nube: lo corre el usuario con la muestra real.
 
 ## Notas de implementación
@@ -219,3 +219,28 @@ A mano, con el comando: 32 archivos (8 conversiones con LibreOffice) en unos 10 
 - **Formato de los archivos:** el manifiesto y la lectura van en JSON con sangría; las palabras van compactas, porque es el archivo pesado. `ejecucion.inicio` va en UTC, con segundos.
 - **Registros:** una línea JSON por evento en stderr, con `id_proceso`, `id_oferente`, `id_documento` y `hash` (12 caracteres) tomados del contexto. De una excepción se anota solo el tipo y el lugar del código (`ValueError en lectura.py:120`), nunca su mensaje, que puede traer rutas o texto del documento.
 - **Sin LibreOffice instalado,** cada Word o Excel falla como bug y la entrega termina con `ErrorEntrega`. Es un problema de la imagen (T12), no del documento.
+
+### T12 — Imagen del job (2026-11-04)
+
+`servicios/normalizacion/Dockerfile`, con tres etapas: `base` (sistema, LibreOffice, fuentes y uv), `pruebas` (dependencias de desarrollo, pruebas y contrato; corre pytest) y `job` (solo las dependencias del paquete; usuario sin privilegios, uid 10001; `ENTRYPOINT ["normalizar"]`). Se construye desde la raíz del repositorio, porque las pruebas necesitan el contrato, y `Dockerfile.dockerignore` deja entrar solo lo que se copia: los documentos y la matriz nunca entran a la imagen.
+
+**Comprobado en este entorno:**
+
+- Las 379 pruebas pasan **dentro de la imagen de pruebas, sin red** (`--network none`), en unos 90 s.
+- La imagen `job` procesa la entrega sintética completa (32 archivos) en unos 12 s, con el usuario sin privilegios, sin red, con la entrega montada de solo lectura. El manifiesto y las 24 lecturas cumplen el contrato.
+- Tamaños: `job` 1,22 GB y `pruebas` 1,28 GB. Casi todo es LibreOffice; el plan estimaba unos 500 MB solo para LibreOffice.
+
+**Hallazgo y corrección en la lectura.** Dentro de la imagen falló la prueba de punta a punta: una palabra de la hoja ancha de Excel convertida quedó con una coordenada negativa, y el contrato pide cajas desde 0. La imagen tenía menos fuentes que el entorno de desarrollo; sin la equivalente de Calibri, el texto salía más ancho y se salía de la página. Dos arreglos:
+
+1. `lectura.py` recorta las cajas de palabras y anclas al borde de la página y las mide desde su esquina superior izquierda. Una palabra que queda entera fuera de la página se descarta del archivo de palabras (su texto sigue en `texto`). Vale para cualquier PDF, no solo los convertidos. Hay una prueba nueva.
+2. La imagen trae las fuentes Carlito (medidas de Calibri) y Caladea (de Cambria), además de Liberation, para que los Word y Excel hechos en Office conserven su paginación.
+
+**Desviación del plan: Ubuntu 24.04 en vez de `python:3.12-slim`.** La red de este entorno no deja descargar paquetes de Debian (`deb.debian.org`), así que una imagen sobre `python:3.12-slim` no se podía construir ni probar aquí. Ubuntu 24.04 trae Python 3.12.3 y LibreOffice 24.2, las mismas versiones del entorno donde corrieron todas las pruebas; Debian bookworm trae LibreOffice 7.4, más antiguo. Volver a `python:3.12-slim` solo cambia la etapa `base`, pero habría que probarla en un entorno con acceso a Debian. **Pendiente de confirmar con el usuario.**
+
+**Otras decisiones:**
+
+- **uv se instala desde PyPI** (`pip install uv==0.11.32`, la versión de desarrollo), en vez de copiarlo de `ghcr.io/astral-sh/uv`. Así la construcción depende de un registro menos; en la etapa `job` se desinstala al terminar.
+- **`BASE_IMAGE` es un argumento**, para usar un espejo de Docker Hub si hace falta (`--build-arg BASE_IMAGE=mirror.gcr.io/library/ubuntu:24.04`). Aquí Docker Hub respondió 429 (demasiadas solicitudes).
+- **Cómo se construyó aquí:** con una copia temporal del Dockerfile, fuera del repositorio, que solo agrega el certificado del proxy de este entorno y pasa los repositorios de Ubuntu a HTTPS. El Dockerfile del repositorio no lleva nada de eso.
+
+**No se hizo:** análisis de vulnerabilidades de la imagen ni publicación en un registro de Azure (no hay acceso a Azure en esta entrega).

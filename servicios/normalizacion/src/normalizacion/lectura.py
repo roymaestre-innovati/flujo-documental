@@ -142,8 +142,17 @@ def _heredado(objeto, clave, defecto):
     return defecto
 
 
-def _caja(x0: float, y0: float, x1: float, y1: float) -> list[float]:
-    return [round(float(v), DECIMALES_CAJA) for v in (x0, y0, x1, y1)]
+def _en_la_pagina(caja, borde) -> list[float] | None:
+    """Caja recortada al borde de la página y medida desde su esquina superior
+    izquierda, como pide el contrato (valores desde 0). None si queda entera fuera:
+    un texto que se sale de la página, por ejemplo una celda ancha de un Excel
+    convertido, no se ve."""
+    x0, y0, x1, y1 = (float(v) for v in caja)
+    bx0, by0, bx1, by1 = (float(v) for v in borde)
+    x0, y0, x1, y1 = max(x0, bx0), max(y0, by0), min(x1, bx1), min(y1, by1)
+    if x1 < x0 or y1 < y0:
+        return None
+    return [round(v, DECIMALES_CAJA) for v in (x0 - bx0, y0 - by0, x1 - bx0, y1 - by0)]
 
 
 def _pagina_vacia(numero: int, rotacion: int) -> tuple[dict, dict]:
@@ -167,12 +176,19 @@ def _leer_pagina(pagina, numero: int, rotacion: int, parametros: Parametros) -> 
     fraccion = cobertura(cajas, tuple(map(float, pagina.bbox)), parametros.celdas_grilla_cobertura)
     tipo = tipo_de_pagina(caracteres, fraccion, parametros)
     palabras_pdfplumber = pagina.extract_words()
-    palabras = [
-        {"t": palabra["text"], "caja": _caja(palabra["x0"], palabra["top"], palabra["x1"], palabra["bottom"])}
-        for palabra in palabras_pdfplumber
-    ]
+    borde = pagina.bbox
+    palabras = []
+    for palabra in palabras_pdfplumber:
+        caja = _en_la_pagina((palabra["x0"], palabra["top"], palabra["x1"], palabra["bottom"]), borde)
+        if caja is not None:
+            palabras.append({"t": palabra["text"], "caja": caja})
     # Las páginas imagen no tienen anclas: no hay texto (plan, "Anclas").
-    zonas = [] if tipo == IMAGEN else anclas.buscar(pagina, palabras_pdfplumber, parametros)
+    zonas = []
+    if tipo != IMAGEN:
+        for ancla in anclas.buscar(pagina, palabras_pdfplumber, parametros):
+            caja = _en_la_pagina(ancla["caja"], borde)
+            if caja is not None:
+                zonas.append({**ancla, "caja": caja})
     lectura = {
         "pagina": numero,
         "tipo": tipo,
