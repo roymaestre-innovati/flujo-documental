@@ -30,7 +30,7 @@ def _tiene_imagen(pagina) -> bool:
 
 
 def test_todos_los_casos_estan_registrados():
-    assert len(fabrica.CASOS) == 29
+    assert len(fabrica.CASOS) == 31
     assert fabrica.CASOS_CON_LIBREOFFICE <= set(fabrica.CASOS)
 
 
@@ -215,6 +215,21 @@ def test_jpg(tmp_path):
 def test_png(tmp_path):
     with Image.open(_un_archivo(fabrica.png(tmp_path))) as imagen:
         assert imagen.format == "PNG"
+
+
+def test_png_transparente(tmp_path):
+    with Image.open(_un_archivo(fabrica.png_transparente(tmp_path))) as imagen:
+        assert imagen.mode == "RGBA"
+
+
+@pytest.mark.libreoffice
+def test_odt_con_macro(tmp_path):
+    ruta = _un_archivo(fabrica.odt_con_macro(tmp_path))
+    with zipfile.ZipFile(ruta) as zip_:
+        assert b"dom:load" in zip_.read("content.xml")
+        assert b"Sub Main" in zip_.read("Basic/Standard/Module1.xml")
+    assert not (tmp_path / fabrica.MARCA_MACRO).exists()
+    assert [p.name for p in tmp_path.iterdir()] == [ruta.name]
 
 
 def test_tiff_tres_paginas(tmp_path):
