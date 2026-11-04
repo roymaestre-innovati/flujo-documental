@@ -2,6 +2,8 @@
 
 Sale de `plan.md`. Cada tarea termina con sus pruebas en verde y un commit propio.
 
+**Estado al 2026-11-04: T01 a T13 hechas** y fusionadas en `main` (387 pruebas). Lo que queda abierto está en `contexto/HANDOFF-implementacion.md`, sección "Pendiente".
+
 ## Para quien implemente
 
 - Leer antes `spec.md` y `plan.md` de esta carpeta. El contexto de diseño está en `contexto/flujo-documental-opcion-a.md` (pasos 1 y 2) y las reglas del proyecto, en `contexto/constitucion.md`.

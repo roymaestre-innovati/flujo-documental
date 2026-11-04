@@ -10,3 +10,9 @@ __pycache__/
 .venv/
 *.pyc
 .pytest_cache/
+
+# Salidas de la normalización y muestras reales: traen datos personales (principio 6)
+salida/
+salida-*/
+muestra/
+muestra-*/

@@ -1,6 +1,6 @@
 # Spec 003 — Validación y extracción documental (módulo 3)
 
-Estado al 2026-11-04. Borrador para revisión.
+Estado al 2026-11-04. **Entrega 1 (normalización y lectura) implementada** y probada con documentos sintéticos (`tasks.md`, T01 a T13). Falta medirla con la muestra real (criterios A3 a A5), después del checklist de habeas data (`checklist-habeas-data.md`).
 
 Esta iniciativa cubre el módulo 3 sin el clasificador, que es de otro equipo: preparar los documentos que entrega cada oferente, leerlos y extraer sus datos. Se construye por entregas. **Esta versión de la spec cubre solo la primera: normalización y lectura** (pasos 1 y 2 de `contexto/flujo-documental-opcion-a.md`). La extracción (paso 5) se agrega a esta misma spec más adelante.
 
