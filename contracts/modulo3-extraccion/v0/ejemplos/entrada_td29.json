@@ -1,0 +1,11 @@
+{
+  "contrato": "modulo3-extraccion/0.1",
+  "id_proceso": "SR0000000001",
+  "id_oferente": "OF-002",
+  "id_documento": "OF-002-seg-11",
+  "archivo": {"uri": "https://<cuenta>.blob.core.windows.net/ofertas/SR0000000001/OF-002/apendice4_experiencia.pdf"},
+  "paginas": {"desde": 1, "hasta": 2},
+  "tipo_documental": "TD-29",
+  "tipo_oferente": "PJ_NAL",
+  "version_modelo": 21
+}

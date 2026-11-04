@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "modulo3-extraccion/v0/entrada.schema.json",
+  "title": "Solicitud de extracción de un segmento de documento",
+  "description": "Una solicitud = un segmento: archivo + rango de páginas + tipo documental, tal como lo devuelve el clasificador. El transporte (HTTP síncrono, asíncrono o cola) y la forma de la referencia al archivo están pendientes de O1 y O2.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["contrato", "id_proceso", "id_oferente", "id_documento", "archivo", "paginas", "tipo_documental"],
+  "properties": {
+    "contrato": {"const": "modulo3-extraccion/0.1"},
+    "id_proceso": {"type": "string", "minLength": 1, "description": "Identificador del proceso de contratación (lo asigna el orquestador)."},
+    "id_oferente": {"type": "string", "minLength": 1},
+    "id_documento": {"type": "string", "minLength": 1, "description": "Identificador del segmento (lo asigna el orquestador). Un documento corregido en subsanación llega con un id nuevo (O7)."},
+    "archivo": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["uri"],
+      "description": "Referencia al PDF o imagen ya normalizado (D18). Provisional hasta O2.",
+      "properties": {
+        "uri": {"type": "string", "format": "uri"},
+        "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$", "description": "Opcional: permite detectar que el archivo cambió detrás de la misma URI."}
+      }
+    },
+    "paginas": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["desde", "hasta"],
+      "description": "Rango de páginas del segmento, numeradas sobre el archivo completo, desde 1.",
+      "properties": {
+        "desde": {"type": "integer", "minimum": 1},
+        "hasta": {"type": "integer", "minimum": 1}
+      }
+    },
+    "tipo_documental": {"type": "string", "pattern": "^TD-[0-9]{2}$", "description": "Sección del modelo semántico. TD-99 (desconocido) no se envía (C1)."},
+    "tipo_oferente": {"enum": ["PJ_NAL", "PJ_EXT", "PN", "EP"], "description": "Si no llega, los campos condicionales quedan con la condición sin evaluar (O3)."},
+    "version_modelo": {"type": "integer", "minimum": 1, "description": "Versión del modelo fijada al abrir el proceso (D7). Si no llega, se usa la vigente y se devuelve en la salida."},
+    "confianza_clasificacion": {"type": "number", "minimum": 0, "maximum": 1},
+    "forzar_reproceso": {"type": "boolean", "default": false, "description": "Ignora el resultado guardado para la misma clave de idempotencia (D22)."}
+  }
+}

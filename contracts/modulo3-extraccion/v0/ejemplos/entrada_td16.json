@@ -1,0 +1,12 @@
+{
+  "contrato": "modulo3-extraccion/0.1",
+  "id_proceso": "SR0000000001",
+  "id_oferente": "OF-002",
+  "id_documento": "OF-002-seg-07",
+  "archivo": {"uri": "https://<cuenta>.blob.core.windows.net/ofertas/SR0000000001/OF-002/formulario3_parafiscales.pdf"},
+  "paginas": {"desde": 1, "hasta": 2},
+  "tipo_documental": "TD-16",
+  "tipo_oferente": "PJ_NAL",
+  "version_modelo": 21,
+  "confianza_clasificacion": 0.96
+}

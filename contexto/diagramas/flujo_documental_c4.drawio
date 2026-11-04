@@ -1,0 +1,691 @@
+<mxfile host="app.diagrams.net" version="26.2.15" pages="4">
+  <diagram name="Nivel 1 - System Context (Objetivo)" id="n1">
+    <mxGraphModel dx="1400" dy="900" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="n1-1" value="Flujo documental de evaluación de ofertas · Nivel 1 · Contexto" style="text;html=1;align=left;verticalAlign=middle;fontSize=20;fontStyle=1;fontColor=#333333;" vertex="1" parent="1">
+          <mxGeometry x="0" y="-80" width="1200" height="40" as="geometry" />
+        </mxCell>
+        <object placeholders="1" c4Name="SAP Ariba" c4Type="Software System" c4Description="Plataforma donde los oferentes presentan sus ofertas." label="&lt;font style=&quot;font-size: 16px&quot;&gt;&lt;b&gt;%c4Name%&lt;/b&gt;&lt;/font&gt;&lt;div&gt;[%c4Type%]&lt;/div&gt;&lt;br&gt;&lt;div&gt;&lt;font style=&quot;font-size: 11px&quot;&gt;&lt;font color=&quot;#E6E6E6&quot;&gt;%c4Description%&lt;/font&gt;&lt;/font&gt;&lt;/div&gt;" id="n1-ariba">
+          <mxCell style="rounded=1;whiteSpace=wrap;html=1;labelBackgroundColor=none;fillColor=#8C8496;fontColor=#ffffff;align=center;arcSize=10;strokeColor=#736782;metaEdit=1;resizable=0;points=[[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0.25,0],[1,0.5,0],[1,0.75,0],[0.75,1,0],[0.5,1,0],[0.25,1,0],[0,0.75,0],[0,0.5,0],[0,0.25,0]];verticalAlign=middle;fontFamily=Helvetica;fontSize=12;fontStyle=1" vertex="1" parent="1">
+            <mxGeometry x="0" y="300" width="240" height="120" as="geometry" />
+          </mxCell>
+        </object>
+        <object placeholders="1" c4Name="Módulo 1 - Entrada" c4Type="Software System" c4Description="Recibe los archivos del oferente y del proceso y avisa cuando una entrega está completa. Otro equipo." label="&lt;font style=&quot;font-size: 16px&quot;&gt;&lt;b&gt;%c4Name%&lt;/b&gt;&lt;/font&gt;&lt;div&gt;[%c4Type%]&lt;/div&gt;&lt;br&gt;&lt;div&gt;&lt;font style=&quot;font-size: 11px&quot;&gt;&lt;font color=&quot;#E6E6E6&quot;&gt;%c4Description%&lt;/font&gt;&lt;/font&gt;&lt;/div&gt;" id="n1-modulo1">
+          <mxCell style="rounded=1;whiteSpace=wrap;html=1;labelBackgroundColor=none;fillColor=#8C8496;fontColor=#ffffff;align=center;arcSize=10;strokeColor=#736782;metaEdit=1;resizable=0;points=[[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0.25,0],[1,0.5,0],[1,0.75,0],[0.75,1,0],[0.5,1,0],[0.25,1,0],[0,0.75,0],[0,0.5,0],[0,0.25,0]];verticalAlign=middle;fontFamily=Helvetica;fontSize=12;fontStyle=1" vertex="1" parent="1">
+            <mxGeometry x="0" y="560" width="240" height="120" as="geometry" />
+          </mxCell>
+        </object>
+        <object placeholders="1" c4Name="Operación" c4Type="Person" c4Description="Equipo técnico: vigila colas y errores, y reprocesa cuando hace falta." label="&lt;font style=&quot;font-size: 16px&quot;&gt;&lt;b&gt;%c4Name%&lt;/b&gt;&lt;/font&gt;&lt;div&gt;[%c4Type%]&lt;/div&gt;&lt;br&gt;&lt;div&gt;&lt;font style=&quot;font-size: 11px&quot;&gt;&lt;font color=&quot;#E6E6E6&quot;&gt;%c4Description%&lt;/font&gt;&lt;/font&gt;&lt;/div&gt;" id="n1-operacion">
+          <mxCell style="html=1;fontSize=11;dashed=0;whiteSpace=wrap;fillColor=#083F75;strokeColor=#06315C;fontColor=#ffffff;shape=mxgraph.c4.person2;align=center;metaEdit=1;points=[[0.5,0,0],[1,0.5,0],[1,0.75,0],[0.75,1,0],[0.5,1,0],[0.25,1,0],[0,0.75,0],[0,0.5,0]];resizable=0;fontStyle=1" vertex="1" parent="1">
+            <mxGeometry x="620" y="0" width="200" height="180" as="geometry" />
+          </mxCell>
+        </object>
+        <object placeholders="1" c4Name="Flujo documental de evaluación" c4Type="Software System" c4Description="Normaliza, lee, clasifica, extrae y evalúa los documentos de cada oferta, y crea las tareas de revisión y el informe." label="&lt;font style=&quot;font-size: 16px&quot;&gt;&lt;b&gt;%c4Name%&lt;/b&gt;&lt;/font&gt;&lt;div&gt;[%c4Type%]&lt;/div&gt;&lt;br&gt;&lt;div&gt;&lt;font style=&quot;font-size: 11px&quot;&gt;&lt;font color=&quot;#E6E6E6&quot;&gt;%c4Description%&lt;/font&gt;&lt;/font&gt;&lt;/div&gt;" id="n1-sistema">
+          <mxCell style="rounded=1;whiteSpace=wrap;html=1;labelBackgroundColor=none;fillColor=#1061B0;fontColor=#ffffff;align=center;arcSize=10;strokeColor=#0D5091;metaEdit=1;resizable=0;points=[[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0.25,0],[1,0.5,0],[1,0.75,0],[0.75,1,0],[0.5,1,0],[0.25,1,0],[0,0.75,0],[0,0.5,0],[0,0.25,0]];fontStyle=1" vertex="1" parent="1">
+            <mxGeometry x="600" y="560" width="240" height="120" as="geometry" />
+          </mxCell>
+        </object>
+        <object placeholders="1" c4Name="Clasificador" c4Type="Software System" c4Description="Identifica el tipo documental de cada archivo y lo segmenta. Usa LLM. Otro equipo." label="&lt;font style=&quot;font-size: 16px&quot;&gt;&lt;b&gt;%c4Name%&lt;/b&gt;&lt;/font&gt;&lt;div&gt;[%c4Type%]&lt;/div&gt;&lt;br&gt;&lt;div&gt;&lt;font style=&quot;font-size: 11px&quot;&gt;&lt;font color=&quot;#E6E6E6&quot;&gt;%c4Description%&lt;/font&gt;&lt;/font&gt;&lt;/div&gt;" id="n1-clasificador">
+          <mxCell style="rounded=1;whiteSpace=wrap;html=1;labelBackgroundColor=none;fillColor=#8C8496;fontColor=#ffffff;align=center;arcSize=10;strokeColor=#736782;metaEdit=1;resizable=0;points=[[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0.25,0],[1,0.5,0],[1,0.75,0],[0.75,1,0],[0.5,1,0],[0.25,1,0],[0,0.75,0],[0,0.5,0],[0,0.25,0]];verticalAlign=middle;fontFamily=Helvetica;fontSize=12;fontStyle=1" vertex="1" parent="1">
+            <mxGeometry x="300" y="860" width="240" height="120" as="geometry" />
+          </mxCell>
+        </object>
+        <object placeholders="1" c4Name="Azure AI Foundry" c4Type="Software System" c4Description="Modelo gpt-5.4 que interpreta los documentos." label="&lt;font style=&quot;font-size: 16px&quot;&gt;&lt;b&gt;%c4Name%&lt;/b&gt;&lt;/font&gt;&lt;div&gt;[%c4Type%]&lt;/div&gt;&lt;br&gt;&lt;div&gt;&lt;font style=&quot;font-size: 11px&quot;&gt;&lt;font color=&quot;#E6E6E6&quot;&gt;%c4Description%&lt;/font&gt;&lt;/font&gt;&lt;/div&gt;" id="n1-foundry">
+          <mxCell style="rounded=1;whiteSpace=wrap;html=1;labelBackgroundColor=none;fillColor=#8C8496;fontColor=#ffffff;align=center;arcSize=10;strokeColor=#736782;metaEdit=1;resizable=0;points=[[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0.25,0],[1,0.5,0],[1,0.75,0],[0.75,1,0],[0.5,1,0],[0.25,1,0],[0,0.75,0],[0,0.5,0],[0,0.25,0]];verticalAlign=middle;fontFamily=Helvetica;fontSize=12;fontStyle=1" vertex="1" parent="1">
+            <mxGeometry x="900" y="860" width="240" height="120" as="geometry" />
+          </mxCell>
+        </object>
+        <object placeholders="1" c4Name="Power App de revisión" c4Type="Software System" c4Description="Muestra las tareas de revisión y recoge las correcciones (Dataverse). Otro equipo." label="&lt;font style=&quot;font-size: 16px&quot;&gt;&lt;b&gt;%c4Name%&lt;/b&gt;&lt;/font&gt;&lt;div&gt;[%c4Type%]&lt;/div&gt;&lt;br&gt;&lt;div&gt;&lt;font style=&quot;font-size: 11px&quot;&gt;&lt;font color=&quot;#E6E6E6&quot;&gt;%c4Description%&lt;/font&gt;&lt;/font&gt;&lt;/div&gt;" id="n1-powerapp">
+          <mxCell style="rounded=1;whiteSpace=wrap;html=1;labelBackgroundColor=none;fillColor=#8C8496;fontColor=#ffffff;align=center;arcSize=10;strokeColor=#736782;metaEdit=1;resizable=0;points=[[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0.25,0],[1,0.5,0],[1,0.75,0],[0.75,1,0],[0.5,1,0],[0.25,1,0],[0,0.75,0],[0,0.5,0],[0,0.25,0]];verticalAlign=middle;fontFamily=Helvetica;fontSize=12;fontStyle=1" vertex="1" parent="1">
+            <mxGeometry x="1200" y="560" width="240" height="120" as="geometry" />
+          </mxCell>
+        </object>
+        <object placeholders="1" c4Name="Evaluador" c4Type="Person" c4Description="Revisa por área: confirma o corrige datos y veredictos." label="&lt;font style=&quot;font-size: 16px&quot;&gt;&lt;b&gt;%c4Name%&lt;/b&gt;&lt;/font&gt;&lt;div&gt;[%c4Type%]&lt;/div&gt;&lt;br&gt;&lt;div&gt;&lt;font style=&quot;font-size: 11px&quot;&gt;&lt;font color=&quot;#E6E6E6&quot;&gt;%c4Description%&lt;/font&gt;&lt;/font&gt;&lt;/div&gt;" id="n1-evaluador">
+          <mxCell style="html=1;fontSize=11;dashed=0;whiteSpace=wrap;fillColor=#083F75;strokeColor=#06315C;fontColor=#ffffff;shape=mxgraph.c4.person2;align=center;metaEdit=1;points=[[0.5,0,0],[1,0.5,0],[1,0.75,0],[0.75,1,0],[0.5,1,0],[0.25,1,0],[0,0.75,0],[0,0.5,0]];resizable=0;fontStyle=1" vertex="1" parent="1">
+            <mxGeometry x="1100" y="0" width="200" height="180" as="geometry" />
+          </mxCell>
+        </object>
+        <object placeholders="1" c4Name="Coordinador" c4Type="Person" c4Description="Confirma la ficha del proceso y firma el informe." label="&lt;font style=&quot;font-size: 16px&quot;&gt;&lt;b&gt;%c4Name%&lt;/b&gt;&lt;/font&gt;&lt;div&gt;[%c4Type%]&lt;/div&gt;&lt;br&gt;&lt;div&gt;&lt;font style=&quot;font-size: 11px&quot;&gt;&lt;font color=&quot;#E6E6E6&quot;&gt;%c4Description%&lt;/font&gt;&lt;/font&gt;&lt;/div&gt;" id="n1-coordinador">
+          <mxCell style="html=1;fontSize=11;dashed=0;whiteSpace=wrap;fillColor=#083F75;strokeColor=#06315C;fontColor=#ffffff;shape=mxgraph.c4.person2;align=center;metaEdit=1;points=[[0.5,0,0],[1,0.5,0],[1,0.75,0],[0.75,1,0],[0.5,1,0],[0.25,1,0],[0,0.75,0],[0,0.5,0]];resizable=0;fontStyle=1" vertex="1" parent="1">
+            <mxGeometry x="1400" y="0" width="200" height="180" as="geometry" />
+          </mxCell>
+        </object>
+        <mxCell id="n1-11" value="Entrega ofertas" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=classic;endFill=1;startArrow=none;startFill=0;strokeColor=#000000;align=center;verticalAlign=middle;arcSize=10;fontFamily=Helvetica;fontSize=12;fontColor=#000000;labelBackgroundColor=default;dashed=1;dashPattern=8 8;fontStyle=0;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="n1-ariba" target="n1-modulo1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="n1-12" value="Entrega archivos&lt;br&gt;y avisa" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=classic;endFill=1;startArrow=none;startFill=0;strokeColor=#000000;align=center;verticalAlign=middle;arcSize=10;fontFamily=Helvetica;fontSize=12;fontColor=#000000;labelBackgroundColor=default;dashed=1;dashPattern=8 8;fontStyle=0;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="n1-modulo1" target="n1-sistema">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="n1-13" value="Vigila y reprocesa" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=classic;endFill=1;startArrow=none;startFill=0;strokeColor=#000000;align=center;verticalAlign=middle;arcSize=10;fontFamily=Helvetica;fontSize=12;fontColor=#000000;labelBackgroundColor=default;dashed=1;dashPattern=8 8;fontStyle=0;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="n1-operacion" target="n1-sistema">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="n1-14" value="Pide clasificar" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=classic;endFill=1;startArrow=none;startFill=0;strokeColor=#000000;align=center;verticalAlign=middle;arcSize=10;fontFamily=Helvetica;fontSize=12;fontColor=#000000;labelBackgroundColor=default;dashed=1;dashPattern=8 8;fontStyle=0;exitX=0.25;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="n1-sistema" target="n1-clasificador">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="n1-15" value="Extrae datos" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=classic;endFill=1;startArrow=none;startFill=0;strokeColor=#000000;align=center;verticalAlign=middle;arcSize=10;fontFamily=Helvetica;fontSize=12;fontColor=#000000;labelBackgroundColor=default;dashed=1;dashPattern=8 8;fontStyle=0;exitX=0.75;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="n1-sistema" target="n1-foundry">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="n1-16" value="Crea tareas&lt;br&gt;e informe" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=classic;endFill=1;startArrow=none;startFill=0;strokeColor=#000000;align=center;verticalAlign=middle;arcSize=10;fontFamily=Helvetica;fontSize=12;fontColor=#000000;labelBackgroundColor=default;dashed=1;dashPattern=8 8;fontStyle=0;exitX=1;exitY=0.3;exitDx=0;exitDy=0;entryX=0;entryY=0.3;entryDx=0;entryDy=0;" edge="1" parent="1" source="n1-sistema" target="n1-powerapp">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="n1-17" value="Devuelve&lt;br&gt;correcciones" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=classic;endFill=1;startArrow=none;startFill=0;strokeColor=#000000;align=center;verticalAlign=middle;arcSize=10;fontFamily=Helvetica;fontSize=12;fontColor=#000000;labelBackgroundColor=default;dashed=1;dashPattern=8 8;fontStyle=0;exitX=0;exitY=0.75;exitDx=0;exitDy=0;entryX=1;entryY=0.75;entryDx=0;entryDy=0;" edge="1" parent="1" source="n1-powerapp" target="n1-sistema">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="n1-18" value="Revisa y corrige" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=classic;endFill=1;startArrow=none;startFill=0;strokeColor=#000000;align=center;verticalAlign=middle;arcSize=10;fontFamily=Helvetica;fontSize=12;fontColor=#000000;labelBackgroundColor=default;dashed=1;dashPattern=8 8;fontStyle=0;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.3;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="n1-evaluador" target="n1-powerapp">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="n1-19" value="Confirma ficha,&lt;br&gt;firma informe" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=classic;endFill=1;startArrow=none;startFill=0;strokeColor=#000000;align=center;verticalAlign=middle;arcSize=10;fontFamily=Helvetica;fontSize=12;fontColor=#000000;labelBackgroundColor=default;dashed=1;dashPattern=8 8;fontStyle=0;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.8;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="n1-coordinador" target="n1-powerapp">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram name="Nivel 2 - Container (Objetivo)" id="n2">
+    <mxGraphModel dx="1400" dy="900" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="n2-1" value="Flujo documental de evaluación de ofertas · Nivel 2 · Contenedores" style="text;html=1;align=left;verticalAlign=middle;fontSize=20;fontStyle=1;fontColor=#333333;" vertex="1" parent="1">
+          <mxGeometry x="0" y="-80" width="1200" height="40" as="geometry" />
+        </mxCell>
+        <object placeholders="1" c4Name="Operación" c4Type="Person" c4Description="Equipo técnico: vigila colas y errores, y reprocesa cuando hace falta." label="&lt;font style=&quot;font-size: 16px&quot;&gt;&lt;b&gt;%c4Name%&lt;/b&gt;&lt;/font&gt;&lt;div&gt;[%c4Type%]&lt;/div&gt;&lt;br&gt;&lt;div&gt;&lt;font style=&quot;font-size: 11px&quot;&gt;&lt;font color=&quot;#E6E6E6&quot;&gt;%c4Description%&lt;/font&gt;&lt;/font&gt;&lt;/div&gt;" id="n2-operacion">
+          <mxCell style="html=1;fontSize=11;dashed=0;whiteSpace=wrap;fillColor=#083F75;strokeColor=#06315C;fontColor=#ffffff;shape=mxgraph.c4.person2;align=center;metaEdit=1;points=[[0.5,0,0],[1,0.5,0],[1,0.75,0],[0.75,1,0],[0.5,1,0],[0.25,1,0],[0,0.75,0],[0,0.5,0]];resizable=0;fontStyle=1" vertex="1" parent="1">
+            <mxGeometry x="1520" y="0" width="200" height="180" as="geometry" />
+          </mxCell>
+        </object>
+        <object placeholders="1" c4Name="Evaluador" c4Type="Person" c4Description="Revisa por área (jurídica, financiera, técnica, económica): confirma o corrige datos y veredictos." label="&lt;font style=&quot;font-size: 16px&quot;&gt;&lt;b&gt;%c4Name%&lt;/b&gt;&lt;/font&gt;&lt;div&gt;[%c4Type%]&lt;/div&gt;&lt;br&gt;&lt;div&gt;&lt;font style=&quot;font-size: 11px&quot;&gt;&lt;font color=&quot;#E6E6E6&quot;&gt;%c4Description%&lt;/font&gt;&lt;/font&gt;&lt;/div&gt;" id="n2-evaluador">
+          <mxCell style="html=1;fontSize=11;dashed=0;whiteSpace=wrap;fillColor=#083F75;strokeColor=#06315C;fontColor=#ffffff;shape=mxgraph.c4.person2;align=center;metaEdit=1;points=[[0.5,0,0],[1,0.5,0],[1,0.75,0],[0.75,1,0],[0.5,1,0],[0.25,1,0],[0,0.75,0],[0,0.5,0]];resizable=0;fontStyle=1" vertex="1" parent="1">
+            <mxGeometry x="2010" y="0" width="200" height="180" as="geometry" />
+          </mxCell>
+        </object>
+        <object placeholders="1" c4Name="Coordinador" c4Type="Person" c4Description="Confirma la ficha del proceso y firma el informe de evaluación." label="&lt;font style=&quot;font-size: 16px&quot;&gt;&lt;b&gt;%c4Name%&lt;/b&gt;&lt;/font&gt;&lt;div&gt;[%c4Type%]&lt;/div&gt;&lt;br&gt;&lt;div&gt;&lt;font style=&quot;font-size: 11px&quot;&gt;&lt;font color=&quot;#E6E6E6&quot;&gt;%c4Description%&lt;/font&gt;&lt;/font&gt;&lt;/div&gt;" id="n2-coordinador">
+          <mxCell style="html=1;fontSize=11;dashed=0;whiteSpace=wrap;fillColor=#083F75;strokeColor=#06315C;fontColor=#ffffff;shape=mxgraph.c4.person2;align=center;metaEdit=1;points=[[0.5,0,0],[1,0.5,0],[1,0.75,0],[0.75,1,0],[0.5,1,0],[0.25,1,0],[0,0.75,0],[0,0.5,0]];resizable=0;fontStyle=1" vertex="1" parent="1">
+            <mxGeometry x="2290" y="0" width="200" height="180" as="geometry" />
+          </mxCell>
+        </object>
+        <object placeholders="1" c4Name="SAP Ariba" c4Type="Software System" c4Description="Plataforma donde los oferentes presentan sus ofertas." label="&lt;font style=&quot;font-size: 16px&quot;&gt;&lt;b&gt;%c4Name%&lt;/b&gt;&lt;/font&gt;&lt;div&gt;[%c4Type%]&lt;/div&gt;&lt;br&gt;&lt;div&gt;&lt;font style=&quot;font-size: 11px&quot;&gt;&lt;font color=&quot;#E6E6E6&quot;&gt;%c4Description%&lt;/font&gt;&lt;/font&gt;&lt;/div&gt;" id="n2-ariba">
+          <mxCell style="rounded=1;whiteSpace=wrap;html=1;labelBackgroundColor=none;fillColor=#8C8496;fontColor=#ffffff;align=center;arcSize=10;strokeColor=#736782;metaEdit=1;resizable=0;points=[[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0.25,0],[1,0.5,0],[1,0.75,0],[0.75,1,0],[0.5,1,0],[0.25,1,0],[0,0.75,0],[0,0.5,0],[0,0.25,0]];verticalAlign=middle;fontFamily=Helvetica;fontSize=12;fontStyle=1" vertex="1" parent="1">
+            <mxGeometry x="-40" y="30" width="240" height="120" as="geometry" />
+          </mxCell>
+        </object>
+        <object placeholders="1" c4Name="Módulo 1 - Entrada" c4Type="Software System" c4Description="Recibe los archivos del oferente y del proceso y avisa cuando una entrega está completa. Otro equipo." label="&lt;font style=&quot;font-size: 16px&quot;&gt;&lt;b&gt;%c4Name%&lt;/b&gt;&lt;/font&gt;&lt;div&gt;[%c4Type%]&lt;/div&gt;&lt;br&gt;&lt;div&gt;&lt;font style=&quot;font-size: 11px&quot;&gt;&lt;font color=&quot;#E6E6E6&quot;&gt;%c4Description%&lt;/font&gt;&lt;/font&gt;&lt;/div&gt;" id="n2-modulo1">
+          <mxCell style="rounded=1;whiteSpace=wrap;html=1;labelBackgroundColor=none;fillColor=#8C8496;fontColor=#ffffff;align=center;arcSize=10;strokeColor=#736782;metaEdit=1;resizable=0;points=[[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0.25,0],[1,0.5,0],[1,0.75,0],[0.75,1,0],[0.5,1,0],[0.25,1,0],[0,0.75,0],[0,0.5,0],[0,0.25,0]];verticalAlign=middle;fontFamily=Helvetica;fontSize=12;fontStyle=1" vertex="1" parent="1">
+            <mxGeometry x="-40" y="300" width="240" height="120" as="geometry" />
+          </mxCell>
+        </object>
+        <object placeholders="1" c4Name="Clasificador" c4Type="Software System" c4Description="Identifica el tipo documental de cada archivo y lo segmenta, con su confianza. Usa LLM. Otro equipo." label="&lt;font style=&quot;font-size: 16px&quot;&gt;&lt;b&gt;%c4Name%&lt;/b&gt;&lt;/font&gt;&lt;div&gt;[%c4Type%]&lt;/div&gt;&lt;br&gt;&lt;div&gt;&lt;font style=&quot;font-size: 11px&quot;&gt;&lt;font color=&quot;#E6E6E6&quot;&gt;%c4Description%&lt;/font&gt;&lt;/font&gt;&lt;/div&gt;" id="n2-clasificador">
+          <mxCell style="rounded=1;whiteSpace=wrap;html=1;labelBackgroundColor=none;fillColor=#8C8496;fontColor=#ffffff;align=center;arcSize=10;strokeColor=#736782;metaEdit=1;resizable=0;points=[[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0.25,0],[1,0.5,0],[1,0.75,0],[0.75,1,0],[0.5,1,0],[0.25,1,0],[0,0.75,0],[0,0.5,0],[0,0.25,0]];verticalAlign=middle;fontFamily=Helvetica;fontSize=12;fontStyle=1" vertex="1" parent="1">
+            <mxGeometry x="1180" y="40" width="240" height="120" as="geometry" />
+          </mxCell>
+        </object>
+        <object placeholders="1" c4Name="Power App de revisión" c4Type="Software System" c4Description="Muestra las tareas de revisión y recoge las correcciones (Dataverse). Otro equipo." label="&lt;font style=&quot;font-size: 16px&quot;&gt;&lt;b&gt;%c4Name%&lt;/b&gt;&lt;/font&gt;&lt;div&gt;[%c4Type%]&lt;/div&gt;&lt;br&gt;&lt;div&gt;&lt;font style=&quot;font-size: 11px&quot;&gt;&lt;font color=&quot;#E6E6E6&quot;&gt;%c4Description%&lt;/font&gt;&lt;/font&gt;&lt;/div&gt;" id="n2-powerapp">
+          <mxCell style="rounded=1;whiteSpace=wrap;html=1;labelBackgroundColor=none;fillColor=#8C8496;fontColor=#ffffff;align=center;arcSize=10;strokeColor=#736782;metaEdit=1;resizable=0;points=[[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0.25,0],[1,0.5,0],[1,0.75,0],[0.75,1,0],[0.5,1,0],[0.25,1,0],[0,0.75,0],[0,0.5,0],[0,0.25,0]];verticalAlign=middle;fontFamily=Helvetica;fontSize=12;fontStyle=1" vertex="1" parent="1">
+            <mxGeometry x="2100" y="560" width="240" height="120" as="geometry" />
+          </mxCell>
+        </object>
+        <object placeholders="1" c4Name="Azure AI Foundry" c4Type="Software System" c4Description="Modelo gpt-5.4 que interpreta los documentos." label="&lt;font style=&quot;font-size: 16px&quot;&gt;&lt;b&gt;%c4Name%&lt;/b&gt;&lt;/font&gt;&lt;div&gt;[%c4Type%]&lt;/div&gt;&lt;br&gt;&lt;div&gt;&lt;font style=&quot;font-size: 11px&quot;&gt;&lt;font color=&quot;#E6E6E6&quot;&gt;%c4Description%&lt;/font&gt;&lt;/font&gt;&lt;/div&gt;" id="n2-foundry">
+          <mxCell style="rounded=1;whiteSpace=wrap;html=1;labelBackgroundColor=none;fillColor=#8C8496;fontColor=#ffffff;align=center;arcSize=10;strokeColor=#736782;metaEdit=1;resizable=0;points=[[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0.25,0],[1,0.5,0],[1,0.75,0],[0.75,1,0],[0.5,1,0],[0.25,1,0],[0,0.75,0],[0,0.5,0],[0,0.25,0]];verticalAlign=middle;fontFamily=Helvetica;fontSize=12;fontStyle=1" vertex="1" parent="1">
+            <mxGeometry x="900" y="1400" width="240" height="120" as="geometry" />
+          </mxCell>
+        </object>
+        <object placeholders="1" c4Name="Blob Storage" c4Type="Container" c4Technology="Azure Blob Storage" c4Description="Originales, PDF normalizados, lectura por página e informes." label="&lt;font style=&quot;font-size: 16px&quot;&gt;&lt;b&gt;%c4Name%&lt;/b&gt;&lt;/font&gt;&lt;div&gt;[%c4Type%:&amp;nbsp;%c4Technology%]&lt;/div&gt;&lt;br&gt;&lt;div&gt;&lt;font style=&quot;font-size: 11px&quot;&gt;&lt;font color=&quot;#E6E6E6&quot;&gt;%c4Description%&lt;/font&gt;&lt;/font&gt;&lt;/div&gt;" id="n2-blob">
+          <mxCell style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;labelBackgroundColor=none;fillColor=#23A2D9;fontColor=#ffffff;align=center;arcSize=10;strokeColor=#0E7DAD;metaEdit=1;resizable=0;points=[[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0.25,0],[1,0.5,0],[1,0.75,0],[0.75,1,0],[0.5,1,0],[0.25,1,0],[0,0.75,0],[0,0.5,0],[0,0.25,0]];" vertex="1" parent="1">
+            <mxGeometry x="300" y="860" width="240" height="120" as="geometry" />
+          </mxCell>
+        </object>
+        <object placeholders="1" c4Name="Base de estado y modelo" c4Type="Container" c4Technology="Cosmos DB" c4Description="Estado de procesos, oferentes, documentos y tareas; versiones fijadas; fichas de los tipos documentales; reglas." label="&lt;font style=&quot;font-size: 16px&quot;&gt;&lt;b&gt;%c4Name%&lt;/b&gt;&lt;/font&gt;&lt;div&gt;[%c4Type%:&amp;nbsp;%c4Technology%]&lt;/div&gt;&lt;br&gt;&lt;div&gt;&lt;font style=&quot;font-size: 11px&quot;&gt;&lt;font color=&quot;#E6E6E6&quot;&gt;%c4Description%&lt;/font&gt;&lt;/font&gt;&lt;/div&gt;" id="n2-cosmos">
+          <mxCell style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;labelBackgroundColor=none;fillColor=#23A2D9;fontColor=#ffffff;align=center;arcSize=10;strokeColor=#0E7DAD;metaEdit=1;resizable=0;points=[[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0.25,0],[1,0.5,0],[1,0.75,0],[0.75,1,0],[0.5,1,0],[0.25,1,0],[0,0.75,0],[0,0.5,0],[0,0.25,0]];" vertex="1" parent="1">
+            <mxGeometry x="1800" y="860" width="240" height="120" as="geometry" />
+          </mxCell>
+        </object>
+        <object placeholders="1" c4Name="Colas de mensajes" c4Type="Container" c4Technology="Azure Service Bus" c4Description="Una cola por paso (normalizar, clasificar, extraer, resultados, reglas), con cola de errores." label="&lt;font style=&quot;font-size: 16px&quot;&gt;&lt;b&gt;%c4Name%&lt;/b&gt;&lt;/font&gt;&lt;div&gt;[%c4Type%:&amp;nbsp;%c4Technology%]&lt;/div&gt;&lt;br&gt;&lt;div&gt;&lt;font style=&quot;font-size: 11px&quot;&gt;&lt;font color=&quot;#E6E6E6&quot;&gt;%c4Description%&lt;/font&gt;&lt;/font&gt;&lt;/div&gt;" id="n2-sb">
+          <mxCell style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;labelBackgroundColor=none;fillColor=#23A2D9;fontColor=#ffffff;align=center;arcSize=10;strokeColor=#0E7DAD;metaEdit=1;resizable=0;points=[[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0.25,0],[1,0.5,0],[1,0.75,0],[0.75,1,0],[0.5,1,0],[0.25,1,0],[0,0.75,0],[0,0.5,0],[0,0.25,0]];" vertex="1" parent="1">
+            <mxGeometry x="600" y="300" width="240" height="120" as="geometry" />
+          </mxCell>
+        </object>
+        <object placeholders="1" c4Name="Servidor MCP del modelo" c4Type="Container" c4Technology="Python, Container Apps" c4Description="Sirve las fichas de cada tipo documental desde el modelo semántico." label="&lt;font style=&quot;font-size: 16px&quot;&gt;&lt;b&gt;%c4Name%&lt;/b&gt;&lt;/font&gt;&lt;div&gt;[%c4Type%:&amp;nbsp;%c4Technology%]&lt;/div&gt;&lt;br&gt;&lt;div&gt;&lt;font style=&quot;font-size: 11px&quot;&gt;&lt;font color=&quot;#E6E6E6&quot;&gt;%c4Description%&lt;/font&gt;&lt;/font&gt;&lt;/div&gt;" id="n2-mcp">
+          <mxCell style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;labelBackgroundColor=none;fillColor=#23A2D9;fontColor=#ffffff;align=center;arcSize=10;strokeColor=#0E7DAD;metaEdit=1;resizable=0;points=[[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0.25,0],[1,0.5,0],[1,0.75,0],[0.75,1,0],[0.5,1,0],[0.25,1,0],[0,0.75,0],[0,0.5,0],[0,0.25,0]];" vertex="1" parent="1">
+            <mxGeometry x="1200" y="1140" width="240" height="120" as="geometry" />
+          </mxCell>
+        </object>
+        <object placeholders="1" c4Name="Flujo documental de evaluación" c4Type="ContainerScopeBoundary" c4Application="Software System" label="&lt;font style=&quot;font-size: 16px&quot;&gt;&lt;b&gt;&lt;div style=&quot;text-align: left&quot;&gt;%c4Name%&lt;/div&gt;&lt;/b&gt;&lt;/font&gt;&lt;div style=&quot;text-align: left&quot;&gt;[%c4Application%]&lt;/div&gt;" id="n2-14">
+          <mxCell style="rounded=1;fontSize=11;whiteSpace=wrap;html=1;dashed=1;arcSize=20;fillColor=none;strokeColor=#666666;fontColor=#333333;labelBackgroundColor=none;align=left;verticalAlign=bottom;labelBorderColor=none;spacingTop=0;spacing=10;dashPattern=8 4;metaEdit=1;rotatable=0;perimeter=rectanglePerimeter;noLabel=0;labelPadding=0;allowArrows=0;connectable=0;expand=0;recursiveResize=0;editable=1;pointerEvents=0;absoluteArcSize=1;points=[[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0.25,0],[1,0.5,0],[1,0.75,0],[0.75,1,0],[0.5,1,0],[0.25,1,0],[0,0.75,0],[0,0.5,0],[0,0.25,0]];" vertex="1" parent="1">
+            <mxGeometry x="260" y="250" width="1820" height="1070" as="geometry" />
+          </mxCell>
+        </object>
+        <object placeholders="1" c4Name="Normalización y lectura" c4Type="Container" c4Technology="Container Apps Job, Python" c4Description="Convierte a PDF, quita duplicados, detecta firma digital y lee el texto y el tipo de cada página. Sin LLM." label="&lt;font style=&quot;font-size: 16px&quot;&gt;&lt;b&gt;%c4Name%&lt;/b&gt;&lt;/font&gt;&lt;div&gt;[%c4Type%:&amp;nbsp;%c4Technology%]&lt;/div&gt;&lt;br&gt;&lt;div&gt;&lt;font style=&quot;font-size: 11px&quot;&gt;&lt;font color=&quot;#E6E6E6&quot;&gt;%c4Description%&lt;/font&gt;&lt;/font&gt;&lt;/div&gt;" id="n2-job">
+          <mxCell style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;labelBackgroundColor=none;fillColor=#23A2D9;fontColor=#ffffff;align=center;arcSize=10;strokeColor=#0E7DAD;metaEdit=1;resizable=0;points=[[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0.25,0],[1,0.5,0],[1,0.75,0],[0.75,1,0],[0.5,1,0],[0.25,1,0],[0,0.75,0],[0,0.5,0],[0,0.25,0]];" vertex="1" parent="1">
+            <mxGeometry x="300" y="300" width="240" height="120" as="geometry" />
+          </mxCell>
+        </object>
+        <object placeholders="1" c4Name="Workers de orquestación" c4Type="Container" c4Technology="Container Apps, Python" c4Description="Llevan cada documento al paso siguiente, guardan el estado, aplican las reglas y crean tareas e informe. Sin LLM." label="&lt;font style=&quot;font-size: 16px&quot;&gt;&lt;b&gt;%c4Name%&lt;/b&gt;&lt;/font&gt;&lt;div&gt;[%c4Type%:&amp;nbsp;%c4Technology%]&lt;/div&gt;&lt;br&gt;&lt;div&gt;&lt;font style=&quot;font-size: 11px&quot;&gt;&lt;font color=&quot;#E6E6E6&quot;&gt;%c4Description%&lt;/font&gt;&lt;/font&gt;&lt;/div&gt;" id="n2-orq">
+          <mxCell style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;labelBackgroundColor=none;fillColor=#23A2D9;fontColor=#ffffff;align=center;arcSize=10;strokeColor=#0E7DAD;metaEdit=1;resizable=0;points=[[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0.25,0],[1,0.5,0],[1,0.75,0],[0.75,1,0],[0.5,1,0],[0.25,1,0],[0,0.75,0],[0,0.5,0],[0,0.25,0]];" vertex="1" parent="1">
+            <mxGeometry x="1200" y="300" width="240" height="120" as="geometry" />
+          </mxCell>
+        </object>
+        <object placeholders="1" c4Name="Unidad de extracción" c4Type="Container" c4Technology="Container Apps, agente LLM" c4Description="Extrae los campos de cada documento con su evidencia y los valida con código." label="&lt;font style=&quot;font-size: 16px&quot;&gt;&lt;b&gt;%c4Name%&lt;/b&gt;&lt;/font&gt;&lt;div&gt;[%c4Type%:&amp;nbsp;%c4Technology%]&lt;/div&gt;&lt;br&gt;&lt;div&gt;&lt;font style=&quot;font-size: 11px&quot;&gt;&lt;font color=&quot;#E6E6E6&quot;&gt;%c4Description%&lt;/font&gt;&lt;/font&gt;&lt;/div&gt;" id="n2-ext">
+          <mxCell style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;labelBackgroundColor=none;fillColor=#23A2D9;fontColor=#ffffff;align=center;arcSize=10;strokeColor=#0E7DAD;metaEdit=1;resizable=0;points=[[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0.25,0],[1,0.5,0],[1,0.75,0],[0.75,1,0],[0.5,1,0],[0.25,1,0],[0,0.75,0],[0,0.5,0],[0,0.25,0]];" vertex="1" parent="1">
+            <mxGeometry x="900" y="860" width="240" height="120" as="geometry" />
+          </mxCell>
+        </object>
+        <mxCell id="n2-18" value="Entrega ofertas" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=classic;endFill=1;startArrow=none;startFill=0;strokeColor=#000000;align=center;verticalAlign=middle;arcSize=10;fontFamily=Helvetica;fontSize=12;fontColor=#000000;labelBackgroundColor=default;dashed=1;dashPattern=8 8;fontStyle=0;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="n2-ariba" target="n2-modulo1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="n2-19" value="Vigila y&lt;br&gt;reprocesa" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=classic;endFill=1;startArrow=none;startFill=0;strokeColor=#000000;align=center;verticalAlign=middle;arcSize=10;fontFamily=Helvetica;fontSize=12;fontColor=#000000;labelBackgroundColor=default;dashed=1;dashPattern=8 8;fontStyle=0;exitX=0.3;exitY=1;exitDx=0;exitDy=0;entryX=0.75;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="n2-operacion" target="n2-orq">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="n2-20" value="Revisa y corrige" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=classic;endFill=1;startArrow=none;startFill=0;strokeColor=#000000;align=center;verticalAlign=middle;arcSize=10;fontFamily=Helvetica;fontSize=12;fontColor=#000000;labelBackgroundColor=default;dashed=1;dashPattern=8 8;fontStyle=0;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.3;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="n2-evaluador" target="n2-powerapp">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="n2-21" value="Confirma ficha,&lt;br&gt;firma informe" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=classic;endFill=1;startArrow=none;startFill=0;strokeColor=#000000;align=center;verticalAlign=middle;arcSize=10;fontFamily=Helvetica;fontSize=12;fontColor=#000000;labelBackgroundColor=default;dashed=1;dashPattern=8 8;fontStyle=0;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.8;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="n2-coordinador" target="n2-powerapp">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="n2-22" value="Avisa entrega lista" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=classic;endFill=1;startArrow=none;startFill=0;strokeColor=#000000;align=center;verticalAlign=middle;arcSize=10;fontFamily=Helvetica;fontSize=12;fontColor=#000000;labelBackgroundColor=default;dashed=1;dashPattern=8 8;fontStyle=0;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="n2-modulo1" target="n2-job">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="n2-23" value="Guarda PDF&lt;br&gt;y lectura" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=classic;endFill=1;startArrow=none;startFill=0;strokeColor=#000000;align=center;verticalAlign=middle;arcSize=10;fontFamily=Helvetica;fontSize=12;fontColor=#000000;labelBackgroundColor=default;dashed=1;dashPattern=8 8;fontStyle=0;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="n2-job" target="n2-blob">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="n2-24" value="Archivo listo" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=classic;endFill=1;startArrow=none;startFill=0;strokeColor=#000000;align=center;verticalAlign=middle;arcSize=10;fontFamily=Helvetica;fontSize=12;fontColor=#000000;labelBackgroundColor=default;dashed=1;dashPattern=8 8;fontStyle=0;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="n2-job" target="n2-sb">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="n2-25" value="Entrega mensajes" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=classic;endFill=1;startArrow=none;startFill=0;strokeColor=#000000;align=center;verticalAlign=middle;arcSize=10;fontFamily=Helvetica;fontSize=12;fontColor=#000000;labelBackgroundColor=default;dashed=1;dashPattern=8 8;fontStyle=0;exitX=1;exitY=0.4;exitDx=0;exitDy=0;entryX=0;entryY=0.4;entryDx=0;entryDy=0;" edge="1" parent="1" source="n2-sb" target="n2-orq">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="n2-26" value="Publica el&lt;br&gt;siguiente paso" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=classic;endFill=1;startArrow=none;startFill=0;strokeColor=#000000;align=center;verticalAlign=middle;arcSize=10;fontFamily=Helvetica;fontSize=12;fontColor=#000000;labelBackgroundColor=default;dashed=1;dashPattern=8 8;fontStyle=0;exitX=0;exitY=0.8;exitDx=0;exitDy=0;entryX=1;entryY=0.8;entryDx=0;entryDy=0;" edge="1" parent="1" source="n2-orq" target="n2-sb">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="n2-27" value="Pide clasificar" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=classic;endFill=1;startArrow=none;startFill=0;strokeColor=#000000;align=center;verticalAlign=middle;arcSize=10;fontFamily=Helvetica;fontSize=12;fontColor=#000000;labelBackgroundColor=default;dashed=1;dashPattern=8 8;fontStyle=0;exitX=0.5;exitY=0;exitDx=0;exitDy=0;entryX=0.5;entryY=1;entryDx=0;entryDy=0;" edge="1" parent="1" source="n2-orq" target="n2-clasificador">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="n2-28" value="Segmento a extraer" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=classic;endFill=1;startArrow=none;startFill=0;strokeColor=#000000;align=center;verticalAlign=middle;arcSize=10;fontFamily=Helvetica;fontSize=12;fontColor=#000000;labelBackgroundColor=default;dashed=1;dashPattern=8 8;fontStyle=0;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="n2-sb" target="n2-ext">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="720" y="920" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="n2-29" value="Resultado" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=classic;endFill=1;startArrow=none;startFill=0;strokeColor=#000000;align=center;verticalAlign=middle;arcSize=10;fontFamily=Helvetica;fontSize=12;fontColor=#000000;labelBackgroundColor=default;dashed=1;dashPattern=8 8;fontStyle=0;exitX=0.5;exitY=0;exitDx=0;exitDy=0;entryX=0.83;entryY=1;entryDx=0;entryDy=0;" edge="1" parent="1" source="n2-ext" target="n2-sb">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1020" y="500" />
+              <mxPoint x="800" y="500" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="n2-30" value="Lee PDF&lt;br&gt;y lectura" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=classic;endFill=1;startArrow=none;startFill=0;strokeColor=#000000;align=center;verticalAlign=middle;arcSize=10;fontFamily=Helvetica;fontSize=12;fontColor=#000000;labelBackgroundColor=default;dashed=1;dashPattern=8 8;fontStyle=0;exitX=0;exitY=0.8;exitDx=0;exitDy=0;entryX=1;entryY=0.8;entryDx=0;entryDy=0;" edge="1" parent="1" source="n2-ext" target="n2-blob">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="n2-31" value="Interpreta con gpt-5.4" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=classic;endFill=1;startArrow=none;startFill=0;strokeColor=#000000;align=center;verticalAlign=middle;arcSize=10;fontFamily=Helvetica;fontSize=12;fontColor=#000000;labelBackgroundColor=default;dashed=1;dashPattern=8 8;fontStyle=0;exitX=0.3;exitY=1;exitDx=0;exitDy=0;entryX=0.3;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="n2-ext" target="n2-foundry">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="n2-32" value="Consulta la ficha" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=classic;endFill=1;startArrow=none;startFill=0;strokeColor=#000000;align=center;verticalAlign=middle;arcSize=10;fontFamily=Helvetica;fontSize=12;fontColor=#000000;labelBackgroundColor=default;dashed=1;dashPattern=8 8;fontStyle=0;exitX=0.75;exitY=1;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="n2-ext" target="n2-mcp">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1080" y="1200" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="n2-33" value="Lee y guarda&lt;br&gt;estado y reglas" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=classic;endFill=1;startArrow=none;startFill=0;strokeColor=#000000;align=center;verticalAlign=middle;arcSize=10;fontFamily=Helvetica;fontSize=12;fontColor=#000000;labelBackgroundColor=default;dashed=1;dashPattern=8 8;fontStyle=0;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="n2-orq" target="n2-cosmos">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1320" y="920" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="n2-34" value="Escribe tareas&lt;br&gt;e informe" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=classic;endFill=1;startArrow=none;startFill=0;strokeColor=#000000;align=center;verticalAlign=middle;arcSize=10;fontFamily=Helvetica;fontSize=12;fontColor=#000000;labelBackgroundColor=default;dashed=1;dashPattern=8 8;fontStyle=0;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.3;entryDx=0;entryDy=0;" edge="1" parent="1" source="n2-orq" target="n2-powerapp">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1980" y="360" />
+              <mxPoint x="1980" y="596" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="n2-35" value="Devuelve correcciones" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=classic;endFill=1;startArrow=none;startFill=0;strokeColor=#000000;align=center;verticalAlign=middle;arcSize=10;fontFamily=Helvetica;fontSize=12;fontColor=#000000;labelBackgroundColor=default;dashed=1;dashPattern=8 8;fontStyle=0;exitX=0;exitY=0.7;exitDx=0;exitDy=0;entryX=0.75;entryY=1;entryDx=0;entryDy=0;" edge="1" parent="1" source="n2-powerapp" target="n2-orq">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1380" y="644" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="n2-36" value="Lee el modelo" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=classic;endFill=1;startArrow=none;startFill=0;strokeColor=#000000;align=center;verticalAlign=middle;arcSize=10;fontFamily=Helvetica;fontSize=12;fontColor=#000000;labelBackgroundColor=default;dashed=1;dashPattern=8 8;fontStyle=0;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0.5;entryY=1;entryDx=0;entryDy=0;" edge="1" parent="1" source="n2-mcp" target="n2-cosmos">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram name="Nivel 3 - Component (Objetivo)" id="n3">
+    <mxGraphModel dx="1400" dy="900" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="n3-1" value="Flujo documental de evaluación de ofertas · Nivel 3 · Componentes" style="text;html=1;align=left;verticalAlign=middle;fontSize=20;fontStyle=1;fontColor=#333333;" vertex="1" parent="1">
+          <mxGeometry x="0" y="-80" width="1200" height="40" as="geometry" />
+        </mxCell>
+        <object placeholders="1" c4Name="Operación" c4Type="Person" c4Description="Equipo técnico: vigila colas y errores, y reprocesa cuando hace falta." label="&lt;font style=&quot;font-size: 16px&quot;&gt;&lt;b&gt;%c4Name%&lt;/b&gt;&lt;/font&gt;&lt;div&gt;[%c4Type%]&lt;/div&gt;&lt;br&gt;&lt;div&gt;&lt;font style=&quot;font-size: 11px&quot;&gt;&lt;font color=&quot;#E6E6E6&quot;&gt;%c4Description%&lt;/font&gt;&lt;/font&gt;&lt;/div&gt;" id="n3-operacion">
+          <mxCell style="html=1;fontSize=11;dashed=0;whiteSpace=wrap;fillColor=#083F75;strokeColor=#06315C;fontColor=#ffffff;shape=mxgraph.c4.person2;align=center;metaEdit=1;points=[[0.5,0,0],[1,0.5,0],[1,0.75,0],[0.75,1,0],[0.5,1,0],[0.25,1,0],[0,0.75,0],[0,0.5,0]];resizable=0;fontStyle=1" vertex="1" parent="1">
+            <mxGeometry x="1520" y="0" width="200" height="180" as="geometry" />
+          </mxCell>
+        </object>
+        <object placeholders="1" c4Name="Evaluador" c4Type="Person" c4Description="Revisa por área (jurídica, financiera, técnica, económica): confirma o corrige datos y veredictos." label="&lt;font style=&quot;font-size: 16px&quot;&gt;&lt;b&gt;%c4Name%&lt;/b&gt;&lt;/font&gt;&lt;div&gt;[%c4Type%]&lt;/div&gt;&lt;br&gt;&lt;div&gt;&lt;font style=&quot;font-size: 11px&quot;&gt;&lt;font color=&quot;#E6E6E6&quot;&gt;%c4Description%&lt;/font&gt;&lt;/font&gt;&lt;/div&gt;" id="n3-evaluador">
+          <mxCell style="html=1;fontSize=11;dashed=0;whiteSpace=wrap;fillColor=#083F75;strokeColor=#06315C;fontColor=#ffffff;shape=mxgraph.c4.person2;align=center;metaEdit=1;points=[[0.5,0,0],[1,0.5,0],[1,0.75,0],[0.75,1,0],[0.5,1,0],[0.25,1,0],[0,0.75,0],[0,0.5,0]];resizable=0;fontStyle=1" vertex="1" parent="1">
+            <mxGeometry x="2010" y="0" width="200" height="180" as="geometry" />
+          </mxCell>
+        </object>
+        <object placeholders="1" c4Name="Coordinador" c4Type="Person" c4Description="Confirma la ficha del proceso y firma el informe de evaluación." label="&lt;font style=&quot;font-size: 16px&quot;&gt;&lt;b&gt;%c4Name%&lt;/b&gt;&lt;/font&gt;&lt;div&gt;[%c4Type%]&lt;/div&gt;&lt;br&gt;&lt;div&gt;&lt;font style=&quot;font-size: 11px&quot;&gt;&lt;font color=&quot;#E6E6E6&quot;&gt;%c4Description%&lt;/font&gt;&lt;/font&gt;&lt;/div&gt;" id="n3-coordinador">
+          <mxCell style="html=1;fontSize=11;dashed=0;whiteSpace=wrap;fillColor=#083F75;strokeColor=#06315C;fontColor=#ffffff;shape=mxgraph.c4.person2;align=center;metaEdit=1;points=[[0.5,0,0],[1,0.5,0],[1,0.75,0],[0.75,1,0],[0.5,1,0],[0.25,1,0],[0,0.75,0],[0,0.5,0]];resizable=0;fontStyle=1" vertex="1" parent="1">
+            <mxGeometry x="2290" y="0" width="200" height="180" as="geometry" />
+          </mxCell>
+        </object>
+        <object placeholders="1" c4Name="SAP Ariba" c4Type="Software System" c4Description="Plataforma donde los oferentes presentan sus ofertas." label="&lt;font style=&quot;font-size: 16px&quot;&gt;&lt;b&gt;%c4Name%&lt;/b&gt;&lt;/font&gt;&lt;div&gt;[%c4Type%]&lt;/div&gt;&lt;br&gt;&lt;div&gt;&lt;font style=&quot;font-size: 11px&quot;&gt;&lt;font color=&quot;#E6E6E6&quot;&gt;%c4Description%&lt;/font&gt;&lt;/font&gt;&lt;/div&gt;" id="n3-ariba">
+          <mxCell style="rounded=1;whiteSpace=wrap;html=1;labelBackgroundColor=none;fillColor=#8C8496;fontColor=#ffffff;align=center;arcSize=10;strokeColor=#736782;metaEdit=1;resizable=0;points=[[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0.25,0],[1,0.5,0],[1,0.75,0],[0.75,1,0],[0.5,1,0],[0.25,1,0],[0,0.75,0],[0,0.5,0],[0,0.25,0]];verticalAlign=middle;fontFamily=Helvetica;fontSize=12;fontStyle=1" vertex="1" parent="1">
+            <mxGeometry x="-40" y="30" width="240" height="120" as="geometry" />
+          </mxCell>
+        </object>
+        <object placeholders="1" c4Name="Módulo 1 - Entrada" c4Type="Software System" c4Description="Recibe los archivos del oferente y del proceso y avisa cuando una entrega está completa. Otro equipo." label="&lt;font style=&quot;font-size: 16px&quot;&gt;&lt;b&gt;%c4Name%&lt;/b&gt;&lt;/font&gt;&lt;div&gt;[%c4Type%]&lt;/div&gt;&lt;br&gt;&lt;div&gt;&lt;font style=&quot;font-size: 11px&quot;&gt;&lt;font color=&quot;#E6E6E6&quot;&gt;%c4Description%&lt;/font&gt;&lt;/font&gt;&lt;/div&gt;" id="n3-modulo1">
+          <mxCell style="rounded=1;whiteSpace=wrap;html=1;labelBackgroundColor=none;fillColor=#8C8496;fontColor=#ffffff;align=center;arcSize=10;strokeColor=#736782;metaEdit=1;resizable=0;points=[[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0.25,0],[1,0.5,0],[1,0.75,0],[0.75,1,0],[0.5,1,0],[0.25,1,0],[0,0.75,0],[0,0.5,0],[0,0.25,0]];verticalAlign=middle;fontFamily=Helvetica;fontSize=12;fontStyle=1" vertex="1" parent="1">
+            <mxGeometry x="-40" y="300" width="240" height="120" as="geometry" />
+          </mxCell>
+        </object>
+        <object placeholders="1" c4Name="Clasificador" c4Type="Software System" c4Description="Identifica el tipo documental de cada archivo y lo segmenta, con su confianza. Usa LLM. Otro equipo." label="&lt;font style=&quot;font-size: 16px&quot;&gt;&lt;b&gt;%c4Name%&lt;/b&gt;&lt;/font&gt;&lt;div&gt;[%c4Type%]&lt;/div&gt;&lt;br&gt;&lt;div&gt;&lt;font style=&quot;font-size: 11px&quot;&gt;&lt;font color=&quot;#E6E6E6&quot;&gt;%c4Description%&lt;/font&gt;&lt;/font&gt;&lt;/div&gt;" id="n3-clasificador">
+          <mxCell style="rounded=1;whiteSpace=wrap;html=1;labelBackgroundColor=none;fillColor=#8C8496;fontColor=#ffffff;align=center;arcSize=10;strokeColor=#736782;metaEdit=1;resizable=0;points=[[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0.25,0],[1,0.5,0],[1,0.75,0],[0.75,1,0],[0.5,1,0],[0.25,1,0],[0,0.75,0],[0,0.5,0],[0,0.25,0]];verticalAlign=middle;fontFamily=Helvetica;fontSize=12;fontStyle=1" vertex="1" parent="1">
+            <mxGeometry x="1180" y="40" width="240" height="120" as="geometry" />
+          </mxCell>
+        </object>
+        <object placeholders="1" c4Name="Power App de revisión" c4Type="Software System" c4Description="Muestra las tareas de revisión y recoge las correcciones (Dataverse). Otro equipo." label="&lt;font style=&quot;font-size: 16px&quot;&gt;&lt;b&gt;%c4Name%&lt;/b&gt;&lt;/font&gt;&lt;div&gt;[%c4Type%]&lt;/div&gt;&lt;br&gt;&lt;div&gt;&lt;font style=&quot;font-size: 11px&quot;&gt;&lt;font color=&quot;#E6E6E6&quot;&gt;%c4Description%&lt;/font&gt;&lt;/font&gt;&lt;/div&gt;" id="n3-powerapp">
+          <mxCell style="rounded=1;whiteSpace=wrap;html=1;labelBackgroundColor=none;fillColor=#8C8496;fontColor=#ffffff;align=center;arcSize=10;strokeColor=#736782;metaEdit=1;resizable=0;points=[[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0.25,0],[1,0.5,0],[1,0.75,0],[0.75,1,0],[0.5,1,0],[0.25,1,0],[0,0.75,0],[0,0.5,0],[0,0.25,0]];verticalAlign=middle;fontFamily=Helvetica;fontSize=12;fontStyle=1" vertex="1" parent="1">
+            <mxGeometry x="2100" y="560" width="240" height="120" as="geometry" />
+          </mxCell>
+        </object>
+        <object placeholders="1" c4Name="Azure AI Foundry" c4Type="Software System" c4Description="Modelo gpt-5.4 que interpreta los documentos." label="&lt;font style=&quot;font-size: 16px&quot;&gt;&lt;b&gt;%c4Name%&lt;/b&gt;&lt;/font&gt;&lt;div&gt;[%c4Type%]&lt;/div&gt;&lt;br&gt;&lt;div&gt;&lt;font style=&quot;font-size: 11px&quot;&gt;&lt;font color=&quot;#E6E6E6&quot;&gt;%c4Description%&lt;/font&gt;&lt;/font&gt;&lt;/div&gt;" id="n3-foundry">
+          <mxCell style="rounded=1;whiteSpace=wrap;html=1;labelBackgroundColor=none;fillColor=#8C8496;fontColor=#ffffff;align=center;arcSize=10;strokeColor=#736782;metaEdit=1;resizable=0;points=[[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0.25,0],[1,0.5,0],[1,0.75,0],[0.75,1,0],[0.5,1,0],[0.25,1,0],[0,0.75,0],[0,0.5,0],[0,0.25,0]];verticalAlign=middle;fontFamily=Helvetica;fontSize=12;fontStyle=1" vertex="1" parent="1">
+            <mxGeometry x="900" y="1400" width="240" height="120" as="geometry" />
+          </mxCell>
+        </object>
+        <object placeholders="1" c4Name="Blob Storage" c4Type="Container" c4Technology="Azure Blob Storage" c4Description="Originales, PDF normalizados, lectura por página e informes." label="&lt;font style=&quot;font-size: 16px&quot;&gt;&lt;b&gt;%c4Name%&lt;/b&gt;&lt;/font&gt;&lt;div&gt;[%c4Type%:&amp;nbsp;%c4Technology%]&lt;/div&gt;&lt;br&gt;&lt;div&gt;&lt;font style=&quot;font-size: 11px&quot;&gt;&lt;font color=&quot;#E6E6E6&quot;&gt;%c4Description%&lt;/font&gt;&lt;/font&gt;&lt;/div&gt;" id="n3-blob">
+          <mxCell style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;labelBackgroundColor=none;fillColor=#23A2D9;fontColor=#ffffff;align=center;arcSize=10;strokeColor=#0E7DAD;metaEdit=1;resizable=0;points=[[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0.25,0],[1,0.5,0],[1,0.75,0],[0.75,1,0],[0.5,1,0],[0.25,1,0],[0,0.75,0],[0,0.5,0],[0,0.25,0]];" vertex="1" parent="1">
+            <mxGeometry x="300" y="860" width="240" height="120" as="geometry" />
+          </mxCell>
+        </object>
+        <object placeholders="1" c4Name="Base de estado y modelo" c4Type="Container" c4Technology="Cosmos DB" c4Description="Estado de procesos, oferentes, documentos y tareas; versiones fijadas; fichas de los tipos documentales; reglas." label="&lt;font style=&quot;font-size: 16px&quot;&gt;&lt;b&gt;%c4Name%&lt;/b&gt;&lt;/font&gt;&lt;div&gt;[%c4Type%:&amp;nbsp;%c4Technology%]&lt;/div&gt;&lt;br&gt;&lt;div&gt;&lt;font style=&quot;font-size: 11px&quot;&gt;&lt;font color=&quot;#E6E6E6&quot;&gt;%c4Description%&lt;/font&gt;&lt;/font&gt;&lt;/div&gt;" id="n3-cosmos">
+          <mxCell style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;labelBackgroundColor=none;fillColor=#23A2D9;fontColor=#ffffff;align=center;arcSize=10;strokeColor=#0E7DAD;metaEdit=1;resizable=0;points=[[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0.25,0],[1,0.5,0],[1,0.75,0],[0.75,1,0],[0.5,1,0],[0.25,1,0],[0,0.75,0],[0,0.5,0],[0,0.25,0]];" vertex="1" parent="1">
+            <mxGeometry x="1800" y="860" width="240" height="120" as="geometry" />
+          </mxCell>
+        </object>
+        <object placeholders="1" c4Name="Colas de mensajes" c4Type="Container" c4Technology="Azure Service Bus" c4Description="Una cola por paso (normalizar, clasificar, extraer, resultados, reglas), con cola de errores." label="&lt;font style=&quot;font-size: 16px&quot;&gt;&lt;b&gt;%c4Name%&lt;/b&gt;&lt;/font&gt;&lt;div&gt;[%c4Type%:&amp;nbsp;%c4Technology%]&lt;/div&gt;&lt;br&gt;&lt;div&gt;&lt;font style=&quot;font-size: 11px&quot;&gt;&lt;font color=&quot;#E6E6E6&quot;&gt;%c4Description%&lt;/font&gt;&lt;/font&gt;&lt;/div&gt;" id="n3-sb">
+          <mxCell style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;labelBackgroundColor=none;fillColor=#23A2D9;fontColor=#ffffff;align=center;arcSize=10;strokeColor=#0E7DAD;metaEdit=1;resizable=0;points=[[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0.25,0],[1,0.5,0],[1,0.75,0],[0.75,1,0],[0.5,1,0],[0.25,1,0],[0,0.75,0],[0,0.5,0],[0,0.25,0]];" vertex="1" parent="1">
+            <mxGeometry x="600" y="300" width="240" height="120" as="geometry" />
+          </mxCell>
+        </object>
+        <object placeholders="1" c4Name="Servidor MCP del modelo" c4Type="Container" c4Technology="Python, Container Apps" c4Description="Sirve las fichas de cada tipo documental desde el modelo semántico." label="&lt;font style=&quot;font-size: 16px&quot;&gt;&lt;b&gt;%c4Name%&lt;/b&gt;&lt;/font&gt;&lt;div&gt;[%c4Type%:&amp;nbsp;%c4Technology%]&lt;/div&gt;&lt;br&gt;&lt;div&gt;&lt;font style=&quot;font-size: 11px&quot;&gt;&lt;font color=&quot;#E6E6E6&quot;&gt;%c4Description%&lt;/font&gt;&lt;/font&gt;&lt;/div&gt;" id="n3-mcp">
+          <mxCell style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;labelBackgroundColor=none;fillColor=#23A2D9;fontColor=#ffffff;align=center;arcSize=10;strokeColor=#0E7DAD;metaEdit=1;resizable=0;points=[[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0.25,0],[1,0.5,0],[1,0.75,0],[0.75,1,0],[0.5,1,0],[0.25,1,0],[0,0.75,0],[0,0.5,0],[0,0.25,0]];" vertex="1" parent="1">
+            <mxGeometry x="1200" y="1140" width="240" height="120" as="geometry" />
+          </mxCell>
+        </object>
+        <object placeholders="1" c4Name="Normalización y lectura" c4Type="ContainerScopeBoundary" c4Application="Container Apps Job" label="&lt;font style=&quot;font-size: 16px&quot;&gt;&lt;b&gt;&lt;div style=&quot;text-align: left&quot;&gt;%c4Name%&lt;/div&gt;&lt;/b&gt;&lt;/font&gt;&lt;div style=&quot;text-align: left&quot;&gt;[%c4Application%]&lt;/div&gt;" id="n3-14">
+          <mxCell style="rounded=1;fontSize=11;whiteSpace=wrap;html=1;dashed=1;arcSize=20;fillColor=none;strokeColor=#666666;fontColor=#333333;labelBackgroundColor=none;align=left;verticalAlign=bottom;labelBorderColor=none;spacingTop=0;spacing=10;dashPattern=8 4;metaEdit=1;rotatable=0;perimeter=rectanglePerimeter;noLabel=0;labelPadding=0;allowArrows=0;connectable=0;expand=0;recursiveResize=0;editable=1;pointerEvents=0;absoluteArcSize=1;points=[[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0.25,0],[1,0.5,0],[1,0.75,0],[0.75,1,0],[0.5,1,0],[0.25,1,0],[0,0.75,0],[0,0.5,0],[0,0.25,0]];" vertex="1" parent="1">
+            <mxGeometry x="280" y="270" width="280" height="470" as="geometry" />
+          </mxCell>
+        </object>
+        <object placeholders="1" c4Name="Normalizador" c4Type="Component" c4Technology="Python, LibreOffice, qpdf, pyHanko" c4Description="Filtra archivos de sistema, calcula el hash, marca duplicados, convierte a PDF y detecta firma digital." label="&lt;font style=&quot;font-size: 16px&quot;&gt;&lt;b&gt;%c4Name%&lt;/b&gt;&lt;/font&gt;&lt;div&gt;[%c4Type%:&amp;nbsp;%c4Technology%]&lt;/div&gt;&lt;br&gt;&lt;div&gt;&lt;font style=&quot;font-size: 11px&quot;&gt;&lt;font color=&quot;#E6E6E6&quot;&gt;%c4Description%&lt;/font&gt;&lt;/font&gt;&lt;/div&gt;" id="n3-norm">
+          <mxCell style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;labelBackgroundColor=none;fillColor=#23A2D9;fontColor=#ffffff;align=center;arcSize=10;strokeColor=#0E7DAD;metaEdit=1;resizable=0;points=[[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0.25,0],[1,0.5,0],[1,0.75,0],[0.75,1,0],[0.5,1,0],[0.25,1,0],[0,0.75,0],[0,0.5,0],[0,0.25,0]];" vertex="1" parent="1">
+            <mxGeometry x="300" y="300" width="240" height="120" as="geometry" />
+          </mxCell>
+        </object>
+        <object placeholders="1" c4Name="Lector de páginas" c4Type="Component" c4Technology="Python" c4Description="Saca el texto de cada página y la clasifica: texto, escaneo, imagen o vacía. Sin LLM." label="&lt;font style=&quot;font-size: 16px&quot;&gt;&lt;b&gt;%c4Name%&lt;/b&gt;&lt;/font&gt;&lt;div&gt;[%c4Type%:&amp;nbsp;%c4Technology%]&lt;/div&gt;&lt;br&gt;&lt;div&gt;&lt;font style=&quot;font-size: 11px&quot;&gt;&lt;font color=&quot;#E6E6E6&quot;&gt;%c4Description%&lt;/font&gt;&lt;/font&gt;&lt;/div&gt;" id="n3-lector">
+          <mxCell style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;labelBackgroundColor=none;fillColor=#23A2D9;fontColor=#ffffff;align=center;arcSize=10;strokeColor=#0E7DAD;metaEdit=1;resizable=0;points=[[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0.25,0],[1,0.5,0],[1,0.75,0],[0.75,1,0],[0.5,1,0],[0.25,1,0],[0,0.75,0],[0,0.5,0],[0,0.25,0]];" vertex="1" parent="1">
+            <mxGeometry x="300" y="560" width="240" height="120" as="geometry" />
+          </mxCell>
+        </object>
+        <object placeholders="1" c4Name="OCR" c4Type="Component" c4Technology="Document Intelligence Read" c4Description="Texto de páginas escaneadas (experimento)." label="&lt;font style=&quot;font-size: 16px&quot;&gt;&lt;b&gt;%c4Name%&lt;/b&gt;&lt;/font&gt;&lt;div&gt;[%c4Type%:&amp;nbsp;%c4Technology%]&lt;/div&gt;&lt;br&gt;&lt;div&gt;&lt;font style=&quot;font-size: 11px&quot;&gt;&lt;font color=&quot;#E6E6E6&quot;&gt;%c4Description%&lt;/font&gt;&lt;/font&gt;&lt;/div&gt;" id="n3-ocr">
+          <mxCell style="shape=hexagon;size=50;perimeter=hexagonPerimeter2;whiteSpace=wrap;html=1;fixedSize=1;rounded=1;labelBackgroundColor=none;fillColor=#23A2D9;fontSize=12;fontColor=#ffffff;align=center;strokeColor=#0E7DAD;metaEdit=1;points=[[0.5,0,0],[1,0.25,0],[1,0.5,0],[1,0.75,0],[0.5,1,0],[0,0.75,0],[0,0.5,0],[0,0.25,0]];resizable=0;" vertex="1" parent="1">
+            <mxGeometry x="-20" y="560" width="200" height="170" as="geometry" />
+          </mxCell>
+        </object>
+        <object placeholders="1" c4Name="Workers de orquestación" c4Type="ContainerScopeBoundary" c4Application="Container Apps" label="&lt;font style=&quot;font-size: 16px&quot;&gt;&lt;b&gt;&lt;div style=&quot;text-align: left&quot;&gt;%c4Name%&lt;/div&gt;&lt;/b&gt;&lt;/font&gt;&lt;div style=&quot;text-align: left&quot;&gt;[%c4Application%]&lt;/div&gt;" id="n3-18">
+          <mxCell style="rounded=1;fontSize=11;whiteSpace=wrap;html=1;dashed=1;arcSize=20;fillColor=none;strokeColor=#666666;fontColor=#333333;labelBackgroundColor=none;align=left;verticalAlign=bottom;labelBorderColor=none;spacingTop=0;spacing=10;dashPattern=8 4;metaEdit=1;rotatable=0;perimeter=rectanglePerimeter;noLabel=0;labelPadding=0;allowArrows=0;connectable=0;expand=0;recursiveResize=0;editable=1;pointerEvents=0;absoluteArcSize=1;points=[[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0.25,0],[1,0.5,0],[1,0.75,0],[0.75,1,0],[0.5,1,0],[0.25,1,0],[0,0.75,0],[0,0.5,0],[0,0.25,0]];" vertex="1" parent="1">
+            <mxGeometry x="880" y="270" width="880" height="490" as="geometry" />
+          </mxCell>
+        </object>
+        <object placeholders="1" c4Name="Worker de clasificación" c4Type="Component" c4Technology="Python" c4Description="Llama al clasificador, valida los segmentos y aplica los umbrales de confianza." label="&lt;font style=&quot;font-size: 16px&quot;&gt;&lt;b&gt;%c4Name%&lt;/b&gt;&lt;/font&gt;&lt;div&gt;[%c4Type%:&amp;nbsp;%c4Technology%]&lt;/div&gt;&lt;br&gt;&lt;div&gt;&lt;font style=&quot;font-size: 11px&quot;&gt;&lt;font color=&quot;#E6E6E6&quot;&gt;%c4Description%&lt;/font&gt;&lt;/font&gt;&lt;/div&gt;" id="n3-wclas">
+          <mxCell style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;labelBackgroundColor=none;fillColor=#23A2D9;fontColor=#ffffff;align=center;arcSize=10;strokeColor=#0E7DAD;metaEdit=1;resizable=0;points=[[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0.25,0],[1,0.5,0],[1,0.75,0],[0.75,1,0],[0.5,1,0],[0.25,1,0],[0,0.75,0],[0,0.5,0],[0,0.25,0]];" vertex="1" parent="1">
+            <mxGeometry x="900" y="300" width="240" height="120" as="geometry" />
+          </mxCell>
+        </object>
+        <object placeholders="1" c4Name="Conector del clasificador" c4Type="Component" c4Technology="API HTTP" c4Description="Llamada por archivo con PDF, nombre y ruta de origen." label="&lt;font style=&quot;font-size: 16px&quot;&gt;&lt;b&gt;%c4Name%&lt;/b&gt;&lt;/font&gt;&lt;div&gt;[%c4Type%:&amp;nbsp;%c4Technology%]&lt;/div&gt;&lt;br&gt;&lt;div&gt;&lt;font style=&quot;font-size: 11px&quot;&gt;&lt;font color=&quot;#E6E6E6&quot;&gt;%c4Description%&lt;/font&gt;&lt;/font&gt;&lt;/div&gt;" id="n3-conector">
+          <mxCell style="shape=hexagon;size=50;perimeter=hexagonPerimeter2;whiteSpace=wrap;html=1;fixedSize=1;rounded=1;labelBackgroundColor=none;fillColor=#23A2D9;fontSize=12;fontColor=#ffffff;align=center;strokeColor=#0E7DAD;metaEdit=1;points=[[0.5,0,0],[1,0.25,0],[1,0.5,0],[1,0.75,0],[0.5,1,0],[0,0.75,0],[0,0.5,0],[0,0.25,0]];resizable=0;" vertex="1" parent="1">
+            <mxGeometry x="1200" y="300" width="200" height="170" as="geometry" />
+          </mxCell>
+        </object>
+        <object placeholders="1" c4Name="Comando reprocesar" c4Type="Component" c4Technology="Python" c4Description="Vuelve a encolar un segmento o un proceso y registra quién y por qué." label="&lt;font style=&quot;font-size: 16px&quot;&gt;&lt;b&gt;%c4Name%&lt;/b&gt;&lt;/font&gt;&lt;div&gt;[%c4Type%:&amp;nbsp;%c4Technology%]&lt;/div&gt;&lt;br&gt;&lt;div&gt;&lt;font style=&quot;font-size: 11px&quot;&gt;&lt;font color=&quot;#E6E6E6&quot;&gt;%c4Description%&lt;/font&gt;&lt;/font&gt;&lt;/div&gt;" id="n3-repro">
+          <mxCell style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;labelBackgroundColor=none;fillColor=#23A2D9;fontColor=#ffffff;align=center;arcSize=10;strokeColor=#0E7DAD;metaEdit=1;resizable=0;points=[[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0.25,0],[1,0.5,0],[1,0.75,0],[0.75,1,0],[0.5,1,0],[0.25,1,0],[0,0.75,0],[0,0.5,0],[0,0.25,0]];" vertex="1" parent="1">
+            <mxGeometry x="1500" y="300" width="240" height="120" as="geometry" />
+          </mxCell>
+        </object>
+        <object placeholders="1" c4Name="Worker de resultados y estado" c4Type="Component" c4Technology="Python" c4Description="Guarda cada resultado, decide si el oferente está completo y aplica correcciones." label="&lt;font style=&quot;font-size: 16px&quot;&gt;&lt;b&gt;%c4Name%&lt;/b&gt;&lt;/font&gt;&lt;div&gt;[%c4Type%:&amp;nbsp;%c4Technology%]&lt;/div&gt;&lt;br&gt;&lt;div&gt;&lt;font style=&quot;font-size: 11px&quot;&gt;&lt;font color=&quot;#E6E6E6&quot;&gt;%c4Description%&lt;/font&gt;&lt;/font&gt;&lt;/div&gt;" id="n3-wres">
+          <mxCell style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;labelBackgroundColor=none;fillColor=#23A2D9;fontColor=#ffffff;align=center;arcSize=10;strokeColor=#0E7DAD;metaEdit=1;resizable=0;points=[[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0.25,0],[1,0.5,0],[1,0.75,0],[0.75,1,0],[0.5,1,0],[0.25,1,0],[0,0.75,0],[0,0.5,0],[0,0.25,0]];" vertex="1" parent="1">
+            <mxGeometry x="900" y="560" width="240" height="120" as="geometry" />
+          </mxCell>
+        </object>
+        <object placeholders="1" c4Name="Motor de reglas (módulo 4)" c4Type="Component" c4Technology="Python" c4Description="Aplica las reglas del proceso, escritas como datos, contra la ficha del proceso. Sin LLM." label="&lt;font style=&quot;font-size: 16px&quot;&gt;&lt;b&gt;%c4Name%&lt;/b&gt;&lt;/font&gt;&lt;div&gt;[%c4Type%:&amp;nbsp;%c4Technology%]&lt;/div&gt;&lt;br&gt;&lt;div&gt;&lt;font style=&quot;font-size: 11px&quot;&gt;&lt;font color=&quot;#E6E6E6&quot;&gt;%c4Description%&lt;/font&gt;&lt;/font&gt;&lt;/div&gt;" id="n3-reglas">
+          <mxCell style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;labelBackgroundColor=none;fillColor=#23A2D9;fontColor=#ffffff;align=center;arcSize=10;strokeColor=#0E7DAD;metaEdit=1;resizable=0;points=[[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0.25,0],[1,0.5,0],[1,0.75,0],[0.75,1,0],[0.5,1,0],[0.25,1,0],[0,0.75,0],[0,0.5,0],[0,0.25,0]];" vertex="1" parent="1">
+            <mxGeometry x="1200" y="560" width="240" height="120" as="geometry" />
+          </mxCell>
+        </object>
+        <object placeholders="1" c4Name="Tareas e informe" c4Type="Component" c4Technology="Python, openpyxl" c4Description="Crea una tarea por oferente y área y genera el informe en Excel." label="&lt;font style=&quot;font-size: 16px&quot;&gt;&lt;b&gt;%c4Name%&lt;/b&gt;&lt;/font&gt;&lt;div&gt;[%c4Type%:&amp;nbsp;%c4Technology%]&lt;/div&gt;&lt;br&gt;&lt;div&gt;&lt;font style=&quot;font-size: 11px&quot;&gt;&lt;font color=&quot;#E6E6E6&quot;&gt;%c4Description%&lt;/font&gt;&lt;/font&gt;&lt;/div&gt;" id="n3-tareas">
+          <mxCell style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;labelBackgroundColor=none;fillColor=#23A2D9;fontColor=#ffffff;align=center;arcSize=10;strokeColor=#0E7DAD;metaEdit=1;resizable=0;points=[[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0.25,0],[1,0.5,0],[1,0.75,0],[0.75,1,0],[0.5,1,0],[0.25,1,0],[0,0.75,0],[0,0.5,0],[0,0.25,0]];" vertex="1" parent="1">
+            <mxGeometry x="1500" y="560" width="240" height="120" as="geometry" />
+          </mxCell>
+        </object>
+        <object placeholders="1" c4Name="Integración Dataverse" c4Type="Component" c4Technology="Dataverse + Service Bus" c4Description="Tareas hacia la Power App y correcciones de vuelta." label="&lt;font style=&quot;font-size: 16px&quot;&gt;&lt;b&gt;%c4Name%&lt;/b&gt;&lt;/font&gt;&lt;div&gt;[%c4Type%:&amp;nbsp;%c4Technology%]&lt;/div&gt;&lt;br&gt;&lt;div&gt;&lt;font style=&quot;font-size: 11px&quot;&gt;&lt;font color=&quot;#E6E6E6&quot;&gt;%c4Description%&lt;/font&gt;&lt;/font&gt;&lt;/div&gt;" id="n3-dataverse">
+          <mxCell style="shape=hexagon;size=50;perimeter=hexagonPerimeter2;whiteSpace=wrap;html=1;fixedSize=1;rounded=1;labelBackgroundColor=none;fillColor=#23A2D9;fontSize=12;fontColor=#ffffff;align=center;strokeColor=#0E7DAD;metaEdit=1;points=[[0.5,0,0],[1,0.25,0],[1,0.5,0],[1,0.75,0],[0.5,1,0],[0,0.75,0],[0,0.5,0],[0,0.25,0]];resizable=0;" vertex="1" parent="1">
+            <mxGeometry x="1800" y="560" width="200" height="170" as="geometry" />
+          </mxCell>
+        </object>
+        <object placeholders="1" c4Name="Unidad de extracción" c4Type="ContainerScopeBoundary" c4Application="Container Apps" label="&lt;font style=&quot;font-size: 16px&quot;&gt;&lt;b&gt;&lt;div style=&quot;text-align: left&quot;&gt;%c4Name%&lt;/div&gt;&lt;/b&gt;&lt;/font&gt;&lt;div style=&quot;text-align: left&quot;&gt;[%c4Application%]&lt;/div&gt;" id="n3-26">
+          <mxCell style="rounded=1;fontSize=11;whiteSpace=wrap;html=1;dashed=1;arcSize=20;fillColor=none;strokeColor=#666666;fontColor=#333333;labelBackgroundColor=none;align=left;verticalAlign=bottom;labelBorderColor=none;spacingTop=0;spacing=10;dashPattern=8 4;metaEdit=1;rotatable=0;perimeter=rectanglePerimeter;noLabel=0;labelPadding=0;allowArrows=0;connectable=0;expand=0;recursiveResize=0;editable=1;pointerEvents=0;absoluteArcSize=1;points=[[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0.25,0],[1,0.5,0],[1,0.75,0],[0.75,1,0],[0.5,1,0],[0.25,1,0],[0,0.75,0],[0,0.5,0],[0,0.25,0]];" vertex="1" parent="1">
+            <mxGeometry x="580" y="830" width="880" height="210" as="geometry" />
+          </mxCell>
+        </object>
+        <object placeholders="1" c4Name="Preprocesamiento" c4Type="Component" c4Technology="Python" c4Description="Toma las páginas del segmento desde la lectura y arma texto, imágenes y recortes de firma." label="&lt;font style=&quot;font-size: 16px&quot;&gt;&lt;b&gt;%c4Name%&lt;/b&gt;&lt;/font&gt;&lt;div&gt;[%c4Type%:&amp;nbsp;%c4Technology%]&lt;/div&gt;&lt;br&gt;&lt;div&gt;&lt;font style=&quot;font-size: 11px&quot;&gt;&lt;font color=&quot;#E6E6E6&quot;&gt;%c4Description%&lt;/font&gt;&lt;/font&gt;&lt;/div&gt;" id="n3-pre">
+          <mxCell style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;labelBackgroundColor=none;fillColor=#23A2D9;fontColor=#ffffff;align=center;arcSize=10;strokeColor=#0E7DAD;metaEdit=1;resizable=0;points=[[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0.25,0],[1,0.5,0],[1,0.75,0],[0.75,1,0],[0.5,1,0],[0.25,1,0],[0,0.75,0],[0,0.5,0],[0,0.25,0]];" vertex="1" parent="1">
+            <mxGeometry x="600" y="860" width="240" height="120" as="geometry" />
+          </mxCell>
+        </object>
+        <object placeholders="1" c4Name="Agente de extracción" c4Type="Component" c4Technology="Agente Foundry, gpt-5.4" c4Description="Extrae los campos con su evidencia siguiendo la ficha del tipo documental." label="&lt;font style=&quot;font-size: 16px&quot;&gt;&lt;b&gt;%c4Name%&lt;/b&gt;&lt;/font&gt;&lt;div&gt;[%c4Type%:&amp;nbsp;%c4Technology%]&lt;/div&gt;&lt;br&gt;&lt;div&gt;&lt;font style=&quot;font-size: 11px&quot;&gt;&lt;font color=&quot;#E6E6E6&quot;&gt;%c4Description%&lt;/font&gt;&lt;/font&gt;&lt;/div&gt;" id="n3-agente">
+          <mxCell style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;labelBackgroundColor=none;fillColor=#23A2D9;fontColor=#ffffff;align=center;arcSize=10;strokeColor=#0E7DAD;metaEdit=1;resizable=0;points=[[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0.25,0],[1,0.5,0],[1,0.75,0],[0.75,1,0],[0.5,1,0],[0.25,1,0],[0,0.75,0],[0,0.5,0],[0,0.25,0]];" vertex="1" parent="1">
+            <mxGeometry x="900" y="860" width="240" height="120" as="geometry" />
+          </mxCell>
+        </object>
+        <object placeholders="1" c4Name="Posvalidación" c4Type="Component" c4Technology="Python" c4Description="Valida con código (NIT, fechas, sumas) y decide qué va a revisión humana." label="&lt;font style=&quot;font-size: 16px&quot;&gt;&lt;b&gt;%c4Name%&lt;/b&gt;&lt;/font&gt;&lt;div&gt;[%c4Type%:&amp;nbsp;%c4Technology%]&lt;/div&gt;&lt;br&gt;&lt;div&gt;&lt;font style=&quot;font-size: 11px&quot;&gt;&lt;font color=&quot;#E6E6E6&quot;&gt;%c4Description%&lt;/font&gt;&lt;/font&gt;&lt;/div&gt;" id="n3-posval">
+          <mxCell style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;labelBackgroundColor=none;fillColor=#23A2D9;fontColor=#ffffff;align=center;arcSize=10;strokeColor=#0E7DAD;metaEdit=1;resizable=0;points=[[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0.25,0],[1,0.5,0],[1,0.75,0],[0.75,1,0],[0.5,1,0],[0.25,1,0],[0,0.75,0],[0,0.5,0],[0,0.25,0]];" vertex="1" parent="1">
+            <mxGeometry x="1200" y="860" width="240" height="120" as="geometry" />
+          </mxCell>
+        </object>
+        <mxCell id="n3-30" value="Entrega ofertas" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=classic;endFill=1;startArrow=none;startFill=0;strokeColor=#000000;align=center;verticalAlign=middle;arcSize=10;fontFamily=Helvetica;fontSize=12;fontColor=#000000;labelBackgroundColor=default;dashed=1;dashPattern=8 8;fontStyle=0;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="n3-ariba" target="n3-modulo1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="n3-31" value="Vigila y&lt;br&gt;reprocesa" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=classic;endFill=1;startArrow=none;startFill=0;strokeColor=#000000;align=center;verticalAlign=middle;arcSize=10;fontFamily=Helvetica;fontSize=12;fontColor=#000000;labelBackgroundColor=default;dashed=1;dashPattern=8 8;fontStyle=0;exitX=0.3;exitY=1;exitDx=0;exitDy=0;entryX=0.25;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="n3-operacion" target="n3-repro">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="n3-32" value="Revisa y corrige" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=classic;endFill=1;startArrow=none;startFill=0;strokeColor=#000000;align=center;verticalAlign=middle;arcSize=10;fontFamily=Helvetica;fontSize=12;fontColor=#000000;labelBackgroundColor=default;dashed=1;dashPattern=8 8;fontStyle=0;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.3;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="n3-evaluador" target="n3-powerapp">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="n3-33" value="Confirma ficha,&lt;br&gt;firma informe" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=classic;endFill=1;startArrow=none;startFill=0;strokeColor=#000000;align=center;verticalAlign=middle;arcSize=10;fontFamily=Helvetica;fontSize=12;fontColor=#000000;labelBackgroundColor=default;dashed=1;dashPattern=8 8;fontStyle=0;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.8;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="n3-coordinador" target="n3-powerapp">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="n3-34" value="Avisa entrega lista" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=classic;endFill=1;startArrow=none;startFill=0;strokeColor=#000000;align=center;verticalAlign=middle;arcSize=10;fontFamily=Helvetica;fontSize=12;fontColor=#000000;labelBackgroundColor=default;dashed=1;dashPattern=8 8;fontStyle=0;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="n3-modulo1" target="n3-norm">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="n3-35" value="PDF normalizado" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=classic;endFill=1;startArrow=none;startFill=0;strokeColor=#000000;align=center;verticalAlign=middle;arcSize=10;fontFamily=Helvetica;fontSize=12;fontColor=#000000;labelBackgroundColor=default;dashed=1;dashPattern=8 8;fontStyle=0;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="n3-norm" target="n3-lector">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="n3-36" value="Pide OCR" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=classic;endFill=1;startArrow=none;startFill=0;strokeColor=#000000;align=center;verticalAlign=middle;arcSize=10;fontFamily=Helvetica;fontSize=12;fontColor=#000000;labelBackgroundColor=default;dashed=1;dashPattern=8 8;fontStyle=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="n3-lector" target="n3-ocr">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="n3-37" value="Guarda PDF&lt;br&gt;y lectura" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=classic;endFill=1;startArrow=none;startFill=0;strokeColor=#000000;align=center;verticalAlign=middle;arcSize=10;fontFamily=Helvetica;fontSize=12;fontColor=#000000;labelBackgroundColor=default;dashed=1;dashPattern=8 8;fontStyle=0;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="n3-lector" target="n3-blob">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="n3-38" value="Archivo listo" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=classic;endFill=1;startArrow=none;startFill=0;strokeColor=#000000;align=center;verticalAlign=middle;arcSize=10;fontFamily=Helvetica;fontSize=12;fontColor=#000000;labelBackgroundColor=default;dashed=1;dashPattern=8 8;fontStyle=0;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="n3-norm" target="n3-sb">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="n3-39" value="Archivo a clasificar" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=classic;endFill=1;startArrow=none;startFill=0;strokeColor=#000000;align=center;verticalAlign=middle;arcSize=10;fontFamily=Helvetica;fontSize=12;fontColor=#000000;labelBackgroundColor=default;dashed=1;dashPattern=8 8;fontStyle=0;exitX=1;exitY=0.25;exitDx=0;exitDy=0;entryX=0;entryY=0.25;entryDx=0;entryDy=0;" edge="1" parent="1" source="n3-sb" target="n3-wclas">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="n3-40" value="Segmentos&lt;br&gt;a extraer" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=classic;endFill=1;startArrow=none;startFill=0;strokeColor=#000000;align=center;verticalAlign=middle;arcSize=10;fontFamily=Helvetica;fontSize=12;fontColor=#000000;labelBackgroundColor=default;dashed=1;dashPattern=8 8;fontStyle=0;exitX=0;exitY=0.65;exitDx=0;exitDy=0;entryX=1;entryY=0.65;entryDx=0;entryDy=0;" edge="1" parent="1" source="n3-wclas" target="n3-sb">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="n3-41" value="Clasifica" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=classic;endFill=1;startArrow=none;startFill=0;strokeColor=#000000;align=center;verticalAlign=middle;arcSize=10;fontFamily=Helvetica;fontSize=12;fontColor=#000000;labelBackgroundColor=default;dashed=1;dashPattern=8 8;fontStyle=0;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="n3-wclas" target="n3-conector">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="n3-42" value="Llama API" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=classic;endFill=1;startArrow=none;startFill=0;strokeColor=#000000;align=center;verticalAlign=middle;arcSize=10;fontFamily=Helvetica;fontSize=12;fontColor=#000000;labelBackgroundColor=default;dashed=1;dashPattern=8 8;fontStyle=0;exitX=0.5;exitY=0;exitDx=0;exitDy=0;entryX=0.5;entryY=1;entryDx=0;entryDy=0;" edge="1" parent="1" source="n3-conector" target="n3-clasificador">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="n3-43" value="Resultados y&lt;br&gt;correcciones" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=classic;endFill=1;startArrow=none;startFill=0;strokeColor=#000000;align=center;verticalAlign=middle;arcSize=10;fontFamily=Helvetica;fontSize=12;fontColor=#000000;labelBackgroundColor=default;dashed=1;dashPattern=8 8;fontStyle=0;exitX=0.85;exitY=1;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="n3-sb" target="n3-wres">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="804" y="620" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="n3-44" value="Segmento" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=classic;endFill=1;startArrow=none;startFill=0;strokeColor=#000000;align=center;verticalAlign=middle;arcSize=10;fontFamily=Helvetica;fontSize=12;fontColor=#000000;labelBackgroundColor=default;dashed=1;dashPattern=8 8;fontStyle=0;exitX=0.2;exitY=1;exitDx=0;exitDy=0;entryX=0.2;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="n3-sb" target="n3-pre">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="n3-45" value="Resultado" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=classic;endFill=1;startArrow=none;startFill=0;strokeColor=#000000;align=center;verticalAlign=middle;arcSize=10;fontFamily=Helvetica;fontSize=12;fontColor=#000000;labelBackgroundColor=default;dashed=1;dashPattern=8 8;fontStyle=0;exitX=0.25;exitY=0;exitDx=0;exitDy=0;entryX=0.5;entryY=1;entryDx=0;entryDy=0;" edge="1" parent="1" source="n3-posval" target="n3-sb">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1260" y="810" />
+              <mxPoint x="720" y="810" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="n3-46" value="Reencola" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=classic;endFill=1;startArrow=none;startFill=0;strokeColor=#000000;align=center;verticalAlign=middle;arcSize=10;fontFamily=Helvetica;fontSize=12;fontColor=#000000;labelBackgroundColor=default;dashed=1;dashPattern=8 8;fontStyle=0;exitX=0.75;exitY=0;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="n3-repro" target="n3-sb">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1680" y="230" />
+              <mxPoint x="720" y="230" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="n3-47" value="Lee páginas" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=classic;endFill=1;startArrow=none;startFill=0;strokeColor=#000000;align=center;verticalAlign=middle;arcSize=10;fontFamily=Helvetica;fontSize=12;fontColor=#000000;labelBackgroundColor=default;dashed=1;dashPattern=8 8;fontStyle=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="n3-pre" target="n3-blob">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="n3-48" value="Texto e imágenes" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=classic;endFill=1;startArrow=none;startFill=0;strokeColor=#000000;align=center;verticalAlign=middle;arcSize=10;fontFamily=Helvetica;fontSize=12;fontColor=#000000;labelBackgroundColor=default;dashed=1;dashPattern=8 8;fontStyle=0;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="n3-pre" target="n3-agente">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="n3-49" value="Campos con&lt;br&gt;evidencia" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=classic;endFill=1;startArrow=none;startFill=0;strokeColor=#000000;align=center;verticalAlign=middle;arcSize=10;fontFamily=Helvetica;fontSize=12;fontColor=#000000;labelBackgroundColor=default;dashed=1;dashPattern=8 8;fontStyle=0;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="n3-agente" target="n3-posval">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="n3-50" value="Interpreta" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=classic;endFill=1;startArrow=none;startFill=0;strokeColor=#000000;align=center;verticalAlign=middle;arcSize=10;fontFamily=Helvetica;fontSize=12;fontColor=#000000;labelBackgroundColor=default;dashed=1;dashPattern=8 8;fontStyle=0;exitX=0.3;exitY=1;exitDx=0;exitDy=0;entryX=0.3;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="n3-agente" target="n3-foundry">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="n3-51" value="Consulta la ficha" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=classic;endFill=1;startArrow=none;startFill=0;strokeColor=#000000;align=center;verticalAlign=middle;arcSize=10;fontFamily=Helvetica;fontSize=12;fontColor=#000000;labelBackgroundColor=default;dashed=1;dashPattern=8 8;fontStyle=0;exitX=0.75;exitY=1;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="n3-agente" target="n3-mcp">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1080" y="1200" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="n3-52" value="Guarda estado" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=classic;endFill=1;startArrow=none;startFill=0;strokeColor=#000000;align=center;verticalAlign=middle;arcSize=10;fontFamily=Helvetica;fontSize=12;fontColor=#000000;labelBackgroundColor=default;dashed=1;dashPattern=8 8;fontStyle=0;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.75;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="n3-wres" target="n3-cosmos">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1020" y="775" />
+              <mxPoint x="1980" y="775" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="n3-53" value="Oferente completo" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=classic;endFill=1;startArrow=none;startFill=0;strokeColor=#000000;align=center;verticalAlign=middle;arcSize=10;fontFamily=Helvetica;fontSize=12;fontColor=#000000;labelBackgroundColor=default;dashed=1;dashPattern=8 8;fontStyle=0;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="n3-wres" target="n3-reglas">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="n3-54" value="Lee datos, ficha&lt;br&gt;y reglas" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=classic;endFill=1;startArrow=none;startFill=0;strokeColor=#000000;align=center;verticalAlign=middle;arcSize=10;fontFamily=Helvetica;fontSize=12;fontColor=#000000;labelBackgroundColor=default;dashed=1;dashPattern=8 8;fontStyle=0;exitX=0.75;exitY=1;exitDx=0;exitDy=0;entryX=0.25;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="n3-reglas" target="n3-cosmos">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1380" y="795" />
+              <mxPoint x="1860" y="795" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="n3-55" value="Veredictos" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=classic;endFill=1;startArrow=none;startFill=0;strokeColor=#000000;align=center;verticalAlign=middle;arcSize=10;fontFamily=Helvetica;fontSize=12;fontColor=#000000;labelBackgroundColor=default;dashed=1;dashPattern=8 8;fontStyle=0;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="n3-reglas" target="n3-tareas">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="n3-56" value="Escribe tareas&lt;br&gt;e informe" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=classic;endFill=1;startArrow=none;startFill=0;strokeColor=#000000;align=center;verticalAlign=middle;arcSize=10;fontFamily=Helvetica;fontSize=12;fontColor=#000000;labelBackgroundColor=default;dashed=1;dashPattern=8 8;fontStyle=0;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="n3-tareas" target="n3-dataverse">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="n3-57" value="Tareas" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=classic;endFill=1;startArrow=none;startFill=0;strokeColor=#000000;align=center;verticalAlign=middle;arcSize=10;fontFamily=Helvetica;fontSize=12;fontColor=#000000;labelBackgroundColor=default;dashed=1;dashPattern=8 8;fontStyle=0;exitX=1;exitY=0.35;exitDx=0;exitDy=0;entryX=0;entryY=0.35;entryDx=0;entryDy=0;" edge="1" parent="1" source="n3-dataverse" target="n3-powerapp">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="n3-58" value="Correcciones" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=classic;endFill=1;startArrow=none;startFill=0;strokeColor=#000000;align=center;verticalAlign=middle;arcSize=10;fontFamily=Helvetica;fontSize=12;fontColor=#000000;labelBackgroundColor=default;dashed=1;dashPattern=8 8;fontStyle=0;exitX=0;exitY=0.75;exitDx=0;exitDy=0;entryX=1;entryY=0.65;entryDx=0;entryDy=0;" edge="1" parent="1" source="n3-powerapp" target="n3-dataverse">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="n3-59" value="Correcciones" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=classic;endFill=1;startArrow=none;startFill=0;strokeColor=#000000;align=center;verticalAlign=middle;arcSize=10;fontFamily=Helvetica;fontSize=12;fontColor=#000000;labelBackgroundColor=default;dashed=1;dashPattern=8 8;fontStyle=0;exitX=0.5;exitY=0;exitDx=0;exitDy=0;entryX=0.75;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="n3-dataverse" target="n3-sb">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1900" y="255" />
+              <mxPoint x="780" y="255" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="n3-60" value="Lee el modelo" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=classic;endFill=1;startArrow=none;startFill=0;strokeColor=#000000;align=center;verticalAlign=middle;arcSize=10;fontFamily=Helvetica;fontSize=12;fontColor=#000000;labelBackgroundColor=default;dashed=1;dashPattern=8 8;fontStyle=0;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0.5;entryY=1;entryDx=0;entryDy=0;" edge="1" parent="1" source="n3-mcp" target="n3-cosmos">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram name="Secuencia - Un documento de punta a punta" id="s1">
+    <mxGraphModel dx="1400" dy="900" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="s1-1" value="Secuencia · Un documento de punta a punta" style="text;html=1;align=left;verticalAlign=middle;fontSize=20;fontStyle=1;fontColor=#333333;" vertex="1" parent="1">
+          <mxGeometry x="0" y="-60" width="900" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="s1-m1" value="Módulo 1" style="shape=umlLifeline;perimeter=lifelinePerimeter;whiteSpace=wrap;html=1;container=1;dropTarget=0;collapsible=0;recursiveResize=0;outlineConnect=0;portConstraint=eastwest;newEdgeStyle={&quot;edgeStyle&quot;:&quot;elbowEdgeStyle&quot;,&quot;elbow&quot;:&quot;vertical&quot;,&quot;curved&quot;:0,&quot;rounded&quot;:0};size=50;" vertex="1" parent="1">
+          <mxGeometry x="0" y="0" width="150" height="968" as="geometry" />
+        </mxCell>
+        <mxCell id="s1-job" value="Normalización y lectura" style="shape=umlLifeline;perimeter=lifelinePerimeter;whiteSpace=wrap;html=1;container=1;dropTarget=0;collapsible=0;recursiveResize=0;outlineConnect=0;portConstraint=eastwest;newEdgeStyle={&quot;edgeStyle&quot;:&quot;elbowEdgeStyle&quot;,&quot;elbow&quot;:&quot;vertical&quot;,&quot;curved&quot;:0,&quot;rounded&quot;:0};size=50;" vertex="1" parent="1">
+          <mxGeometry x="230" y="0" width="150" height="968" as="geometry" />
+        </mxCell>
+        <mxCell id="s1-sb" value="Service Bus" style="shape=umlLifeline;perimeter=lifelinePerimeter;whiteSpace=wrap;html=1;container=1;dropTarget=0;collapsible=0;recursiveResize=0;outlineConnect=0;portConstraint=eastwest;newEdgeStyle={&quot;edgeStyle&quot;:&quot;elbowEdgeStyle&quot;,&quot;elbow&quot;:&quot;vertical&quot;,&quot;curved&quot;:0,&quot;rounded&quot;:0};size=50;" vertex="1" parent="1">
+          <mxGeometry x="460" y="0" width="150" height="968" as="geometry" />
+        </mxCell>
+        <mxCell id="s1-orq" value="Orquestación" style="shape=umlLifeline;perimeter=lifelinePerimeter;whiteSpace=wrap;html=1;container=1;dropTarget=0;collapsible=0;recursiveResize=0;outlineConnect=0;portConstraint=eastwest;newEdgeStyle={&quot;edgeStyle&quot;:&quot;elbowEdgeStyle&quot;,&quot;elbow&quot;:&quot;vertical&quot;,&quot;curved&quot;:0,&quot;rounded&quot;:0};size=50;" vertex="1" parent="1">
+          <mxGeometry x="690" y="0" width="150" height="968" as="geometry" />
+        </mxCell>
+        <mxCell id="s1-cla" value="Clasificador" style="shape=umlLifeline;perimeter=lifelinePerimeter;whiteSpace=wrap;html=1;container=1;dropTarget=0;collapsible=0;recursiveResize=0;outlineConnect=0;portConstraint=eastwest;newEdgeStyle={&quot;edgeStyle&quot;:&quot;elbowEdgeStyle&quot;,&quot;elbow&quot;:&quot;vertical&quot;,&quot;curved&quot;:0,&quot;rounded&quot;:0};size=50;" vertex="1" parent="1">
+          <mxGeometry x="920" y="0" width="150" height="968" as="geometry" />
+        </mxCell>
+        <mxCell id="s1-ext" value="Unidad de extracción" style="shape=umlLifeline;perimeter=lifelinePerimeter;whiteSpace=wrap;html=1;container=1;dropTarget=0;collapsible=0;recursiveResize=0;outlineConnect=0;portConstraint=eastwest;newEdgeStyle={&quot;edgeStyle&quot;:&quot;elbowEdgeStyle&quot;,&quot;elbow&quot;:&quot;vertical&quot;,&quot;curved&quot;:0,&quot;rounded&quot;:0};size=50;" vertex="1" parent="1">
+          <mxGeometry x="1150" y="0" width="150" height="968" as="geometry" />
+        </mxCell>
+        <mxCell id="s1-llm" value="gpt-5.4 (Foundry)" style="shape=umlLifeline;perimeter=lifelinePerimeter;whiteSpace=wrap;html=1;container=1;dropTarget=0;collapsible=0;recursiveResize=0;outlineConnect=0;portConstraint=eastwest;newEdgeStyle={&quot;edgeStyle&quot;:&quot;elbowEdgeStyle&quot;,&quot;elbow&quot;:&quot;vertical&quot;,&quot;curved&quot;:0,&quot;rounded&quot;:0};size=50;" vertex="1" parent="1">
+          <mxGeometry x="1380" y="0" width="150" height="968" as="geometry" />
+        </mxCell>
+        <mxCell id="s1-app" value="Power App" style="shape=umlLifeline;perimeter=lifelinePerimeter;whiteSpace=wrap;html=1;container=1;dropTarget=0;collapsible=0;recursiveResize=0;outlineConnect=0;portConstraint=eastwest;newEdgeStyle={&quot;edgeStyle&quot;:&quot;elbowEdgeStyle&quot;,&quot;elbow&quot;:&quot;vertical&quot;,&quot;curved&quot;:0,&quot;rounded&quot;:0};size=50;" vertex="1" parent="1">
+          <mxGeometry x="1610" y="0" width="150" height="968" as="geometry" />
+        </mxCell>
+        <mxCell id="s1-eva" value="Evaluador" style="shape=umlLifeline;perimeter=lifelinePerimeter;whiteSpace=wrap;html=1;container=1;dropTarget=0;collapsible=0;recursiveResize=0;outlineConnect=0;portConstraint=eastwest;newEdgeStyle={&quot;edgeStyle&quot;:&quot;elbowEdgeStyle&quot;,&quot;elbow&quot;:&quot;vertical&quot;,&quot;curved&quot;:0,&quot;rounded&quot;:0};size=50;" vertex="1" parent="1">
+          <mxGeometry x="1840" y="0" width="150" height="968" as="geometry" />
+        </mxCell>
+        <mxCell id="s1-11" value="Entrega lista" style="endArrow=block;startArrow=none;endFill=1;startFill=0;endSize=8;html=1;verticalAlign=bottom;labelBackgroundColor=none;rounded=0;fontSize=11;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="75" y="110" as="sourcePoint" />
+            <mxPoint x="305" y="110" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="s1-12" value="Normaliza y lee" style="endArrow=block;startArrow=none;endFill=1;startFill=0;endSize=8;html=1;verticalAlign=bottom;labelBackgroundColor=none;rounded=0;fontSize=11;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="305" y="156" as="sourcePoint" />
+            <mxPoint x="305" y="156" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="s1-13" value="Archivo listo" style="endArrow=block;startArrow=none;endFill=1;startFill=0;endSize=8;html=1;verticalAlign=bottom;labelBackgroundColor=none;rounded=0;fontSize=11;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="305" y="202" as="sourcePoint" />
+            <mxPoint x="535" y="202" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="s1-14" value="Archivo a clasificar" style="endArrow=block;startArrow=none;endFill=1;startFill=0;endSize=8;html=1;verticalAlign=bottom;labelBackgroundColor=none;rounded=0;fontSize=11;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="535" y="248" as="sourcePoint" />
+            <mxPoint x="765" y="248" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="s1-15" value="Clasificar archivo" style="endArrow=block;startArrow=none;endFill=1;startFill=0;endSize=8;html=1;verticalAlign=bottom;labelBackgroundColor=none;rounded=0;fontSize=11;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="765" y="294" as="sourcePoint" />
+            <mxPoint x="995" y="294" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="s1-16" value="Segmentos + confianza" style="endArrow=open;startArrow=none;endFill=0;startFill=0;endSize=8;html=1;verticalAlign=bottom;labelBackgroundColor=none;rounded=0;dashed=1;fontSize=11;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="995" y="340" as="sourcePoint" />
+            <mxPoint x="765" y="340" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="s1-17" value="Confianza baja: tarea humana de clasificación, no se extrae." style="shape=note;whiteSpace=wrap;html=1;backgroundOutline=1;size=12;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;align=left;spacing=6;verticalAlign=top;" vertex="1" parent="1">
+          <mxGeometry x="2050" y="346" width="250" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="s1-18" value="Segmento a extraer" style="endArrow=block;startArrow=none;endFill=1;startFill=0;endSize=8;html=1;verticalAlign=bottom;labelBackgroundColor=none;rounded=0;fontSize=11;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="765" y="386" as="sourcePoint" />
+            <mxPoint x="535" y="386" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="s1-19" value="Segmento" style="endArrow=block;startArrow=none;endFill=1;startFill=0;endSize=8;html=1;verticalAlign=bottom;labelBackgroundColor=none;rounded=0;fontSize=11;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="535" y="432" as="sourcePoint" />
+            <mxPoint x="1225" y="432" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="s1-20" value="Ficha + páginas" style="endArrow=block;startArrow=none;endFill=1;startFill=0;endSize=8;html=1;verticalAlign=bottom;labelBackgroundColor=none;rounded=0;fontSize=11;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="1225" y="478" as="sourcePoint" />
+            <mxPoint x="1455" y="478" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="s1-21" value="Campos con evidencia" style="endArrow=open;startArrow=none;endFill=0;startFill=0;endSize=8;html=1;verticalAlign=bottom;labelBackgroundColor=none;rounded=0;dashed=1;fontSize=11;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="1455" y="524" as="sourcePoint" />
+            <mxPoint x="1225" y="524" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="s1-22" value="Posvalidación" style="endArrow=block;startArrow=none;endFill=1;startFill=0;endSize=8;html=1;verticalAlign=bottom;labelBackgroundColor=none;rounded=0;fontSize=11;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="1225" y="570" as="sourcePoint" />
+            <mxPoint x="1225" y="570" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="s1-23" value="Resultado" style="endArrow=block;startArrow=none;endFill=1;startFill=0;endSize=8;html=1;verticalAlign=bottom;labelBackgroundColor=none;rounded=0;fontSize=11;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="1225" y="616" as="sourcePoint" />
+            <mxPoint x="535" y="616" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="s1-24" value="loop: por segmento" style="shape=umlFrame;whiteSpace=wrap;html=1;pointerEvents=0;width=150;height=26;fillColor=#f5f5f5;strokeColor=#666666;fontColor=#333333;fontSize=11;align=left;spacingLeft=6;" vertex="1" parent="1">
+          <mxGeometry x="-30" y="352" width="2050" height="280" as="geometry" />
+        </mxCell>
+        <mxCell id="s1-25" value="Resultado" style="endArrow=block;startArrow=none;endFill=1;startFill=0;endSize=8;html=1;verticalAlign=bottom;labelBackgroundColor=none;rounded=0;fontSize=11;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="535" y="662" as="sourcePoint" />
+            <mxPoint x="765" y="662" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="s1-26" value="Las reglas corren cuando el oferente no tiene pendientes y la ficha del proceso está confirmada." style="shape=note;whiteSpace=wrap;html=1;backgroundOutline=1;size=12;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;align=left;spacing=6;verticalAlign=top;" vertex="1" parent="1">
+          <mxGeometry x="2050" y="668" width="250" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="s1-27" value="Reglas del oferente" style="endArrow=block;startArrow=none;endFill=1;startFill=0;endSize=8;html=1;verticalAlign=bottom;labelBackgroundColor=none;rounded=0;fontSize=11;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="765" y="708" as="sourcePoint" />
+            <mxPoint x="765" y="708" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="s1-28" value="Tareas de revisión" style="endArrow=block;startArrow=none;endFill=1;startFill=0;endSize=8;html=1;verticalAlign=bottom;labelBackgroundColor=none;rounded=0;fontSize=11;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="765" y="754" as="sourcePoint" />
+            <mxPoint x="1685" y="754" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="s1-29" value="Confirma o corrige" style="endArrow=block;startArrow=none;endFill=1;startFill=0;endSize=8;html=1;verticalAlign=bottom;labelBackgroundColor=none;rounded=0;fontSize=11;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="1915" y="800" as="sourcePoint" />
+            <mxPoint x="1685" y="800" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="s1-30" value="Corrección (Service Bus)" style="endArrow=open;startArrow=none;endFill=0;startFill=0;endSize=8;html=1;verticalAlign=bottom;labelBackgroundColor=none;rounded=0;dashed=1;fontSize=11;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="1685" y="846" as="sourcePoint" />
+            <mxPoint x="765" y="846" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="s1-31" value="Recalcula reglas" style="endArrow=block;startArrow=none;endFill=1;startFill=0;endSize=8;html=1;verticalAlign=bottom;labelBackgroundColor=none;rounded=0;fontSize=11;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="765" y="892" as="sourcePoint" />
+            <mxPoint x="765" y="892" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

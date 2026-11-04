@@ -1,0 +1,12 @@
+# Datos personales o documentos reales: no van a git (principio 6)
+Documentos/clasificados/
+Documentos/**/*.pdf
+matriz/
+*.pdf
+!tests/**/*.pdf
+
+# Python
+__pycache__/
+.venv/
+*.pyc
+.pytest_cache/

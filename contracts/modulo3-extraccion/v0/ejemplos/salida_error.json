@@ -1,0 +1,23 @@
+{
+  "contrato": "modulo3-extraccion/0.1",
+  "id_proceso": "SR0000000001",
+  "id_oferente": "OF-004",
+  "id_documento": "OF-004-seg-02",
+  "tipo_documental": "TD-07",
+  "paginas": {"desde": 3, "hasta": 9},
+  "estado": "error_entrada",
+  "error": {"codigo": "PAGINAS_FUERA_DE_RANGO", "mensaje": "El archivo tiene 6 páginas y se pidió hasta la 9.", "reintentable": false},
+  "version_modelo": 21,
+  "requiere_revision": false,
+  "campos_en_revision": [],
+  "resultados": [],
+  "alertas": [],
+  "ejecucion": {
+    "id": "ej-000000000004",
+    "inicio": "2026-10-29T10:20:00-05:00",
+    "duracion_ms": 120,
+    "modelo_llm": "gpt-5.4",
+    "version_prompt": "extraccion_documental/prompt@0.1",
+    "version_unidad": "0.1.0"
+  }
+}

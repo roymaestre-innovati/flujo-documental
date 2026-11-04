@@ -1,0 +1,365 @@
+# Fichas de clasificación de tipos documentales – ontología v1.0.0
+
+Cada sección describe cómo reconocer un tipo documental en una oferta.
+
+## TD-01 – Condiciones del Proceso de Contratación (CPC)
+
+- Criticidad: alta (umbral de confianza 0.95)
+- Títulos típicos: Condiciones del Proceso de Contratación; Condiciones del proceso
+- Emisor: Grupo Energía Bogotá; logo GEB o filial
+- Estructura: carátula con número de proceso, objeto y modalidad; índice con numerales 1.8, 2.1, 2.2, 2.3, 3.2, 4.1
+- Vocabulario: requisitos habilitantes; factores de ponderación; subsanación; presupuesto oficial
+- No es este tipo si aparece: Adenda No.
+- Se confunde con TD-02: TD-02 dice 'Adenda No.' y modifica numerales puntuales
+
+## TD-02 – Adenda
+
+- Criticidad: alta (umbral de confianza 0.95)
+- Títulos típicos: Adenda No.
+- Emisor: Grupo Energía Bogotá
+- Estructura: referencia a número de proceso; lista de numerales modificados
+- Vocabulario: se modifica el numeral; quedará así; se adiciona
+- No es este tipo si aparece: respuesta a observaciones sin modificación de numerales
+- Se confunde con TD-01: TD-02 dice 'Adenda No.' y modifica numerales puntuales
+
+## TD-03 – Carta de presentación de la oferta
+
+- Criticidad: alta (umbral de confianza 0.95)
+- Títulos típicos: Carta de presentación de la oferta
+- Emisor: formato GEB diligenciado por el oferente
+- Estructura: bloque final con nombre, NIT, dirección, correo, ciudad y firma
+- Vocabulario: declaro bajo la gravedad de juramento; el suscrito; en nombre y representación de
+- No es este tipo si aparece: tabla de ítems con cantidad y valor unitario; acepto el clausulado
+- Se confunde con TD-04: TD-04 acepta el clausulado; TD-03 identifica al oferente y se obliga por la oferta
+- Se confunde con TD-35: TD-35 tiene tabla de ítems con cantidad y valor unitario
+
+## TD-04 – Carta de aceptación del clausulado del contrato
+
+- Criticidad: media (umbral de confianza 0.9)
+- Títulos típicos: Carta de aceptación; Aceptación del clausulado
+- Emisor: —
+- Estructura: texto breve con firma
+- Vocabulario: acepto; clausulado general; condiciones esenciales del contrato; 2.1.2
+- No es este tipo si aparece: declaro bajo la gravedad de juramento que la oferta
+- Se confunde con TD-03: TD-04 acepta el clausulado; TD-03 identifica al oferente y se obliga por la oferta
+
+## TD-05 – Compromiso de confidencialidad
+
+- Criticidad: baja (umbral de confianza 0.85)
+- Títulos típicos: Compromiso de confidencialidad; Acuerdo de confidencialidad
+- Emisor: —
+- Estructura: —
+- Vocabulario: información confidencial; reserva; no divulgar
+- No es este tipo si aparece: cláusula dentro de documento consorcial o de contrato de experiencia
+
+## TD-06 – Constancia de asistencia a reunión o visita técnica
+
+- Criticidad: media (umbral de confianza 0.9)
+- Títulos típicos: Acta de visita técnica; Reunión informativa; Certificado de asistencia
+- Emisor: —
+- Estructura: lista de asistentes con nombre, empresa y firma
+- Vocabulario: visita técnica; reunión informativa; asistentes
+- No es este tipo si aparece: quórum; Junta Directiva; Asamblea
+- Se confunde con TD-10: TD-06 es de GEB con lista de asistentes; TD-10 es del órgano social del oferente
+
+## TD-07 – Certificado de existencia y representación legal (Cámara de Comercio)
+
+- Criticidad: alta (umbral de confianza 0.95)
+- Títulos típicos: Certificado de existencia y representación legal; Cámara de Comercio de
+- Emisor: Cámara de Comercio
+- Estructura: código de verificación en cada página; fecha y hora de expedición; secciones Matrícula, Constitución, Término de duración, Objeto social, Representación legal, Facultades, Nombramientos
+- Vocabulario: matrícula mercantil; término de duración; representante legal suplente; limitaciones
+- No es este tipo si aparece: Registro Único de Proponentes; UNSPSC; Formulario 001
+- Se confunde con TD-23: TD-23 dice 'Registro Único de Proponentes' y trae UNSPSC e indicadores
+- Se confunde con TD-13: TD-13 tiene logo DIAN, casillas numeradas y CIIU
+- Subtipos: sociedad; sucursal_extranjera
+
+## TD-08 – Documento de existencia de sociedad extranjera
+
+- Criticidad: alta (umbral de confianza 0.95)
+- Títulos típicos: Certificate of Incorporation; Certificate of Good Standing; Registro Mercantil; Extracto de registro
+- Emisor: registro del país de origen; sello de apostilla
+- Estructura: documento en idioma extranjero o con traducción oficial; apostilla de La Haya
+- Vocabulario: incorporated; good standing; registered agent; director
+- No es este tipo si aparece: Bylaws; Independent Auditor's Report
+
+## TD-09 – Estatutos, certificación de facultades o declaración juramentada (extranjera)
+
+- Criticidad: media (umbral de confianza 0.9)
+- Títulos típicos: Bylaws; Articles of Association; Estatutos; Secretary's Certificate; Declaración juramentada
+- Emisor: —
+- Estructura: —
+- Vocabulario: declaro bajo juramento; powers of the director; objeto social; duración
+- No es este tipo si aparece: confiero poder; quórum; orden del día
+- Se confunde con TD-10, TD-11: TD-10 = acta (quórum, orden del día); TD-11 = confiere poder a tercero; TD-09 = estatutos o certificación general
+
+## TD-10 – Extracto de acta de junta o asamblea
+
+- Criticidad: alta (umbral de confianza 0.95)
+- Títulos típicos: Acta No.; Extracto del acta
+- Emisor: —
+- Estructura: firmas de presidente y secretario
+- Vocabulario: Junta Directiva; Asamblea General de Accionistas; quórum; orden del día; se autoriza al representante legal
+- No es este tipo si aparece: visita técnica; confiero poder
+- Se confunde con TD-09, TD-11: TD-10 = acta (quórum, orden del día); TD-11 = confiere poder a tercero; TD-09 = estatutos o certificación general
+- Se confunde con TD-06: TD-06 es de GEB con lista de asistentes; TD-10 es del órgano social del oferente
+
+## TD-11 – Poder al apoderado
+
+- Criticidad: alta (umbral de confianza 0.95)
+- Títulos típicos: Poder especial; Poder general; Power of Attorney
+- Emisor: —
+- Estructura: lista de facultades; sello notarial o apostilla
+- Vocabulario: confiero poder; apoderado; faculto a; en nombre de
+- No es este tipo si aparece: quórum; Bylaws
+- Se confunde con TD-09, TD-10: TD-10 = acta (quórum, orden del día); TD-11 = confiere poder a tercero; TD-09 = estatutos o certificación general
+
+## TD-12 – Documento de conformación de estructura plural
+
+- Criticidad: alta (umbral de confianza 0.95)
+- Títulos típicos: Documento de conformación de consorcio; Documento de constitución de unión temporal
+- Emisor: —
+- Estructura: tabla de integrantes con razón social, NIT y %; firmas de todos los integrantes
+- Vocabulario: Consorcio; Unión Temporal; responsabilidad solidaria; representante del consorcio; porcentaje de participación
+- No es este tipo si aparece: accionistas; número de acciones
+- Se confunde con TD-15: TD-12 reparte % entre empresas de una EP; TD-15 entre accionistas
+- Subtipos: consorcio; union_temporal
+
+## TD-13 – RUT
+
+- Criticidad: media (umbral de confianza 0.9)
+- Títulos típicos: Registro Único Tributario; Formulario 001
+- Emisor: DIAN; logo DIAN
+- Estructura: casillas numeradas (5. NIT, 6. DV, 35. Razón social); códigos CIIU; responsabilidades tributarias
+- Vocabulario: Número de Identificación Tributaria; actividad económica; Certificado; Documento sin costo
+- No es este tipo si aparece: Cámara de Comercio; Registro Único de Proponentes
+- Se confunde con TD-07: TD-13 tiene logo DIAN, casillas numeradas y CIIU
+
+## TD-14 – Documento de identidad del representante o apoderado
+
+- Criticidad: media (umbral de confianza 0.9)
+- Títulos típicos: Cédula de ciudadanía; Cédula de extranjería; Pasaporte; Passport
+- Emisor: República de Colombia; Registraduría Nacional; Migración Colombia
+- Estructura: formato tarjeta una o dos caras; foto; huella; código de barras o zona MRZ
+- Vocabulario: identificación personal; fecha de nacimiento; lugar de expedición
+- No es este tipo si aparece: Junta Central de Contadores; Tarjeta profesional
+- Se confunde con TD-26: TD-26 dice 'Junta Central de Contadores' y 'T.P.'
+- Subtipos: cedula_ciudadania; cedula_extranjeria; pasaporte
+
+## TD-15 – Certificado de composición accionaria
+
+- Criticidad: baja (umbral de confianza 0.85)
+- Títulos típicos: Certificado de composición accionaria; Composición accionaria
+- Emisor: —
+- Estructura: tabla nombre, identificación, número de acciones, %
+- Vocabulario: accionistas; socios; beneficiario final; número de acciones
+- No es este tipo si aparece: Consorcio; Unión Temporal; responsabilidad solidaria
+- Se confunde con TD-12: TD-12 reparte % entre empresas de una EP; TD-15 entre accionistas
+
+## TD-16 – Certificación de aportes a seguridad social y parafiscales
+
+- Criticidad: media (umbral de confianza 0.9)
+- Títulos típicos: Certificación de pago de aportes; Certificación de aportes parafiscales
+- Emisor: —
+- Estructura: firma con tarjeta profesional del revisor fiscal
+- Vocabulario: artículo 50 de la Ley 789 de 2002; seguridad social; parafiscales; últimos seis (6) meses
+- No es este tipo si aparece: planilla PILA sin texto de certificación
+- Subtipos: PJ; PN
+
+## TD-17 – Formulario de demandas, multas y sanciones
+
+- Criticidad: baja (umbral de confianza 0.85)
+- Títulos típicos: Formulario de demandas, multas y sanciones
+- Emisor: —
+- Estructura: tabla entidad, año, motivo, valor o declaración 'no tiene'
+- Vocabulario: demandas; multas; sanciones; incumplimientos
+- No es este tipo si aparece: listas restrictivas; SARLAFT
+
+## TD-18 – Formulario de verificación en listas restrictivas
+
+- Criticidad: media (umbral de confianza 0.9)
+- Títulos típicos: Formulario de verificación en listas restrictivas; Autorización de consulta
+- Emisor: —
+- Estructura: —
+- Vocabulario: listas restrictivas; lavado de activos; financiación del terrorismo; SARLAFT; OFAC; autorizo la consulta
+- No es este tipo si aparece: multas; demandas
+
+## TD-19 – Garantía de seriedad – póliza de seguro
+
+- Criticidad: alta (umbral de confianza 0.95)
+- Títulos típicos: Póliza de seguro de cumplimiento; Seriedad de la oferta
+- Emisor: compañía de seguros
+- Estructura: campos Tomador, Asegurado/Beneficiario, Valor asegurado, Vigencia desde/hasta, número de póliza
+- Vocabulario: a favor de Empresas de Servicios Públicos; amparo; prima
+- No es este tipo si aparece: Condiciones generales sin datos del tomador; Recibo de caja
+- Se confunde con TD-21, TD-22: TD-19 tiene tomador, valor y vigencia; TD-21 clausulado sin datos particulares; TD-22 prima pagada
+- Se confunde con TD-20: TD-20 lo emite un banco o fiduciaria: irrevocable, primer requerimiento, stand-by
+
+## TD-20 – Garantía de seriedad – garantía bancaria, stand-by o fiducia
+
+- Criticidad: alta (umbral de confianza 0.95)
+- Títulos típicos: Bank Guarantee; Standby Letter of Credit; Garantía bancaria; Encargo fiduciario
+- Emisor: banco; fiduciaria; referencia SWIFT
+- Estructura: —
+- Vocabulario: irrevocable; a primer requerimiento; on first demand; ISP98; URDG 758
+- No es este tipo si aparece: póliza; cupo de crédito
+- Se confunde con TD-19: TD-20 lo emite un banco o fiduciaria: irrevocable, primer requerimiento, stand-by
+- Subtipos: garantia_bancaria; standby; fiducia
+
+## TD-21 – Condiciones generales de la póliza
+
+- Criticidad: baja (umbral de confianza 0.85)
+- Títulos típicos: Condiciones generales
+- Emisor: —
+- Estructura: cláusulas numeradas: amparos, exclusiones, siniestro; código de clausulado o forma
+- Vocabulario: exclusiones; siniestro; terminación automática
+- No es este tipo si aparece: valor asegurado particular; nombre del tomador
+- Se confunde con TD-19, TD-22: TD-19 tiene tomador, valor y vigencia; TD-21 clausulado sin datos particulares; TD-22 prima pagada
+
+## TD-22 – Recibo o certificación de pago de la prima
+
+- Criticidad: media (umbral de confianza 0.9)
+- Títulos típicos: Recibo de caja; Certificado de pago; Constancia de pago de prima
+- Emisor: —
+- Estructura: —
+- Vocabulario: prima; valor pagado; número de póliza
+- No es este tipo si aparece: valor asegurado; vigencia desde/hasta
+- Se confunde con TD-19, TD-21: TD-19 tiene tomador, valor y vigencia; TD-21 clausulado sin datos particulares; TD-22 prima pagada
+
+## TD-23 – Registro Único de Proponentes (RUP)
+
+- Criticidad: media (umbral de confianza 0.9)
+- Títulos típicos: Registro Único de Proponentes
+- Emisor: Cámara de Comercio
+- Estructura: códigos UNSPSC; secciones Capacidad financiera, Capacidad organizacional, Experiencia
+- Vocabulario: índice de liquidez; índice de endeudamiento; capital de trabajo; firmeza
+- No es este tipo si aparece: Certificado de existencia y representación legal sin UNSPSC
+- Se confunde con TD-07: TD-23 dice 'Registro Único de Proponentes' y trae UNSPSC e indicadores
+
+## TD-24 – Estados financieros con notas
+
+- Criticidad: alta (umbral de confianza 0.95)
+- Títulos típicos: Estado de situación financiera; Balance general; Estado de resultados; Notas a los estados financieros
+- Emisor: —
+- Estructura: dos columnas de años comparativos; renglones Activo corriente, Total activo, Pasivo corriente, Total pasivo, Patrimonio; tres firmas con T.P.
+- Vocabulario: cifras expresadas en miles de pesos; cifras expresadas en millones; patrimonio; utilidad del ejercicio
+- No es este tipo si aparece: en mi opinión; Independent Auditor's Report; UNSPSC
+- Se confunde con TD-25: TD-24 tiene cifras de balance; TD-25 es una opinión en texto
+
+## TD-25 – Dictamen del revisor fiscal o certificación de auditoría externa
+
+- Criticidad: media (umbral de confianza 0.9)
+- Títulos típicos: Dictamen del revisor fiscal; Informe del revisor fiscal; Independent Auditor's Report
+- Emisor: revisor fiscal; firma de auditoría
+- Estructura: secciones Opinión, Fundamento de la opinión, Responsabilidades
+- Vocabulario: en mi opinión; presentan razonablemente; salvedad; abstención
+- No es este tipo si aparece: tabla de activos y pasivos; Ley 789 de 2002
+- Se confunde con TD-24: TD-24 tiene cifras de balance; TD-25 es una opinión en texto
+
+## TD-26 – Tarjeta profesional de contador o revisor fiscal
+
+- Criticidad: baja (umbral de confianza 0.85)
+- Títulos típicos: Tarjeta profesional; Contador público
+- Emisor: Junta Central de Contadores
+- Estructura: formato tarjeta con foto; número T.P. xxxxx-T
+- Vocabulario: —
+- No es este tipo si aparece: Registraduría; certifica que no registra sanciones
+- Se confunde con TD-14: TD-26 dice 'Junta Central de Contadores' y 'T.P.'
+- Se confunde con TD-27: TD-27 es certificado con fecha de expedición y estado disciplinario
+
+## TD-27 – Certificado de antecedentes disciplinarios (JCC)
+
+- Criticidad: media (umbral de confianza 0.9)
+- Títulos típicos: Certificado de vigencia y antecedentes disciplinarios
+- Emisor: Junta Central de Contadores
+- Estructura: código de verificación; fecha de expedición
+- Vocabulario: no registra sanciones; inscripción vigente
+- No es este tipo si aparece: Procuraduría; Contraloría; Policía Nacional
+- Se confunde con TD-26: TD-27 es certificado con fecha de expedición y estado disciplinario
+
+## TD-28 – Certificado de calificación crediticia
+
+- Criticidad: media (umbral de confianza 0.9)
+- Títulos típicos: Calificación de riesgo; Credit rating
+- Emisor: sociedad calificadora; central de riesgo
+- Estructura: —
+- Vocabulario: calificación; rating; AAA; perspectiva; comité técnico
+- No es este tipo si aparece: garantía bancaria; stand-by
+
+## TD-29 – Formulario de experiencia del oferente
+
+- Criticidad: media (umbral de confianza 0.9)
+- Títulos típicos: Experiencia del oferente; Formulario de experiencia
+- Emisor: —
+- Estructura: tabla con contratante, número y objeto, fecha inicio, fecha terminación, valor, % participación
+- Vocabulario: 2.3.1; contratos acreditados; valor ejecutado
+- No es este tipo si aparece: valor unitario; unidad de medida; membrete del contratante
+- Se confunde con TD-35: TD-29 lista contratos y contratantes; TD-35 lista ítems con unidad y cantidad
+- Se confunde con TD-30: TD-30 lleva membrete y firma del contratante
+
+## TD-30 – Certificación o acta de contrato (soporte de experiencia)
+
+- Criticidad: media (umbral de confianza 0.9)
+- Títulos típicos: Certificación de experiencia; Acta de liquidación; Acta de terminación; Acta de recibo final
+- Emisor: membrete de la entidad contratante
+- Estructura: número de contrato, objeto, plazo, valor; firma del contratante
+- Vocabulario: certifica que; ejecutó a satisfacción; valor final ejecutado
+- No es este tipo si aparece: formato de experiencia del proceso con varias filas
+- Se confunde con TD-29: TD-30 lleva membrete y firma del contratante
+- Subtipos: certificacion; acta_liquidacion; acta_terminacion
+
+## TD-31 – Certificado del sistema de gestión de calidad
+
+- Criticidad: media (umbral de confianza 0.9)
+- Títulos típicos: Certificado de registro; Certificate of registration
+- Emisor: ICONTEC; Bureau Veritas; SGS; logos ONAC o IQNet
+- Estructura: norma, alcance, fecha de emisión, válido hasta
+- Vocabulario: ISO 9001:2015; sistema de gestión de calidad; alcance
+- No es este tipo si aparece: ISO 45001; ISO 14001; SG-SST
+- Se confunde con TD-34: ISO 9001 -> TD-31; ISO 45001 o SG-SST -> TD-34; ISO 14001 -> según el criterio que la puntúe
+
+## TD-32 – Otros soportes técnicos definidos en las CPC
+
+- Criticidad: media (umbral de confianza 0.9)
+- Títulos típicos: —
+- Emisor: —
+- Estructura: —
+- Vocabulario: —
+- No es este tipo si aparece: —
+- Señales: se definen en las CPC de cada proceso.
+- Subtipos: hoja_de_vida; titulo_profesional; ficha_tecnica; cronograma; listado_equipos
+
+## TD-33 – Anexo de sostenibilidad
+
+- Criticidad: media (umbral de confianza 0.9)
+- Títulos típicos: Anexo de sostenibilidad
+- Emisor: —
+- Estructura: preguntas con respuesta Sí/No y soporte
+- Vocabulario: ambiental, social y de gobernanza; ASG; sostenibilidad
+- No es este tipo si aparece: SG-SST; Resolución 0312; ISO 45001
+
+## TD-34 – Soportes de SST
+
+- Criticidad: media (umbral de confianza 0.9)
+- Títulos típicos: Autoevaluación de estándares mínimos; Certificación ARL; ISO 45001
+- Emisor: —
+- Estructura: —
+- Vocabulario: SG-SST; Resolución 0312; estándares mínimos; accidentalidad
+- No es este tipo si aparece: ISO 9001
+- Se confunde con TD-31: ISO 9001 -> TD-31; ISO 45001 o SG-SST -> TD-34; ISO 14001 -> según el criterio que la puntúe
+- Subtipos: autoevaluacion_estandares_minimos; certificado_arl; iso_45001; indices_accidentalidad
+
+## TD-35 – Formulario No. 8 – Oferta económica
+
+- Criticidad: alta (umbral de confianza 0.95)
+- Títulos típicos: Formulario No. 8; Oferta económica
+- Emisor: —
+- Estructura: tabla ítem, descripción, unidad, cantidad, valor unitario, valor total; renglones subtotal, AIU, IVA, total
+- Vocabulario: valor unitario; AIU; IVA; valor total de la oferta
+- No es este tipo si aparece: contratante; fecha de terminación; declaro bajo la gravedad de juramento
+- Se confunde con TD-03: TD-35 tiene tabla de ítems con cantidad y valor unitario
+- Se confunde con TD-29: TD-29 lista contratos y contratantes; TD-35 lista ítems con unidad y cantidad
+
+## TD-99 – No identificado
+
+- Regla: max(confianza) < 0.50 o documento no exigido (folletos, presentaciones); siempre revisión

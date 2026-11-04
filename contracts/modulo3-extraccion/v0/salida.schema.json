@@ -1,0 +1,128 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "modulo3-extraccion/v0/salida.schema.json",
+  "title": "Resultado de extracción de un segmento de documento",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["contrato", "id_proceso", "id_oferente", "id_documento", "tipo_documental", "paginas", "estado", "version_modelo", "requiere_revision", "campos_en_revision", "resultados", "alertas", "ejecucion"],
+  "properties": {
+    "contrato": {"const": "modulo3-extraccion/0.1"},
+    "id_proceso": {"type": "string"},
+    "id_oferente": {"type": "string"},
+    "id_documento": {"type": "string"},
+    "tipo_documental": {"type": "string", "pattern": "^TD-[0-9]{2}$"},
+    "paginas": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["desde", "hasta"],
+      "properties": {"desde": {"type": "integer", "minimum": 1}, "hasta": {"type": "integer", "minimum": 1}}
+    },
+    "estado": {
+      "enum": ["ok", "no_corresponde", "error_entrada", "error_proceso"],
+      "description": "ok: se extrajo (puede haber campos en revisión). no_corresponde: el contenido no es del TD indicado. error_entrada: archivo ilegible, con contraseña o páginas fuera de rango. error_proceso: falló el LLM o el MCP tras los reintentos."
+    },
+    "error": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["codigo", "mensaje", "reintentable"],
+      "description": "Solo cuando estado es error_entrada o error_proceso.",
+      "properties": {
+        "codigo": {"type": "string"},
+        "mensaje": {"type": "string"},
+        "reintentable": {"type": "boolean"}
+      }
+    },
+    "version_modelo": {"type": "integer", "minimum": 1},
+    "td_probado": {"type": "boolean", "description": "false: el TD no se ha probado con documentos reales y todos sus campos van a revisión (D4)."},
+    "requiere_revision": {"type": "boolean"},
+    "campos_en_revision": {"type": "array", "items": {"type": "string"}},
+    "resultados": {
+      "type": "array",
+      "description": "Un resultado por elemento de la sección, en el orden del modelo, incluidos los no encontrados. Vacío si estado no es ok.",
+      "items": {"$ref": "#/$defs/resultado"}
+    },
+    "alertas": {"type": "array", "items": {"$ref": "#/$defs/alerta"}},
+    "lectura": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Cómo se leyó el documento (D19, D20).",
+      "properties": {
+        "paginas_con_texto": {"type": "array", "items": {"type": "integer"}},
+        "paginas_solo_imagen": {"type": "array", "items": {"type": "integer"}},
+        "ampliaciones_firma": {"type": "array", "items": {"type": "integer"}, "description": "Páginas en las que se envió un recorte ampliado de la zona de firma."}
+      }
+    },
+    "ejecucion": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "inicio", "duracion_ms", "modelo_llm", "version_prompt", "version_unidad"],
+      "properties": {
+        "id": {"type": "string"},
+        "inicio": {"type": "string", "format": "date-time"},
+        "duracion_ms": {"type": "integer", "minimum": 0},
+        "tokens_entrada": {"type": "integer", "minimum": 0},
+        "tokens_salida": {"type": "integer", "minimum": 0},
+        "modelo_llm": {"type": "string"},
+        "version_prompt": {"type": "string"},
+        "version_unidad": {"type": "string"},
+        "reintentos": {"type": "integer", "minimum": 0},
+        "desde_cache": {"type": "boolean", "description": "true si se devolvió un resultado guardado por idempotencia (D22)."}
+      }
+    }
+  },
+  "$defs": {
+    "motivo": {
+      "enum": ["CONFIANZA_BAJA", "NO_CUMPLE", "OBLIGATORIO_VACIO", "REQUIERE_IMAGEN", "PLANTILLA_SIN_LLENAR", "NOTA_ELEMENTO", "CONTRADICCION", "VALIDACION_FALLIDA", "TD_NO_PROBADO"]
+    },
+    "cita": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["pagina", "cita", "visual"],
+      "properties": {
+        "pagina": {"type": "integer", "minimum": 1, "description": "Página del archivo completo."},
+        "cita": {"type": ["string", "null"], "description": "Texto tal como está en el documento, sin corregir."},
+        "visual": {"type": ["string", "null"], "description": "Descripción de lo que solo se ve en la imagen: firma, casilla, sello."}
+      }
+    },
+    "regla_pendiente": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id_regla", "texto", "requiere"],
+      "properties": {
+        "id_regla": {"type": "string", "description": "Identificador estable de la regla en la matriz (R1). Provisional: <id_tecnico>.r<n>."},
+        "texto": {"type": "string"},
+        "requiere": {"type": "array", "items": {"type": "string"}, "description": "Lo que necesita el módulo 4: TD-NN, PRO-NN o un campo calculado."}
+      }
+    },
+    "resultado": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id_tecnico", "valor", "confianza", "evidencia", "cumple", "reglas_pendientes", "revision", "motivos", "observacion", "datos_personales"],
+      "properties": {
+        "id_tecnico": {"type": "string", "pattern": "^td[0-9]{2}\\."},
+        "valor": {"description": "Forma según tipo_dato y atributos del modelo. null si no aparece en el documento."},
+        "confianza": {"type": ["number", "null"], "minimum": 0, "maximum": 1, "description": "Confianza que declara el agente. No se mezcla con las validaciones en v0 (D17)."},
+        "evidencia": {"type": "array", "items": {"$ref": "#/$defs/cita"}},
+        "cumple": {"enum": ["SI", "NO", "PENDIENTE", null], "description": "Solo reglas de ámbito documento. null si el elemento no tiene ninguna. PENDIENTE si no se pudo evaluar con el documento."},
+        "reglas_pendientes": {"type": "array", "items": {"$ref": "#/$defs/regla_pendiente"}, "description": "Reglas de ámbito proceso para el módulo 4. No mandan el campo a revisión."},
+        "revision": {"type": "boolean", "description": "Lo decide la posvalidación, no el agente (D13)."},
+        "motivos": {"type": "array", "items": {"$ref": "#/$defs/motivo"}, "uniqueItems": true},
+        "observacion": {"type": ["string", "null"]},
+        "datos_personales": {"type": "boolean"}
+      },
+      "if": {"properties": {"revision": {"const": true}}},
+      "then": {"properties": {"motivos": {"minItems": 1}}},
+      "else": {"properties": {"motivos": {"maxItems": 0}}}
+    },
+    "alerta": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["codigo", "mensaje"],
+      "properties": {
+        "codigo": {"type": "string"},
+        "mensaje": {"type": "string"},
+        "id_tecnico": {"type": ["string", "null"]}
+      }
+    }
+  }
+}
