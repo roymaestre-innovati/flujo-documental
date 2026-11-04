@@ -21,7 +21,7 @@ from dataclasses import dataclass
 import pdfplumber
 import pikepdf
 
-from . import CONTRATO, VERSION
+from . import CONTRATO, VERSION, anclas
 from .firma import FirmaDigital
 from .parametros import PARAMETROS, Parametros
 
@@ -166,10 +166,13 @@ def _leer_pagina(pagina, numero: int, rotacion: int, parametros: Parametros) -> 
     cajas = [(imagen["x0"], imagen["top"], imagen["x1"], imagen["bottom"]) for imagen in pagina.images]
     fraccion = cobertura(cajas, tuple(map(float, pagina.bbox)), parametros.celdas_grilla_cobertura)
     tipo = tipo_de_pagina(caracteres, fraccion, parametros)
+    palabras_pdfplumber = pagina.extract_words()
     palabras = [
         {"t": palabra["text"], "caja": _caja(palabra["x0"], palabra["top"], palabra["x1"], palabra["bottom"])}
-        for palabra in pagina.extract_words()
+        for palabra in palabras_pdfplumber
     ]
+    # Las páginas imagen no tienen anclas: no hay texto (plan, "Anclas").
+    zonas = [] if tipo == IMAGEN else anclas.buscar(pagina, palabras_pdfplumber, parametros)
     lectura = {
         "pagina": numero,
         "tipo": tipo,
@@ -178,7 +181,7 @@ def _leer_pagina(pagina, numero: int, rotacion: int, parametros: Parametros) -> 
         "caracteres": caracteres,
         "cobertura_imagen": fraccion,
         "rotacion": rotacion,
-        "anclas": [],  # T10
+        "anclas": zonas,
     }
     return lectura, {"pagina": numero, "palabras": palabras}
 
