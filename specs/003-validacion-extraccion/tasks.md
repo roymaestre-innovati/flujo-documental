@@ -17,7 +17,7 @@ Dependencias del sistema: `libreoffice` (writer y calc) y Python 3.12 con `uv`. 
 
 - [x] **T01 — Contrato.** Escribir `contracts/modulo3-normalizacion/v0/`: `README.md`, `manifiesto.schema.json`, `lectura.schema.json` y `palabras.schema.json` (JSON Schema 2020-12), más ejemplos: una entrega con un normalizado, un duplicado, un error y un descartado, y una lectura con una página de cada tipo. Validar los ejemplos contra los esquemas, como en `contracts/modulo3-extraccion/v0/README.md`. **Detenerse aquí para revisión del usuario** antes de seguir (principio 5).
 - [x] **T02 — Esqueleto.** `servicios/normalizacion/` con `pyproject.toml` (uv, pytest), `__init__.py` con `VERSION = "0.1.0"`, `parametros.py`, `almacen.py` (interfaz y `AlmacenLocal`) y el comando `normalizar` que por ahora solo lista la entrega. Agregar la prueba que valida los ejemplos del contrato.
-- [ ] **T03 — Fábrica de pruebas.** `tests/fabrica.py` con todos los casos de la tabla de pruebas del plan. Una prueba por caso que solo confirma que el archivo se fabricó.
+- [x] **T03 — Fábrica de pruebas.** `tests/fabrica.py` con todos los casos de la tabla de pruebas del plan. Una prueba por caso que solo confirma que el archivo se fabricó.
 - [ ] **T04 — Inventario.** Recorrido recursivo, descarte de archivos de sistema (por nombre y por contenido), SHA-256, duplicados por orden de ruta e `id_documento`. Requisitos R1 a R5.
 - [ ] **T05 — Tipo real.** `tipos.py` con la tabla del plan. Incluye la extensión falsa y los no soportados. Requisito R6.
 - [ ] **T06 — Revisión del PDF.** Abrir, reparar una vez, detectar contraseña y restricciones, contar páginas. Requisitos R11 a R13 y R16.
@@ -69,3 +69,20 @@ Contrato escrito en `contracts/modulo3-normalizacion/v0/`, con los ejemplos vali
 - **Validadores del contrato en `tests/contrato.py`**, para que la prueba de punta a punta (T11) los reuse. Además de validar los ejemplos, las pruebas comprueban que los esquemas rechazan casos mal formados y que los ejemplos usan las versiones del paquete.
 
 **Duda resuelta para T10:** la tabla SI/NO se reconoce sin importar mayúsculas ni tildes ("Sí" cuenta), igual que "firma". Ya está en `plan.md`.
+
+### T03 — Fábrica de pruebas (2026-11-04)
+
+`tests/fabrica.py` fabrica los 18 casos de la tabla de pruebas del plan, repartidos en 24 funciones reunidas en `CASOS`, y `tests/test_fabrica.py` tiene una prueba por función. 88 pruebas en verde. Sin LibreOffice, las de ODT y DOC se saltan.
+
+**Decisiones que el plan no fijaba:**
+
+- **Cada prueba revisa la propiedad del caso**, no solo que el archivo exista: que la contraseña se pida, que el dañado reparable abra solo con recuperación, que la firma esté íntegra o que el TIFF tenga 3 páginas. Usa pikepdf, pyHanko, Pillow y olefile directamente, sin el código del normalizador.
+- **Caso extra `appledouble_sin_prefijo`:** un AppleDouble con nombre normal (`anexo_tecnico.pdf`), para probar que R2 descarta también por contenido y no solo por el prefijo `._`.
+- **La tabla SI/NO de `pdf_anclas`** trae una fila con "SI"/"NO" y otra con "Sí"/"No", por la decisión de reconocerlas sin mayúsculas ni tildes. El documento tiene dos líneas de firma: una con guiones bajos y otra dibujada.
+- **Dañado reparable:** un PDF válido con `startxref` apuntando mal (qpdf reconstruye la tabla). **Irreparable:** la cabecera `%PDF-` seguida de bytes sin estructura.
+- **Firma:** certificado autofirmado de curva elíptica (P-256), generado en cada prueba, con un nombre ficticio. pyHanko firma con `adbe.pkcs7.detached`. El caso modificado agrega un dibujo en una actualización incremental: la parte firmada sigue intacta, pero pyHanko reporta un cambio no permitido.
+- **Fabricación reproducible:** reportlab con `invariant=1` y pikepdf con identificador fijo, así que el mismo caso da los mismos bytes. Los cifrados son la excepción, porque el cifrado usa una sal aleatoria. La prueba de determinismo (T11) debe fabricar una vez y procesar dos.
+- **Dependencias:** reportlab, python-docx, openpyxl, cryptography, pikepdf, pyhanko, Pillow y olefile quedan en el grupo `dev`. pikepdf, pyhanko, Pillow y olefile pasan a dependencias del paquete cuando el código los use (T04 a T08).
+- **Nombres de archivo:** varios casos usan nombres parecidos (`carta_presentacion.*`). La entrega completa de T11 debe poner cada caso en su propia subcarpeta.
+
+**Duda para T08:** R15 pide anotar una firma que no se puede leer (`leida: false`, p. ej. `adbe.pkcs7.sha1`), pero la tabla de pruebas del plan no trae ese caso y pyHanko no firma en ese formato. Opciones: cambiar el `/SubFilter` de un PDF ya firmado, o fabricar a mano la firma en ese formato. Se decide en T08.
