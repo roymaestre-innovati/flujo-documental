@@ -12,6 +12,14 @@ normalizar = "normalizacion.cli:main"
 dev = [
     "pytest>=8",
     "jsonschema>=4.23",
+    "reportlab>=5.1.0",
+    "python-docx>=1.2.0",
+    "openpyxl>=3.1.5",
+    "cryptography>=50.0.2",
+    "pikepdf>=10.17.0",
+    "pyhanko>=0.38.1",
+    "pillow>=13.0.0",
+    "olefile>=0.47",
 ]
 
 [build-system]
