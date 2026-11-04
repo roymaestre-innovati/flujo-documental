@@ -140,6 +140,13 @@ def _con_pikepdf(datos: bytes, cambio, **guardar) -> bytes:
     return salida.getvalue()
 
 
+def pdf_sin_paginas(carpeta: Path) -> list[Path]:
+    """Un PDF bien formado, pero sin ninguna página."""
+    salida = io.BytesIO()
+    pikepdf.new().save(salida, deterministic_id=True)
+    return [_guardar(carpeta / "anexo_sin_paginas.pdf", salida.getvalue())]
+
+
 def pdf_rotado(carpeta: Path) -> list[Path]:
     def rotar(pdf):
         pdf.pages[0].obj.Rotate = 90
@@ -478,6 +485,7 @@ CASOS = {
     "pdf_escaneo_sin_texto": pdf_escaneo_sin_texto,
     "pdf_escaneo_con_ocr": pdf_escaneo_con_ocr,
     "pdf_vacio": pdf_vacio,
+    "pdf_sin_paginas": pdf_sin_paginas,
     "pdf_rotado": pdf_rotado,
     "pdf_con_contrasena": pdf_con_contrasena,
     "pdf_solo_restricciones": pdf_solo_restricciones,

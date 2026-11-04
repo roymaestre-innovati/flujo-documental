@@ -26,6 +26,7 @@ ESPERADOS = {
     "pdf_escaneo_con_ocr": TipoReal(PDF),
     "pdf_vacio": TipoReal(PDF),
     "pdf_rotado": TipoReal(PDF),
+    "pdf_sin_paginas": TipoReal(PDF),
     "pdf_con_contrasena": TipoReal(PDF),
     "pdf_solo_restricciones": TipoReal(PDF),
     "pdf_danado_reparable": TipoReal(PDF),

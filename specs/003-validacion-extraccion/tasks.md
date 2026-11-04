@@ -20,7 +20,7 @@ Dependencias del sistema: `libreoffice` (writer y calc) y Python 3.12 con `uv`. 
 - [x] **T03 — Fábrica de pruebas.** `tests/fabrica.py` con todos los casos de la tabla de pruebas del plan. Una prueba por caso que solo confirma que el archivo se fabricó.
 - [x] **T04 — Inventario.** Recorrido recursivo, descarte de archivos de sistema (por nombre y por contenido), SHA-256, duplicados por orden de ruta e `id_documento`. Requisitos R1 a R5.
 - [x] **T05 — Tipo real.** `tipos.py` con la tabla del plan. Incluye la extensión falsa y los no soportados. Requisito R6.
-- [ ] **T06 — Revisión del PDF.** Abrir, reparar una vez, detectar contraseña y restricciones, contar páginas. Requisitos R11 a R13 y R16.
+- [x] **T06 — Revisión del PDF.** Abrir, reparar una vez, detectar contraseña y restricciones, contar páginas. Requisitos R11 a R13 y R16.
 - [ ] **T07 — Conversión.** LibreOffice con perfil temporal y macros bloqueadas, con tiempo máximo y un reintento; imágenes con img2pdf, incluido el TIFF de varias páginas; Excel convertido y conservado como anexo. Requisitos R7 a R10.
 - [ ] **T08 — Firma digital.** Firmante, fecha, integridad, formato y `leida`. Casos: íntegro, modificado después de firmar, sin firma. Requisito R15.
 - [ ] **T09 — Lectura.** Texto, caracteres, cobertura de imagen (grilla de 200 × 200), rotación, tipo de página, origen del texto y archivo de palabras. Requisitos R14 y R18 a R20, R22 y R23.
@@ -113,3 +113,17 @@ Contrato escrito en `contracts/modulo3-normalizacion/v0/`, con los ejemplos vali
 1. **Word o Excel con contraseña: resuelta con el usuario.** `detectar` marca `cifrado = True` en el DOCX o XLSX con `EncryptedPackage` (queda `no_soportado`, porque no se sabe si era Word o Excel), en el DOC con la bandera `fEncrypted`, en el XLS con el registro `FILEPASS` y en el ODT u ODS con datos de cifrado en el manifiesto (estos conservan su tipo). La entrega (T11) deja esos documentos con `CONTRASENA`, sin convertirlos. La fábrica suma un DOCX y un XLSX cifrados con `msoffcrypto-tool` (MIT, solo en desarrollo).
 2. **PDF con bytes antes de `%PDF-`.** Acrobat abre PDF con hasta 1024 bytes de basura antes de la cabecera; aquí quedarían `no_soportado`. No se sabe si pasa en la muestra real: se verá en A3. Si pasa, la regla se amplía a "`%PDF-` en los primeros 1024 bytes".
 3. **Formatos fuera de la tabla:** RTF, PPTX, HEIC (fotos de iPhone), GIF, BMP y WEBP quedan `no_soportado`, con el aviso de entregarlos en PDF. HEIC y RTF podrían ser comunes entre oferentes; convendría confirmarlo con la muestra antes de agregarlos.
+
+### T06 — Revisión del PDF (2026-11-04)
+
+`revision_pdf.revisar(datos)` devuelve el PDF normalizado (el original tal cual, o la copia reparada), las páginas, las restricciones, si se reparó y el error, si lo hay. Nunca lanza excepción por un problema del documento. `errores.py` reúne los cinco códigos con su aviso para el evaluador, según la tabla del README del contrato. `pikepdf` es ahora dependencia del paquete. La fábrica suma un PDF sin páginas. 192 pruebas en verde.
+
+**Decisiones que el plan no fijaba:**
+
+- **"Abre"** quiere decir que pikepdf lo abre sin recuperación y puede contar sus páginas. Si no, se intenta la reparación una sola vez: se abre con recuperación, se guarda una copia y la copia tiene que abrir sin recuperación. Si algo de eso falla, `DANADO`.
+- **La copia reparada se guarda sin cifrado** y con un identificador derivado del contenido, así reparar dos veces da los mismos bytes (R25). Las restricciones se leen del original, así que `restricciones` sigue siendo `true` aunque la copia ya no las traiga.
+- **`restricciones`** solo cuenta las de copia e impresión (`extract`, `print_lowres` y `print_highres`), que son las que nombra R13. Un PDF cifrado que solo prohíbe, por ejemplo, modificarlo queda con `restricciones: false`.
+- **Avisos:** `error_documento(codigo, documento)` arma el `detalle` con el sujeto que corresponde ("El PDF pide contraseña…", "El archivo pide contraseña…").
+- **Registro de la reparación:** un mensaje con `logging`, sin nombre ni texto del documento. El formato JSON con los identificadores llega en T11.
+
+**Duda para T09 y T11.** Un PDF puede abrir y contar sus páginas, pero fallar después, al leer una página (un objeto roto adentro). La revisión no lo detecta. Si pdfplumber falla al leer, ¿el documento queda `DANADO` o se lee lo que se pueda y la página fallida queda `vacia`? Mientras tanto, esa falla sería una excepción (clase 4).

@@ -363,6 +363,7 @@ name = "normalizacion"
 source = { editable = "." }
 dependencies = [
     { name = "olefile" },
+    { name = "pikepdf" },
 ]
 
 [package.dev-dependencies]
@@ -371,7 +372,6 @@ dev = [
     { name = "jsonschema" },
     { name = "msoffcrypto-tool" },
     { name = "openpyxl" },
-    { name = "pikepdf" },
     { name = "pillow" },
     { name = "pyhanko" },
     { name = "pytest" },
@@ -380,7 +380,10 @@ dev = [
 ]
 
 [package.metadata]
-requires-dist = [{ name = "olefile", specifier = ">=0.47" }]
+requires-dist = [
+    { name = "olefile", specifier = ">=0.47" },
+    { name = "pikepdf", specifier = ">=10.17.0" },
+]
 
 [package.metadata.requires-dev]
 dev = [
@@ -388,7 +391,6 @@ dev = [
     { name = "jsonschema", specifier = ">=4.23" },
     { name = "msoffcrypto-tool", specifier = ">=6.1.0" },
     { name = "openpyxl", specifier = ">=3.1.5" },
-    { name = "pikepdf", specifier = ">=10.17.0" },
     { name = "pillow", specifier = ">=13.0.0" },
     { name = "pyhanko", specifier = ">=0.38.1" },
     { name = "pytest", specifier = ">=8" },

@@ -30,7 +30,7 @@ def _tiene_imagen(pagina) -> bool:
 
 
 def test_todos_los_casos_estan_registrados():
-    assert len(fabrica.CASOS) == 28
+    assert len(fabrica.CASOS) == 29
     assert fabrica.CASOS_CON_LIBREOFFICE <= set(fabrica.CASOS)
 
 
@@ -70,6 +70,12 @@ def test_pdf_vacio(tmp_path):
         assert len(pdf.pages) == 1
         assert not _tiene_imagen(pdf.pages[0])
         assert b"Tj" not in _texto_contenido(pdf.pages[0])
+
+
+def test_pdf_sin_paginas(tmp_path):
+    ruta = _un_archivo(fabrica.pdf_sin_paginas(tmp_path))
+    with pikepdf.open(ruta) as pdf:
+        assert len(pdf.pages) == 0
 
 
 def test_pdf_rotado(tmp_path):
