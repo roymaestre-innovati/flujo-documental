@@ -34,6 +34,7 @@
           "leida": true
         }
       ],
+      "reparado": false,
       "error": null
     },
     {
@@ -61,6 +62,7 @@
           "leida": true
         }
       ],
+      "reparado": false,
       "error": null
     },
     {
@@ -75,11 +77,12 @@
       "paginas": null,
       "paginas_sin_texto": [],
       "duplicado_de": null,
-      "restricciones": false,
-      "firma_digital": [],
+      "restricciones": null,
+      "firma_digital": null,
+      "reparado": false,
       "error": {
         "codigo": "CONTRASENA",
-        "detalle": "El PDF pide contraseña para abrirse."
+        "detalle": "El PDF pide contraseña para abrirse. Si se pide subsanación, el oferente debe entregarlo sin contraseña."
       }
     }
   ],

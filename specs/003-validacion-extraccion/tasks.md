@@ -35,15 +35,15 @@ Dependencias del sistema: `libreoffice` (writer y calc) y Python 3.12 con `uv`. 
 
 Contrato escrito en `contracts/modulo3-normalizacion/v0/`, con los ejemplos validados. Revisado y fusionado en `main`.
 
-**Dudas que el plan no resuelve.** El contrato las deja abiertas o sigue la lectura más literal del plan; hay que confirmarlas en la revisión:
+**Dudas resueltas con el usuario (2026-11-04).** Ya están aplicadas en el contrato y en `plan.md`:
 
-1. **Campos del duplicado.** El plan dice que `pdf`, `lectura` y `paginas` apuntan a los del original, pero no dice qué pasa con `paginas_sin_texto`, `restricciones`, `firma_digital` y `anexo_nativo`. El esquema no lo restringe; el ejemplo copia los valores del original, siguiendo la idea de "que nadie tenga que seguir el enlace".
-2. **Bytes de `ruta_origen` para `id_documento` y para ordenar.** No está fijada la codificación (¿UTF-8?) ni la normalización Unicode. Mac guarda los nombres con tildes en NFD y Windows en NFC, así que la misma entrega copiada desde otro equipo podría dar otros identificadores y otro orden (R5, R25). Los ejemplos usan UTF-8 sin normalizar.
-3. **Documentos con error que no se pudieron abrir.** `restricciones` es booleano y `firma_digital` es una lista: en un PDF con contraseña no se sabe ni lo uno ni lo otro, pero el contrato obliga a poner `false` y `[]`, que se leen como "no tiene". Tampoco está claro si `SIN_PAGINAS` debe llevar `paginas: 0` o `null`; el esquema pide `null` en todo error.
-4. **Descartados en el inventario.** R2 y la historia 1 hablan de un inventario con todos los archivos, "con su huella y su estado". El plan pone los descartados en una lista aparte, sin huella ni identificador. Se siguió el plan.
-5. **Archivo de palabras sin versión.** El plan le da solo `{id_documento, paginas}`. Sin `contrato` ni `hash_pdf`, el archivo no dice por sí solo a qué versión ni a qué PDF corresponde (se sabe por la lectura que lo enlaza). Se siguió el plan.
-6. **`ocr_propio`.** Está reservado, pero el plan dice que las páginas `imagen` llevan `origen_texto: null`. Si el experimento de OCR agrega texto a una página `imagen`, hay que decidir si cambia el tipo o la regla. En 0.1 el esquema exige `null` en `imagen` y `vacia`.
-7. **PDF reparado.** Cuando se repara un PDF dañado, el plan solo lo anota en el registro. El manifiesto no dice que el normalizado es una copia reparada y no el original, lo que puede importar para la trazabilidad (principio 3).
+1. **Campos del duplicado.** Repite todos los datos del original: `pdf`, `anexo_nativo`, `lectura`, `paginas`, `paginas_sin_texto`, `restricciones`, `firma_digital` y `reparado`.
+2. **Rutas con tildes.** `ruta_origen` se normaliza a Unicode NFC. Con esa ruta, en UTF-8, se calcula `id_documento` y se ordena (por punto de código). Le toca a T04.
+3. **Documentos que no abren.** `restricciones` y `firma_digital` van en `null` ("no se sabe") en todo `error_entrada`. Basta con avisar claro al evaluador: `detalle` dice qué pasó y qué pedirle al oferente si decide solicitar subsanación. La solicitud va por Ariba, fuera del sistema. `paginas` sigue en `null` en todo error, también en `SIN_PAGINAS`.
+4. **Descartados.** Se quedan en su lista aparte, solo con ruta y motivo, sin huella: el original no se borra y los `._*` se reconocen también por contenido.
+5. **Archivo de palabras.** Se queda como está, sin `contrato` ni `hash_pdf`. Se identifica por la lectura que lo enlaza.
+6. **`ocr_propio`.** Se decide cuando llegue el experimento de OCR. En 0.1 las páginas `imagen` y `vacia` llevan `origen_texto: null`.
+7. **PDF reparado.** Campo nuevo `reparado` en el manifiesto (`true` solo en un `pdf` cuya copia reparada es el normalizado). Le toca a T06.
 
 **Decisiones que el plan no fijaba:**
 
@@ -68,4 +68,4 @@ Contrato escrito en `contracts/modulo3-normalizacion/v0/`, con los ejemplos vali
 - **Python fijado en 3.12** (`>=3.12,<3.13`), el mismo de la imagen del job (T12).
 - **Validadores del contrato en `tests/contrato.py`**, para que la prueba de punta a punta (T11) los reuse. Además de validar los ejemplos, las pruebas comprueban que los esquemas rechazan casos mal formados y que los ejemplos usan las versiones del paquete.
 
-**Dudas para T10:** el plan dice "sin importar mayúsculas ni tildes" solo para la palabra "firma". Para la tabla SI/NO no lo dice; el oferente puede escribir "SÍ" con tilde.
+**Duda resuelta para T10:** la tabla SI/NO se reconoce sin importar mayúsculas ni tildes ("Sí" cuenta), igual que "firma". Ya está en `plan.md`.

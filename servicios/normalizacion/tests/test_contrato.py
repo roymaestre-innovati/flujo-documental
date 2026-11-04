@@ -1,5 +1,6 @@
 import copy
 import json
+import unicodedata
 
 import pytest
 from jsonschema import Draft202012Validator
@@ -91,6 +92,20 @@ CASOS_INVALIDOS = {
     "motivo_de_descarte_desconocido": ("manifiesto", lambda m: m["descartados"][0].update(motivo="otro")),
     "hash_corto": ("manifiesto", _cambiar_manifiesto("normalizado", "hash", "abc")),
     "otro_contrato": ("manifiesto", lambda m: m.update(contrato="modulo3-normalizacion/9.9")),
+    "error_con_restricciones_conocidas": ("manifiesto", _cambiar_manifiesto("error_entrada", "restricciones", False)),
+    "error_con_firmas_conocidas": ("manifiesto", _cambiar_manifiesto("error_entrada", "firma_digital", [])),
+    "error_reparado": ("manifiesto", _cambiar_manifiesto("error_entrada", "reparado", True)),
+    "error_sin_detalle": (
+        "manifiesto",
+        _cambiar_manifiesto("error_entrada", "error", {"codigo": "CONTRASENA", "detalle": ""}),
+    ),
+    "normalizado_sin_saber_restricciones": ("manifiesto", _cambiar_manifiesto("normalizado", "restricciones", None)),
+    "normalizado_sin_saber_firmas": ("manifiesto", _cambiar_manifiesto("normalizado", "firma_digital", None)),
+    "reparado_que_no_es_pdf": (
+        "manifiesto",
+        lambda m: _por_estado(m, "normalizado").update(tipo_origen="docx", reparado=True),
+    ),
+    "sin_campo_reparado": ("manifiesto", lambda m: _por_estado(m, "normalizado").pop("reparado")),
     "imagen_con_origen": ("lectura", lambda l: l["paginas"][2].update(origen_texto="nativo")),
     "texto_con_ocr": ("lectura", lambda l: l["paginas"][0].update(origen_texto="ocr_escaner")),
     "imagen_con_anclas": ("lectura", lambda l: l["paginas"][2].update(anclas=l["paginas"][0]["anclas"])),
@@ -107,3 +122,29 @@ def test_el_esquema_rechaza(caso):
     assert validador(nombre).is_valid(datos)
     cambio(datos)
     assert not validador(nombre).is_valid(datos)
+
+
+CAMPOS_COPIADOS_DEL_ORIGINAL = (
+    "hash", "tipo_origen", "pdf", "anexo_nativo", "lectura", "paginas",
+    "paginas_sin_texto", "restricciones", "firma_digital", "reparado",
+)
+
+
+def test_el_duplicado_del_ejemplo_repite_los_datos_del_original():
+    manifiesto = _manifiesto()
+    por_id = {a["id_documento"]: a for a in manifiesto["archivos"]}
+    duplicados = [a for a in manifiesto["archivos"] if a["estado"] == "duplicado"]
+    assert duplicados
+    for copia in duplicados:
+        original = por_id[copia["duplicado_de"]]
+        assert original["ruta_origen"] < copia["ruta_origen"]
+        for campo in CAMPOS_COPIADOS_DEL_ORIGINAL:
+            assert copia[campo] == original[campo], campo
+
+
+def test_las_rutas_del_ejemplo_estan_en_nfc_y_ordenadas():
+    manifiesto = _manifiesto()
+    for lista in ("archivos", "descartados"):
+        rutas = [a["ruta_origen"] for a in manifiesto[lista]]
+        assert rutas == sorted(rutas)
+        assert all(r == unicodedata.normalize("NFC", r) for r in rutas)
