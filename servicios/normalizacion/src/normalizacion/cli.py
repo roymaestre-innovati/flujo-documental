@@ -2,17 +2,26 @@
 
     normalizar <carpeta_entrega> --proceso SR0000000001 [--oferente OF-002] --salida <carpeta> [--forzar]
 
-Por ahora (T04) solo hace el inventario e imprime los conteos. No imprime
-nombres de archivo, porque pueden traer nombres de personas (principio 6).
+Normaliza y lee la entrega y escribe el resultado en la carpeta de salida. Imprime
+un resumen sin datos personales: conteos por estado y por tipo de página.
+
+Sale con 0 aunque haya documentos con error, porque un error del documento es un
+resultado. Solo sale distinto de 0 ante un bug (clase 4 del diseño).
 """
 
 import argparse
 import sys
+from collections import Counter
 from pathlib import Path
 
-from . import VERSION
-from .inventario import ENTREGA_DEL_PROCESO, inventariar
+from . import VERSION, registros
+from .almacen import AlmacenLocal
+from .entrega import ErrorEntrega, normalizar_entrega
+from .inventario import ENTREGA_DEL_PROCESO
 from .parametros import VERSION_PARAMETROS
+
+ESTADOS = ("normalizado", "duplicado", "error_entrada")
+TIPOS_DE_PAGINA = ("texto", "escaneo_con_ocr", "imagen", "vacia")
 
 
 def _argumentos(argv: list[str] | None) -> argparse.Namespace:
@@ -32,15 +41,37 @@ def _argumentos(argv: list[str] | None) -> argparse.Namespace:
     return argumentos
 
 
+def resumen(resultado, proceso: str, entrega: str) -> str:
+    manifiesto = resultado.manifiesto
+    estados = Counter(archivo["estado"] for archivo in manifiesto["archivos"])
+    errores = Counter(a["error"]["codigo"] for a in manifiesto["archivos"] if a["error"])
+    lineas = [
+        f"Entrega {proceso}/{entrega}: {len(manifiesto['archivos'])} archivos, "
+        f"{len(manifiesto['descartados'])} descartados, {resultado.reusados} reusados.",
+        "Estados: " + ", ".join(f"{estado} {estados.get(estado, 0)}" for estado in ESTADOS) + ".",
+        "Páginas: " + ", ".join(f"{tipo} {resultado.tipos_de_pagina.get(tipo, 0)}" for tipo in TIPOS_DE_PAGINA) + ".",
+    ]
+    if errores:
+        lineas.append("Errores: " + ", ".join(f"{codigo} {n}" for codigo, n in sorted(errores.items())) + ".")
+    return "\n".join(lineas)
+
+
 def main(argv: list[str] | None = None) -> int:
     argumentos = _argumentos(argv)
-    inventario = inventariar(argumentos.carpeta_entrega, argumentos.oferente)
-    duplicados = sum(1 for archivo in inventario.archivos if archivo.duplicado_de)
+    registros.configurar()
     entrega = argumentos.oferente or ENTREGA_DEL_PROCESO
-    print(
-        f"Entrega {argumentos.proceso}/{entrega}: {len(inventario.archivos)} archivos, "
-        f"{duplicados} duplicados, {len(inventario.descartados)} descartados."
-    )
+    try:
+        resultado = normalizar_entrega(
+            argumentos.carpeta_entrega,
+            argumentos.proceso,
+            argumentos.oferente,
+            AlmacenLocal(argumentos.salida),
+            forzar=argumentos.forzar,
+        )
+    except ErrorEntrega as error:
+        print(f"Falla inesperada: {error}", file=sys.stderr)
+        return 1
+    print(resumen(resultado, argumentos.proceso, entrega))
     return 0
 
 

@@ -46,7 +46,10 @@ def test_comando_cuenta_sin_mostrar_nombres(entrega, tmp_path, capsys):
     codigo = main([str(entrega), "--proceso", "SR0000000001", "--oferente", "OF-002", "--salida", str(tmp_path / "salida")])
     salida = capsys.readouterr().out
     assert codigo == 0
-    assert "SR0000000001/OF-002: 3 archivos, 0 duplicados, 2 descartados." in salida
+    assert "SR0000000001/OF-002: 3 archivos, 2 descartados, 0 reusados." in salida
+    # Los archivos del ejemplo no son documentos reales: quedan no soportados.
+    assert "error_entrada 3" in salida and "NO_SOPORTADO 3" in salida
+    assert (tmp_path / "salida" / "SR0000000001" / "OF-002" / "manifiesto.json").is_file()
     assert "carta.docx" not in salida and "foto.jpg" not in salida
 
 
