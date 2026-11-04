@@ -10,13 +10,12 @@ import unicodedata
 from dataclasses import dataclass
 from pathlib import Path
 
+from .tipos import es_appledouble
+
 ENTREGA_DEL_PROCESO = "PROCESO"
 
 MOTIVO_MAC = "archivo_sistema_mac"
 MOTIVO_WINDOWS = "archivo_sistema_windows"
-
-# Número mágico de los archivos AppleDouble (los `._*` de Mac).
-MAGICO_APPLEDOUBLE = bytes.fromhex("00051607")
 
 _BLOQUE = 1024 * 1024
 
@@ -86,11 +85,6 @@ def huella(ruta: Path) -> str:
         while bloque := archivo.read(_BLOQUE):
             sha.update(bloque)
     return sha.hexdigest()
-
-
-def es_appledouble(ruta: Path) -> bool:
-    with Path(ruta).open("rb") as archivo:
-        return archivo.read(len(MAGICO_APPLEDOUBLE)) == MAGICO_APPLEDOUBLE
 
 
 def motivo_descarte(ruta_origen: str, ruta: Path) -> str | None:

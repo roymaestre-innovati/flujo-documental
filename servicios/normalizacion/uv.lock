@@ -348,12 +348,14 @@ wheels = [
 [[package]]
 name = "normalizacion"
 source = { editable = "." }
+dependencies = [
+    { name = "olefile" },
+]
 
 [package.dev-dependencies]
 dev = [
     { name = "cryptography" },
     { name = "jsonschema" },
-    { name = "olefile" },
     { name = "openpyxl" },
     { name = "pikepdf" },
     { name = "pillow" },
@@ -364,12 +366,12 @@ dev = [
 ]
 
 [package.metadata]
+requires-dist = [{ name = "olefile", specifier = ">=0.47" }]
 
 [package.metadata.requires-dev]
 dev = [
     { name = "cryptography", specifier = ">=50.0.2" },
     { name = "jsonschema", specifier = ">=4.23" },
-    { name = "olefile", specifier = ">=0.47" },
     { name = "openpyxl", specifier = ">=3.1.5" },
     { name = "pikepdf", specifier = ">=10.17.0" },
     { name = "pillow", specifier = ">=13.0.0" },
