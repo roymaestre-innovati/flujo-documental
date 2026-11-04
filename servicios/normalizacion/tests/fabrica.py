@@ -333,6 +333,23 @@ def xlsx_ancho(carpeta: Path) -> list[Path]:
     return [_guardar(carpeta / "experiencia.xlsx", xlsx_bytes())]
 
 
+def _cifrar_ooxml(datos: bytes) -> bytes:
+    """DOCX o XLSX protegido con contraseña, como lo deja Office (EncryptedPackage)."""
+    from msoffcrypto.format.ooxml import OOXMLFile
+
+    salida = io.BytesIO()
+    OOXMLFile(io.BytesIO(datos)).encrypt(CONTRASENA_USUARIO, salida)
+    return salida.getvalue()
+
+
+def docx_con_contrasena(carpeta: Path) -> list[Path]:
+    return [_guardar(carpeta / "pacto_anticorrupcion.docx", _cifrar_ooxml(docx_bytes()))]
+
+
+def xlsx_con_contrasena(carpeta: Path) -> list[Path]:
+    return [_guardar(carpeta / "estados_financieros.xlsx", _cifrar_ooxml(xlsx_bytes()))]
+
+
 def _desde_xlsx(carpeta: Path, formato: str, nombre: str) -> list[Path]:
     with tempfile.TemporaryDirectory() as temporal:
         origen = _guardar(Path(temporal) / "experiencia.xlsx", xlsx_bytes())
@@ -474,6 +491,8 @@ CASOS = {
     "xlsx_ancho": xlsx_ancho,
     "xls": xls,
     "ods": ods,
+    "docx_con_contrasena": docx_con_contrasena,
+    "xlsx_con_contrasena": xlsx_con_contrasena,
     "jpg": jpg,
     "png": png,
     "tiff_tres_paginas": tiff_tres_paginas,

@@ -30,7 +30,7 @@ def _tiene_imagen(pagina) -> bool:
 
 
 def test_todos_los_casos_estan_registrados():
-    assert len(fabrica.CASOS) == 26
+    assert len(fabrica.CASOS) == 28
     assert fabrica.CASOS_CON_LIBREOFFICE <= set(fabrica.CASOS)
 
 
@@ -174,6 +174,22 @@ def test_ods(tmp_path):
     ruta = _un_archivo(fabrica.ods(tmp_path))
     with zipfile.ZipFile(ruta) as zip_:
         assert zip_.read("mimetype") == b"application/vnd.oasis.opendocument.spreadsheet"
+
+
+@pytest.mark.parametrize("caso", ["docx_con_contrasena", "xlsx_con_contrasena"])
+def test_office_con_contrasena(tmp_path, caso):
+    import msoffcrypto
+    import olefile
+
+    ruta = _un_archivo(fabrica.CASOS[caso](tmp_path))
+    with olefile.OleFileIO(str(ruta)) as ole:
+        assert ole.exists("EncryptedPackage")
+    with ruta.open("rb") as archivo:
+        documento = msoffcrypto.OfficeFile(archivo)
+        documento.load_key(password=fabrica.CONTRASENA_USUARIO)
+        descifrado = io.BytesIO()
+        documento.decrypt(descifrado)
+    assert zipfile.is_zipfile(descifrado)
 
 
 def test_xlsx_ancho(tmp_path):

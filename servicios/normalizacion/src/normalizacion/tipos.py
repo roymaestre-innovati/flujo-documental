@@ -4,6 +4,7 @@ Sigue la tabla del plan: mira los primeros bytes y, en los ZIP y OLE, qué traen
 adentro. Son pocas reglas y así no hace falta otra dependencia.
 """
 
+import struct
 import zipfile
 from dataclasses import dataclass
 from pathlib import Path
@@ -54,6 +55,14 @@ class TipoReal:
     """Uno de TIPOS_ORIGEN: el valor que va al manifiesto."""
     formato: str | None = None
     """En las imágenes: jpeg, png o tiff. None en los demás."""
+    cifrado: bool = False
+    """Word o Excel protegido con contraseña: el documento queda con error CONTRASENA.
+
+    Un DOCX o XLSX cifrado es un OLE con un flujo `EncryptedPackage`, y no se
+    sabe si era Word o Excel: queda `no_soportado` con `cifrado` en True. Los DOC,
+    XLS, ODT y ODS cifrados conservan su tipo. Los PDF no se marcan aquí: su
+    contraseña la revisa `revision_pdf`.
+    """
 
 
 def leer_cabecera(ruta: Path) -> bytes:
@@ -74,13 +83,13 @@ def detectar(ruta: Path) -> TipoReal:
         if cabecera.startswith(magico):
             return TipoReal(IMAGEN, formato)
     if cabecera.startswith(MAGICO_ZIP):
-        return TipoReal(_tipo_zip(ruta))
+        return _tipo_zip(ruta)
     if cabecera.startswith(MAGICO_OLE):
-        return TipoReal(_tipo_ole(ruta))
+        return _tipo_ole(ruta)
     return TipoReal(NO_SOPORTADO)
 
 
-def _tipo_zip(ruta: Path) -> str:
+def _tipo_zip(ruta: Path) -> TipoReal:
     """DOCX, XLSX, ODT u ODS según lo que trae el ZIP. Un ZIP cualquiera no se soporta."""
     try:
         with zipfile.ZipFile(ruta) as zip_:
@@ -88,27 +97,63 @@ def _tipo_zip(ruta: Path) -> str:
             if "mimetype" in nombres:
                 tipo = _MIMETYPES_ODF.get(zip_.read("mimetype").strip())
                 if tipo:
-                    return tipo
+                    return TipoReal(tipo, cifrado=_odf_cifrado(zip_, nombres))
     except (zipfile.BadZipFile, OSError, KeyError, ValueError, NotImplementedError):
-        return NO_SOPORTADO
+        return TipoReal(NO_SOPORTADO)
     # Se pide la pieza principal, no solo la carpeta, para no confundir un ZIP
     # que el oferente armó con una carpeta llamada word/ o xl/.
     if "[Content_Types].xml" in nombres:
         if "word/document.xml" in nombres:
-            return DOCX
+            return TipoReal(DOCX)
         if "xl/workbook.xml" in nombres:
-            return XLSX
-    return NO_SOPORTADO
+            return TipoReal(XLSX)
+    return TipoReal(NO_SOPORTADO)
 
 
-def _tipo_ole(ruta: Path) -> str:
+def _odf_cifrado(zip_: zipfile.ZipFile, nombres: set[str]) -> bool:
+    """Un ODT u ODS con contraseña declara sus datos de cifrado en el manifiesto."""
+    if "META-INF/manifest.xml" not in nombres:
+        return False
+    return b"encryption-data" in zip_.read("META-INF/manifest.xml")
+
+
+# Registro FILEPASS de Excel 97: va justo después del BOF cuando el libro está cifrado.
+_XLS_BOF = 0x0809
+_XLS_FILEPASS = 0x002F
+# Bit fEncrypted en las banderas del encabezado (FIB) del flujo WordDocument.
+_DOC_FENCRYPTED = 0x0100
+
+
+def _tipo_ole(ruta: Path) -> TipoReal:
     """DOC o XLS según los flujos del archivo OLE. Los demás OLE no se soportan."""
     try:
         with olefile.OleFileIO(str(ruta)) as ole:
+            if ole.exists("EncryptedPackage"):
+                return TipoReal(NO_SOPORTADO, cifrado=True)
             if ole.exists("WordDocument"):
-                return DOC
-            if ole.exists("Workbook") or ole.exists("Book"):
-                return XLS
-    except (OSError, ValueError, IndexError, TypeError):
+                return TipoReal(DOC, cifrado=_doc_cifrado(ole))
+            for flujo in ("Workbook", "Book"):
+                if ole.exists(flujo):
+                    return TipoReal(XLS, cifrado=_xls_cifrado(ole, flujo))
+    except (OSError, ValueError, IndexError, TypeError, struct.error):
         pass
-    return NO_SOPORTADO
+    return TipoReal(NO_SOPORTADO)
+
+
+def _doc_cifrado(ole: olefile.OleFileIO) -> bool:
+    encabezado = ole.openstream("WordDocument").read(12)
+    if len(encabezado) < 12:
+        return False
+    (banderas,) = struct.unpack_from("<H", encabezado, 10)
+    return bool(banderas & _DOC_FENCRYPTED)
+
+
+def _xls_cifrado(ole: olefile.OleFileIO, flujo: str) -> bool:
+    datos = ole.openstream(flujo).read(4096)
+    if len(datos) < 4:
+        return False
+    tipo, largo = struct.unpack_from("<HH", datos, 0)
+    if tipo != _XLS_BOF or len(datos) < 4 + largo + 2:
+        return False
+    (siguiente,) = struct.unpack_from("<H", datos, 4 + largo)
+    return siguiente == _XLS_FILEPASS
