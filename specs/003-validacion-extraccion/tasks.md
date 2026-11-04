@@ -23,7 +23,7 @@ Dependencias del sistema: `libreoffice` (writer y calc) y Python 3.12 con `uv`. 
 - [x] **T06 — Revisión del PDF.** Abrir, reparar una vez, detectar contraseña y restricciones, contar páginas. Requisitos R11 a R13 y R16.
 - [x] **T07 — Conversión.** LibreOffice con perfil temporal y macros bloqueadas, con tiempo máximo y un reintento; imágenes con img2pdf, incluido el TIFF de varias páginas; Excel convertido y conservado como anexo. Requisitos R7 a R10.
 - [x] **T08 — Firma digital.** Firmante, fecha, integridad, formato y `leida`. Casos: íntegro, modificado después de firmar, sin firma. Requisito R15.
-- [ ] **T09 — Lectura.** Texto, caracteres, cobertura de imagen (grilla de 200 × 200), rotación, tipo de página, origen del texto y archivo de palabras. Requisitos R14 y R18 a R20, R22 y R23.
+- [x] **T09 — Lectura.** Texto, caracteres, cobertura de imagen (grilla de 200 × 200), rotación, tipo de página, origen del texto y archivo de palabras. Requisitos R14 y R18 a R20, R22 y R23.
 - [ ] **T10 — Anclas.** `linea_firma`, `casilla` y `tabla_si_no`, según el plan. Requisito R21.
 - [ ] **T11 — Entrega completa.** `entrega.py` une todo y escribe manifiesto, PDF, anexos, lecturas y palabras en el almacén. Aislamiento de errores (R17), errores de clase 4 relanzados al final, idempotencia y `--forzar`, y registros sin datos personales. Prueba de punta a punta con una entrega sintética que trae todos los casos, validada contra el contrato. Prueba de determinismo (R24 y R25, criterio A2).
 - [ ] **T12 — Imagen del job.** `Dockerfile` (Python 3.12 slim, LibreOffice writer y calc, uv) que corre `normalizar`. Comprobar que las pruebas pasan dentro de la imagen.
@@ -161,3 +161,18 @@ Contrato escrito en `contracts/modulo3-normalizacion/v0/`, con los ejemplos vali
 - **Registros:** pyHanko escribe en el registro los datos del certificado (el nombre de quien firma) cuando algo le parece raro, por ejemplo un certificado autofirmado. Se silencian los registros de `pyhanko` y `pyhanko_certvalidator` para que esos nombres no lleguen a los registros del servicio (principio 6).
 
 **Para T11:** las firmas se leen del PDF original del oferente, no de la copia reparada, porque reescribir el archivo invalida la firma. En un PDF dañado que se reparó, lo más probable es que la firma quede `leida: false`.
+
+### T09 — Lectura (2026-11-04)
+
+`lectura.leer(datos, id_documento, firmas, uri_palabras)` devuelve la lectura y el archivo de palabras, los dos según el contrato, y `paginas_sin_texto` para el manifiesto. Las anclas quedan vacías hasta T10. `pdfplumber` es ahora dependencia del paquete. 289 pruebas en verde. Un PDF sintético de 40 páginas se lee en unos 0,2 s; los reales pesan más y lo medirá A5.
+
+**Hallazgo: rotación.** pdfplumber devuelve las coordenadas de una página con `/Rotate` ya giradas, y su texto sale con una palabra por línea. El contrato pide las cajas sobre la página sin rotar. Se lee una copia interna del PDF con `/Rotate` en 0, así que texto y cajas quedan como si la página no estuviera girada. La `rotacion` de la lectura es la del PDF normalizado, también cuando la página la hereda de su padre.
+
+**Decisiones que el plan no fijaba:**
+
+- **Cobertura:** una celda de la grilla de 200 × 200 cuenta como cubierta si su centro cae dentro de alguna imagen (recortada al borde de la página). El valor es la fracción exacta de celdas cubiertas, sin redondear.
+- **Texto:** `extract_text()` de pdfplumber con sus valores por defecto; incluye el texto invisible (modo de render 3) de los escáneres. **Palabras:** `extract_words()`, en el orden de lectura de pdfplumber, con las cajas redondeadas a 2 decimales para que el archivo pese menos.
+- **Rotaciones raras:** se normalizan a 0, 90, 180 o 270 (`-90` es 270). Un valor que no es múltiplo de 90 se toma como 0.
+- **Página que no se puede leer** (decisión del usuario): queda `vacia`, sin texto ni palabras, y el registro anota el número de página. Si pdfplumber no puede abrir el documento entero, todas las páginas quedan `vacia`.
+
+**Para revisar con la muestra (A4):** la página que cae en la regla 2 por ser "una foto chica en una página blanca" (el plan ya lo acepta en v0) y si `extract_text()` con sus valores por defecto junta bien las columnas de tablas anchas.
