@@ -107,8 +107,8 @@ Entrada por archivo. Son los campos del paso 1 del diseño, más `estado` y `lec
 
 | Campo | Tipo | Contenido |
 |---|---|---|
-| `id_documento` | texto | `<id_oferente o PROCESO>-<primeros 12 hex del SHA-256 de ruta_origen>`. Es estable entre corridas. Provisional hasta A-1: si el módulo 1 da identificadores, se usan los suyos |
-| `ruta_origen` | texto | Ruta relativa dentro de la entrega, con `/` |
+| `id_documento` | texto | `<id_oferente o PROCESO>-<primeros 12 hex del SHA-256 de ruta_origen>`, con la ruta en UTF-8 y NFC. Es estable entre corridas. Provisional hasta A-1: si el módulo 1 da identificadores, se usan los suyos |
+| `ruta_origen` | texto | Ruta relativa dentro de la entrega, con `/` y normalizada a Unicode NFC (Mac y Windows escriben las tildes distinto) |
 | `hash` | texto | SHA-256 del original |
 | `tipo_origen` | enum | `pdf`, `doc`, `docx`, `odt`, `xls`, `xlsx`, `ods`, `imagen`, `no_soportado` |
 | `estado` | enum | `normalizado`, `duplicado` o `error_entrada` |
@@ -118,13 +118,14 @@ Entrada por archivo. Son los campos del paso 1 del diseño, más `estado` y `lec
 | `paginas` | entero o null | |
 | `paginas_sin_texto` | lista de enteros | Contadas desde 1 |
 | `duplicado_de` | texto o null | `id_documento` del original |
-| `restricciones` | booleano | Trae restricciones de copia o impresión |
-| `firma_digital` | lista | `{firmante, fecha, integro, formato, leida}`. `leida: false` cuando no se pudo leer (p. ej. `adbe.pkcs7.sha1`); en ese caso `firmante`, `fecha` e `integro` van en `null` |
-| `error` | objeto o null | `{codigo, detalle}`. Códigos: `CONTRASENA`, `DANADO`, `SIN_PAGINAS`, `NO_SOPORTADO`, `CONVERSION_FALLIDA`. `detalle` no lleva texto del documento |
+| `restricciones` | booleano o null | Trae restricciones de copia o impresión. `null` en un documento con error: no se sabe |
+| `firma_digital` | lista o null | `null` en un documento con error: no se sabe. Cada firma: `{firmante, fecha, integro, formato, leida}`. `leida: false` cuando no se pudo leer (p. ej. `adbe.pkcs7.sha1`); en ese caso `firmante`, `fecha` e `integro` van en `null` |
+| `reparado` | booleano | El PDF llegó dañado y el normalizado es una copia reparada |
+| `error` | objeto o null | `{codigo, detalle}`. Códigos: `CONTRASENA`, `DANADO`, `SIN_PAGINAS`, `NO_SOPORTADO`, `CONVERSION_FALLIDA`. `detalle` le dice al evaluador qué pasó y qué pedirle al oferente si decide solicitar subsanación (la tabla está en el README del contrato). No lleva texto del documento |
 
 `formato` y `leida` amplían lo que pide el diseño (`{firmante, fecha, integro}`), para no confundir "no tiene firma" con "tiene una firma que no se pudo leer".
 
-Un duplicado lleva `hash`, `tipo_origen` y `duplicado_de`. `pdf`, `lectura` y `paginas` apuntan a los del original, para que nadie tenga que seguir el enlace.
+Un duplicado repite todos los datos del original (`pdf`, `anexo_nativo`, `lectura`, `paginas`, `paginas_sin_texto`, `restricciones`, `firma_digital` y `reparado`), para que nadie tenga que seguir el enlace. Solo cambian `id_documento`, `ruta_origen`, `estado` y `duplicado_de`.
 
 ### Lectura de un documento
 
@@ -186,7 +187,7 @@ Reglas simples y deterministas, sin LLM:
 
 - `linea_firma`: una palabra que empieza por "firma" (sin importar mayúsculas ni tildes), o una línea dibujada horizontal, o una secuencia de 8 o más `_`, con texto que menciona firma, representante, revisor o contador a menos de 60 puntos. La caja cubre la línea y su rótulo.
 - `casilla`: un rectángulo casi cuadrado, de 6 a 20 puntos de lado.
-- `tabla_si_no`: una línea de texto donde aparecen las palabras "SI" y "NO" como palabras sueltas, junto con al menos una casilla o una celda de tabla a menos de 20 puntos.
+- `tabla_si_no`: una línea de texto donde aparecen las palabras "SI" y "NO" como palabras sueltas (sin importar mayúsculas ni tildes: "Sí" cuenta), junto con al menos una casilla o una celda de tabla a menos de 20 puntos.
 
 En las páginas `imagen` no hay anclas, porque no hay texto: el recorte de firma de la extracción toma el tercio inferior (D20). Las palabras clave quedan en `parametros.py`.
 
@@ -205,12 +206,12 @@ No se valida la cadena de confianza: no se cargan autoridades raíz ni se consul
 
 - **LibreOffice:** `soffice --headless --norestore --convert-to pdf`, con un perfil temporal propio por conversión (`-env:UserInstallation=file:///tmp/...`), configurado con la seguridad de macros en "muy alta", para que ninguna macro se ejecute. Tiempo máximo de 120 s por archivo. Si falla o se pasa del tiempo, se reintenta una vez; si vuelve a fallar, `CONVERSION_FALLIDA`.
 - **Imágenes:** `img2pdf`, una página por imagen o por cuadro del TIFF. Antes se valida con Pillow que la imagen abre.
-- **PDF:** se abre con `pikepdf`. Si abre sin contraseña, se usa el original tal cual (R11). Si está dañado, se intenta guardar una copia reparada una vez: si pikepdf la guarda y la copia abre, esa copia es el normalizado (se anota en el log); si no, `DANADO`.
+- **PDF:** se abre con `pikepdf`. Si abre sin contraseña, se usa el original tal cual (R11). Si está dañado, se intenta guardar una copia reparada una vez: si pikepdf la guarda y la copia abre, esa copia es el normalizado, con `reparado = true` en el manifiesto y una anotación en el log; si no, `DANADO`.
 - Si el PDF pide contraseña para abrirse: `CONTRASENA`. Si abre con contraseña vacía y solo trae permisos restringidos: `restricciones = true`, y se procesa.
 
 ### Duplicados e identificadores
 
-- Se ordena todo por `ruta_origen` antes de procesar. Para cada hash, el primero es el original; los siguientes quedan `duplicado` con `duplicado_de`.
+- Las rutas se normalizan a NFC y se ordena todo por `ruta_origen` (punto de código) antes de procesar. Para cada hash, el primero es el original; los siguientes quedan `duplicado` con `duplicado_de`.
 - `id_documento` depende de la ruta y no del hash, así dos copias del mismo archivo tienen identificadores distintos.
 
 ### Almacén

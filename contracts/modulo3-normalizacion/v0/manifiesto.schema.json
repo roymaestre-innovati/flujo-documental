@@ -39,18 +39,18 @@
       "type": "string",
       "minLength": 1,
       "pattern": "^[^/\\\\].*$",
-      "description": "Ruta relativa dentro de la entrega, separada con `/`."
+      "description": "Ruta relativa dentro de la entrega, separada con `/` y normalizada a Unicode NFC, para que la misma entrega dé lo mismo venga de Mac o de Windows."
     },
     "tipo_origen": {"enum": ["pdf", "doc", "docx", "odt", "xls", "xlsx", "ods", "imagen", "no_soportado"]},
     "archivo": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["id_documento", "ruta_origen", "hash", "tipo_origen", "estado", "pdf", "anexo_nativo", "lectura", "paginas", "paginas_sin_texto", "duplicado_de", "restricciones", "firma_digital", "error"],
+      "required": ["id_documento", "ruta_origen", "hash", "tipo_origen", "estado", "pdf", "anexo_nativo", "lectura", "paginas", "paginas_sin_texto", "duplicado_de", "restricciones", "firma_digital", "reparado", "error"],
       "properties": {
         "id_documento": {
           "type": "string",
           "minLength": 1,
-          "description": "Estable entre corridas (R5). Provisional hasta A-1: <id_oferente o PROCESO>-<primeros 12 hex del SHA-256 de ruta_origen>."
+          "description": "Estable entre corridas (R5). Provisional hasta A-1: <id_oferente o PROCESO>-<primeros 12 hex del SHA-256 de ruta_origen, en UTF-8 y normalizada a NFC>."
         },
         "ruta_origen": {"$ref": "#/$defs/ruta"},
         "hash": {"$ref": "#/$defs/sha256", "description": "SHA-256 del archivo original (R3)."},
@@ -67,8 +67,9 @@
           "description": "Páginas con 0 caracteres, contadas desde 1 y en orden. No es lo mismo que las páginas de tipo imagen."
         },
         "duplicado_de": {"type": ["string", "null"], "minLength": 1, "description": "id_documento del original (R4)."},
-        "restricciones": {"type": "boolean", "description": "El PDF trae restricciones de copia o impresión y se leyó igual (R13)."},
-        "firma_digital": {"type": "array", "items": {"$ref": "#/$defs/firma"}},
+        "restricciones": {"type": ["boolean", "null"], "description": "El PDF trae restricciones de copia o impresión y se leyó igual (R13). null: no se sabe, porque el documento no se pudo abrir."},
+        "firma_digital": {"type": ["array", "null"], "items": {"$ref": "#/$defs/firma"}, "description": "Firmas digitales del PDF. null: no se sabe, porque el documento no se pudo abrir."},
+        "reparado": {"type": "boolean", "description": "true: el PDF original estaba dañado y el normalizado es una copia reparada (R12). Solo puede ser true en un pdf."},
         "error": {
           "oneOf": [{"type": "null"}, {"$ref": "#/$defs/error"}]
         }
@@ -82,6 +83,8 @@
               "lectura": {"type": "string"},
               "paginas": {"type": "integer"},
               "duplicado_de": {"type": "null"},
+              "restricciones": {"type": "boolean"},
+              "firma_digital": {"type": "array"},
               "error": {"type": "null"}
             }
           }
@@ -89,7 +92,7 @@
         {
           "if": {"properties": {"estado": {"const": "duplicado"}}},
           "then": {
-            "description": "pdf, lectura y paginas apuntan a los del original; si el original tiene error, van en null.",
+            "description": "Repite todos los datos del original (pdf, anexo_nativo, lectura, paginas, paginas_sin_texto, restricciones, firma_digital y reparado), para no tener que seguir el enlace. Si el original tiene error, van como en el original.",
             "properties": {
               "duplicado_de": {"type": "string"},
               "error": {"type": "null"}
@@ -106,6 +109,9 @@
               "paginas": {"type": "null"},
               "paginas_sin_texto": {"maxItems": 0},
               "duplicado_de": {"type": "null"},
+              "restricciones": {"type": "null"},
+              "firma_digital": {"type": "null"},
+              "reparado": {"const": false},
               "error": {"$ref": "#/$defs/error"}
             }
           }
@@ -113,6 +119,10 @@
         {
           "if": {"properties": {"tipo_origen": {"not": {"enum": ["xls", "xlsx", "ods"]}}}},
           "then": {"properties": {"anexo_nativo": {"type": "null"}}}
+        },
+        {
+          "if": {"properties": {"tipo_origen": {"not": {"const": "pdf"}}}},
+          "then": {"properties": {"reparado": {"const": false}}}
         },
         {
           "if": {"properties": {"tipo_origen": {"const": "no_soportado"}}},
@@ -142,7 +152,7 @@
       "required": ["codigo", "detalle"],
       "properties": {
         "codigo": {"enum": ["CONTRASENA", "DANADO", "SIN_PAGINAS", "NO_SOPORTADO", "CONVERSION_FALLIDA"]},
-        "detalle": {"type": "string", "description": "Motivo legible para el evaluador. Nunca lleva texto del documento."}
+        "detalle": {"type": "string", "minLength": 1, "description": "Aviso para el evaluador: qué pasó y qué pedirle al oferente si decide solicitar subsanación. Nunca lleva texto del documento."}
       }
     },
     "descartado": {

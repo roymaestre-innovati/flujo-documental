@@ -1,0 +1,29 @@
+[project]
+name = "normalizacion"
+dynamic = ["version"]
+description = "Normalización y lectura de las entregas de documentos (módulo 3, spec 003)"
+requires-python = ">=3.12,<3.13"
+dependencies = []
+
+[project.scripts]
+normalizar = "normalizacion.cli:main"
+
+[dependency-groups]
+dev = [
+    "pytest>=8",
+    "jsonschema>=4.23",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.version]
+path = "src/normalizacion/__init__.py"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra --strict-markers"
+markers = [
+    "libreoffice: necesita el comando soffice; se salta si no está instalado",
+]

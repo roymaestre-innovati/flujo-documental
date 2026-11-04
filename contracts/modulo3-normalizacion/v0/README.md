@@ -38,19 +38,29 @@ Los enlaces (`pdf`, `anexo_nativo`, `lectura`, `palabras`) son URI. En esta vers
 - **Un estado por archivo.** `normalizado`, `duplicado` o `error_entrada`. Los archivos de sistema no son documentos: van en `descartados`, con su ruta y su motivo, sin huella ni identificador.
 - **Qué lleva cada estado.**
   - `normalizado`: `pdf`, `lectura` y `paginas` con valor; `duplicado_de` y `error` en `null`.
-  - `duplicado`: `duplicado_de` con el `id_documento` del original (el primero por orden de ruta). `pdf`, `lectura` y `paginas` apuntan a los del original, para no tener que seguir el enlace. La copia no se procesa ni se borra.
-  - `error_entrada`: `error` con su código; `pdf`, `anexo_nativo`, `lectura`, `paginas` y `duplicado_de` en `null`, y `paginas_sin_texto` vacía. Un error no frena a los demás documentos.
+  - `duplicado`: `duplicado_de` con el `id_documento` del original (el primero por orden de ruta). Repite todos los datos del original (`pdf`, `anexo_nativo`, `lectura`, `paginas`, `paginas_sin_texto`, `restricciones`, `firma_digital` y `reparado`), para no tener que seguir el enlace; solo cambian `id_documento`, `ruta_origen`, `estado` y `duplicado_de`. La copia no se procesa ni se borra.
+  - `error_entrada`: `error` con su código; `pdf`, `anexo_nativo`, `lectura`, `paginas` y `duplicado_de` en `null`, y `paginas_sin_texto` vacía. `restricciones` y `firma_digital` van en `null`, que quiere decir "no se sabe": el documento no se pudo abrir. Un error no frena a los demás documentos.
 - **`anexo_nativo` solo en hojas de cálculo** (`xls`, `xlsx`, `ods`): es el archivo original, que la extracción lee como tabla.
-- **Orden.** `archivos` y `descartados` van ordenados por `ruta_origen`, y `paginas` en orden, una por página, sin saltos. Con esto, dos corridas sobre la misma entrega dan el mismo manifiesto y la misma lectura, salvo `ejecucion` (R25).
+- **Rutas en NFC.** `ruta_origen` se guarda normalizada a Unicode NFC. Mac y Windows escriben las tildes de forma distinta, y así la misma entrega da las mismas rutas e identificadores venga de donde venga.
+- **Orden.** `archivos` y `descartados` van ordenados por `ruta_origen` (por punto de código, ya en NFC), y `paginas` en orden, una por página, sin saltos. Con esto, dos corridas sobre la misma entrega dan el mismo manifiesto y la misma lectura, salvo `ejecucion` (R25).
 - **Páginas sobre el documento completo**, contadas desde 1, igual que en el contrato de extracción.
-- **`id_documento` estable** entre corridas (R5): `<id_oferente o PROCESO>-<primeros 12 hex del SHA-256 de ruta_origen>`. Depende de la ruta y no del contenido, así dos copias del mismo archivo tienen identificadores distintos. Es provisional hasta A-1: si el módulo 1 da identificadores, se usan los suyos.
+- **`id_documento` estable** entre corridas (R5): `<id_oferente o PROCESO>-<primeros 12 hex del SHA-256 de ruta_origen>`, con la ruta en UTF-8 y NFC. Depende de la ruta y no del contenido, así dos copias del mismo archivo tienen identificadores distintos. Es provisional hasta A-1: si el módulo 1 da identificadores, se usan los suyos.
+- **PDF reparado.** `reparado` es `true` cuando el PDF del oferente llegó dañado y el normalizado es una copia reparada (R12). Así el evaluador sabe que las páginas que ve salen de una reparación. Solo puede ser `true` en un `pdf`.
 - **`hash_pdf`** en la lectura es la huella del PDF que se leyó. Cuando el PDF del oferente se usa tal cual (R11), coincide con `hash` del manifiesto.
 - **Tipo de página y origen del texto.** `texto` va con `nativo`, `escaneo_con_ocr` con `ocr_escaner`, e `imagen` y `vacia` con `null`. `ocr_propio` está reservado para el experimento de OCR y no se produce en 0.1.
 - **`paginas_sin_texto`** son las páginas con 0 caracteres. No es lo mismo que las páginas de tipo `imagen`.
 - **Anclas.** `linea_firma`, `casilla` y `tabla_si_no`. `texto` es el rótulo o la línea que dio lugar al ancla, y va en `null` en una casilla. Las páginas `imagen` no tienen anclas.
 - **Cajas.** `[x0, y0, x1, y1]` en puntos PDF, con el origen arriba a la izquierda y sobre la página sin rotar.
 - **Firma digital.** Por firma: `firmante`, `fecha`, `integro`, `formato` y `leida`. Si `leida` es `false`, hay una firma que no se pudo leer, y `firmante`, `fecha` e `integro` van en `null`. Una firma sin leer no es error del documento. No se valida la confianza del certificado.
-- **Errores.** Códigos `CONTRASENA`, `DANADO`, `SIN_PAGINAS`, `NO_SOPORTADO` y `CONVERSION_FALLIDA`. `detalle` nunca lleva texto del documento.
+- **Errores.** El error llega al evaluador por medio del orquestador, como una tarea "documento con error", y él decide si pide subsanación por Ariba. Por eso `detalle` dice qué pasó y qué pedirle al oferente, sin que el evaluador tenga que abrir el archivo. Nunca lleva texto del documento.
+
+  | Código | Qué pasó | Ejemplo de `detalle` |
+  |---|---|---|
+  | `CONTRASENA` | El PDF pide contraseña para abrirse | El PDF pide contraseña para abrirse. Si se pide subsanación, el oferente debe entregarlo sin contraseña. |
+  | `DANADO` | El archivo no abre y no se pudo reparar | El archivo está dañado y no se pudo reparar. Si se pide subsanación, el oferente debe entregarlo de nuevo. |
+  | `SIN_PAGINAS` | El documento abre pero no tiene páginas | El documento no tiene páginas. Si se pide subsanación, el oferente debe entregarlo de nuevo. |
+  | `NO_SOPORTADO` | El tipo de archivo no se puede leer | El tipo de archivo no se puede leer. Si se pide subsanación, el oferente debe entregarlo en PDF. |
+  | `CONVERSION_FALLIDA` | El Word, Excel o imagen no se pudo pasar a PDF | No se pudo convertir el archivo a PDF. Si se pide subsanación, el oferente debe entregarlo en PDF. |
 - **Motivos de descarte.** `archivo_sistema_mac` (`.DS_Store`, todo lo que está dentro de `__MACOSX` y los archivos `._*`) y `archivo_sistema_windows` (`Thumbs.db`). Un registro por archivo.
 - **Trazabilidad.** El manifiesto y la lectura llevan `version_normalizador` y `version_parametros` (R24).
 
@@ -67,6 +77,10 @@ Las dudas sobre este borrador están en "Notas de implementación" de `specs/003
 ## Versionado
 
 `contrato` lleva la versión (`modulo3-normalizacion/0.1`). Mientras sea 0.x se puede cambiar de forma incompatible avisando a los equipos. Desde la 1.0, un cambio incompatible exige una versión mayor nueva, sin editar la vigente (principio 5).
+
+Cambios dentro de 0.1, antes de que nadie lo use:
+
+- 2026-11-04, revisión del borrador: el duplicado repite todos los datos del original; rutas en NFC; `restricciones` y `firma_digital` en `null` cuando el documento no abre; campo nuevo `reparado`; `detalle` con lo que hay que pedir al oferente.
 
 ## Validar los ejemplos
 
