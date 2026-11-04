@@ -27,7 +27,7 @@ Dependencias del sistema: `libreoffice` (writer y calc) y Python 3.12 con `uv`. 
 - [x] **T10 — Anclas.** `linea_firma`, `casilla` y `tabla_si_no`, según el plan. Requisito R21.
 - [x] **T11 — Entrega completa.** `entrega.py` une todo y escribe manifiesto, PDF, anexos, lecturas y palabras en el almacén. Aislamiento de errores (R17), errores de clase 4 relanzados al final, idempotencia y `--forzar`, y registros sin datos personales. Prueba de punta a punta con una entrega sintética que trae todos los casos, validada contra el contrato. Prueba de determinismo (R24 y R25, criterio A2).
 - [x] **T12 — Imagen del job.** `Dockerfile` (Python 3.12 slim, LibreOffice writer y calc, uv) que corre `normalizar`. Comprobar que las pruebas pasan dentro de la imagen.
-- [ ] **T13 — Script de la muestra.** `scripts/medir_muestra.py <carpeta>`: corre `normalizar` sobre cada oferente de una carpeta e imprime solo conteos (páginas únicas, duplicados, restricciones, firmas, descartados, proporción de tipos de página y tiempo por oferente), para los criterios A3 a A5. No se corre en la nube: lo corre el usuario con la muestra real.
+- [x] **T13 — Script de la muestra.** `scripts/medir_muestra.py <carpeta>`: corre `normalizar` sobre cada oferente de una carpeta e imprime solo conteos (páginas únicas, duplicados, restricciones, firmas, descartados, proporción de tipos de página y tiempo por oferente), para los criterios A3 a A5. No se corre en la nube: lo corre el usuario con la muestra real.
 
 ## Notas de implementación
 
@@ -235,7 +235,7 @@ A mano, con el comando: 32 archivos (8 conversiones con LibreOffice) en unos 10 
 1. `lectura.py` recorta las cajas de palabras y anclas al borde de la página y las mide desde su esquina superior izquierda. Una palabra que queda entera fuera de la página se descarta del archivo de palabras (su texto sigue en `texto`). Vale para cualquier PDF, no solo los convertidos. Hay una prueba nueva.
 2. La imagen trae las fuentes Carlito (medidas de Calibri) y Caladea (de Cambria), además de Liberation, para que los Word y Excel hechos en Office conserven su paginación.
 
-**Desviación del plan: Ubuntu 24.04 en vez de `python:3.12-slim`.** La red de este entorno no deja descargar paquetes de Debian (`deb.debian.org`), así que una imagen sobre `python:3.12-slim` no se podía construir ni probar aquí. Ubuntu 24.04 trae Python 3.12.3 y LibreOffice 24.2, las mismas versiones del entorno donde corrieron todas las pruebas; Debian bookworm trae LibreOffice 7.4, más antiguo. Volver a `python:3.12-slim` solo cambia la etapa `base`, pero habría que probarla en un entorno con acceso a Debian. **Pendiente de confirmar con el usuario.**
+**Desviación del plan: Ubuntu 24.04 en vez de `python:3.12-slim`.** La red de este entorno no deja descargar paquetes de Debian (`deb.debian.org`), así que una imagen sobre `python:3.12-slim` no se podía construir ni probar aquí. Ubuntu 24.04 trae Python 3.12.3 y LibreOffice 24.2, las mismas versiones del entorno donde corrieron todas las pruebas; Debian bookworm trae LibreOffice 7.4, más antiguo. **Confirmado por el usuario: se queda Ubuntu 24.04.**
 
 **Otras decisiones:**
 
@@ -244,3 +244,25 @@ A mano, con el comando: 32 archivos (8 conversiones con LibreOffice) en unos 10 
 - **Cómo se construyó aquí:** con una copia temporal del Dockerfile, fuera del repositorio, que solo agrega el certificado del proxy de este entorno y pasa los repositorios de Ubuntu a HTTPS. El Dockerfile del repositorio no lleva nada de eso.
 
 **No se hizo:** análisis de vulnerabilidades de la imagen ni publicación en un registro de Azure (no hay acceso a Azure en esta entrega).
+
+### T13 — Script de la muestra (2026-11-04)
+
+`servicios/normalizacion/scripts/medir_muestra.py` corre la normalización sobre cada oferente de una carpeta e imprime solo conteos, junto a lo que espera el diseño, para los criterios A3 a A5. 387 pruebas en verde.
+
+**Cómo correrlo** (en la máquina del equipo, con la muestra real SR5658940621; nunca en la nube):
+
+```bash
+cd servicios/normalizacion
+uv sync
+uv run python scripts/medir_muestra.py /ruta/a/la/muestra
+```
+
+La carpeta trae una subcarpeta por oferente, con sus archivos tal como los entregó. Opciones: `--json` (los mismos conteos en JSON), `--salida <carpeta>` (conserva PDF y lecturas para revisarlos a mano) y `--detalle` (registros de cada documento en stderr, sin nombres). Hace falta LibreOffice instalado, o correrlo dentro de la imagen de T12.
+
+**Decisiones que el plan no fijaba:**
+
+- **Ubicación:** en `servicios/normalizacion/scripts/` y no en `scripts/` en la raíz, para correrlo con el entorno del servicio (`uv run`).
+- **Oferentes anónimos:** se numeran OF-001, OF-002… en el orden alfabético de sus carpetas. Nunca se imprimen nombres de carpetas ni de archivos, ni texto, ni quién firma. Las carpetas ocultas y los archivos sueltos en la raíz se ignoran.
+- **La salida se borra:** los PDF, lecturas y palabras traen datos personales, así que por defecto van a una carpeta temporal que se borra al terminar. Con `--salida` se conservan; esa carpeta no se sube al repositorio.
+- **Qué se cuenta:** "páginas únicas" son las páginas de los documentos normalizados, sin los duplicados. "PDF con restricciones" y "PDF con firma digital" cuentan documentos normalizados; de las firmas se cuentan además las leídas, las no leídas y las no íntegras. También van los descartados por motivo, los errores por código, los reparados y los convertidos.
+- **Falla inesperada en un oferente:** se marca en la tabla, se siguen los demás y el script sale con código 1.
