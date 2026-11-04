@@ -18,7 +18,7 @@ Dependencias del sistema: `libreoffice` (writer y calc) y Python 3.12 con `uv`. 
 - [x] **T01 — Contrato.** Escribir `contracts/modulo3-normalizacion/v0/`: `README.md`, `manifiesto.schema.json`, `lectura.schema.json` y `palabras.schema.json` (JSON Schema 2020-12), más ejemplos: una entrega con un normalizado, un duplicado, un error y un descartado, y una lectura con una página de cada tipo. Validar los ejemplos contra los esquemas, como en `contracts/modulo3-extraccion/v0/README.md`. **Detenerse aquí para revisión del usuario** antes de seguir (principio 5).
 - [x] **T02 — Esqueleto.** `servicios/normalizacion/` con `pyproject.toml` (uv, pytest), `__init__.py` con `VERSION = "0.1.0"`, `parametros.py`, `almacen.py` (interfaz y `AlmacenLocal`) y el comando `normalizar` que por ahora solo lista la entrega. Agregar la prueba que valida los ejemplos del contrato.
 - [x] **T03 — Fábrica de pruebas.** `tests/fabrica.py` con todos los casos de la tabla de pruebas del plan. Una prueba por caso que solo confirma que el archivo se fabricó.
-- [ ] **T04 — Inventario.** Recorrido recursivo, descarte de archivos de sistema (por nombre y por contenido), SHA-256, duplicados por orden de ruta e `id_documento`. Requisitos R1 a R5.
+- [x] **T04 — Inventario.** Recorrido recursivo, descarte de archivos de sistema (por nombre y por contenido), SHA-256, duplicados por orden de ruta e `id_documento`. Requisitos R1 a R5.
 - [ ] **T05 — Tipo real.** `tipos.py` con la tabla del plan. Incluye la extensión falsa y los no soportados. Requisito R6.
 - [ ] **T06 — Revisión del PDF.** Abrir, reparar una vez, detectar contraseña y restricciones, contar páginas. Requisitos R11 a R13 y R16.
 - [ ] **T07 — Conversión.** LibreOffice con perfil temporal y macros bloqueadas, con tiempo máximo y un reintento; imágenes con img2pdf, incluido el TIFF de varias páginas; Excel convertido y conservado como anexo. Requisitos R7 a R10.
@@ -86,3 +86,15 @@ Contrato escrito en `contracts/modulo3-normalizacion/v0/`, con los ejemplos vali
 - **Nombres de archivo:** varios casos usan nombres parecidos (`carta_presentacion.*`). La entrega completa de T11 debe poner cada caso en su propia subcarpeta.
 
 **Duda para T08:** R15 pide anotar una firma que no se puede leer (`leida: false`, p. ej. `adbe.pkcs7.sha1`), pero la tabla de pruebas del plan no trae ese caso y pyHanko no firma en ese formato. Opciones: cambiar el `/SubFilter` de un PDF ya firmado, o fabricar a mano la firma en ese formato. Se decide en T08.
+
+### T04 — Inventario (2026-11-04)
+
+`inventario.inventariar(carpeta, id_oferente)` devuelve los archivos (con `id_documento`, `ruta_origen` en NFC, ruta en disco, `hash` y `duplicado_de`) y los descartados, los dos ordenados por `ruta_origen`. El comando `normalizar` ya muestra los conteos de archivos, duplicados y descartados. 108 pruebas en verde, con al menos una por requisito de R1 a R5.
+
+**Decisiones que el plan no fijaba:**
+
+- **Archivos `._*`: se descartan por contenido.** R2 dice "por nombre y por contenido". Se descarta todo archivo con cabecera AppleDouble, se llame como se llame. Un archivo que empieza por `._` pero es, por ejemplo, un PDF de verdad, se trata como documento. Así ningún documento se pierde por su nombre. Lo demás va por nombre: `.DS_Store`, `Thumbs.db` (sin importar mayúsculas, como en Windows) y todo lo que esté dentro de una carpeta `__MACOSX`, sea lo que sea.
+- **Duplicados:** un archivo descartado nunca cuenta como original de una copia. Un archivo vacío sí entra al inventario, con la huella de cero bytes; T05 le dará su tipo.
+- **Enlaces simbólicos:** el recorrido no los sigue (decidido en T02). No quedan en el inventario ni como descartados.
+
+**Duda abierta.** Si dos archivos de la misma carpeta tienen nombres que solo se diferencian en cómo escriben las tildes (uno en NFC y otro en NFD), quedarían con la misma `ruta_origen` y el mismo `id_documento`. Pasa solo si alguien arma la carpeta a propósito: Mac no lo permite y en Windows es muy raro. Por ahora `inventariar` lanza `ErrorInventario` y no procesa la entrega, lo que choca con R17 (un documento con error no frena a los demás). Alternativas: agregar un sufijo a la segunda ruta, o dejar el segundo archivo como `error_entrada` con un código nuevo. La segunda cambia el contrato.

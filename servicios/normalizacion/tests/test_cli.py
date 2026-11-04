@@ -13,7 +13,7 @@ def entrega(tmp_path):
     for ruta in ("b.pdf", "a/carta.docx", "a/sub/foto.jpg", "__MACOSX/._b.pdf", ".DS_Store"):
         archivo = carpeta / ruta
         archivo.parent.mkdir(parents=True, exist_ok=True)
-        archivo.write_bytes(b"x")
+        archivo.write_bytes(ruta.encode("utf-8"))
     (carpeta / "vacia").mkdir()
     return carpeta
 
@@ -46,8 +46,8 @@ def test_comando_cuenta_sin_mostrar_nombres(entrega, tmp_path, capsys):
     codigo = main([str(entrega), "--proceso", "SR0000000001", "--oferente", "OF-002", "--salida", str(tmp_path / "salida")])
     salida = capsys.readouterr().out
     assert codigo == 0
-    assert "SR0000000001/OF-002: 5 archivos" in salida
-    assert "carta" not in salida
+    assert "SR0000000001/OF-002: 3 archivos, 0 duplicados, 2 descartados." in salida
+    assert "carta.docx" not in salida and "foto.jpg" not in salida
 
 
 def test_comando_entrega_del_proceso(entrega, tmp_path, capsys):
