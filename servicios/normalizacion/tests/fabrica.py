@@ -314,7 +314,7 @@ def doc(carpeta: Path) -> list[Path]:
     return _desde_docx(carpeta, "doc:MS Word 97", "carta_presentacion.doc")
 
 
-def xlsx_ancho(carpeta: Path) -> list[Path]:
+def xlsx_bytes() -> bytes:
     """Hoja de cálculo con 40 columnas: al pasarla a PDF se corta en varias páginas."""
     from openpyxl import Workbook
 
@@ -326,7 +326,27 @@ def xlsx_ancho(carpeta: Path) -> list[Path]:
         hoja.append([f"{OFERENTE} {fila}-{n}" if n == 1 else fila * n for n in range(1, 41)])
     salida = io.BytesIO()
     libro.save(salida)
-    return [_guardar(carpeta / "experiencia.xlsx", salida.getvalue())]
+    return salida.getvalue()
+
+
+def xlsx_ancho(carpeta: Path) -> list[Path]:
+    return [_guardar(carpeta / "experiencia.xlsx", xlsx_bytes())]
+
+
+def _desde_xlsx(carpeta: Path, formato: str, nombre: str) -> list[Path]:
+    with tempfile.TemporaryDirectory() as temporal:
+        origen = _guardar(Path(temporal) / "experiencia.xlsx", xlsx_bytes())
+        return [convertir_con_libreoffice(origen, formato, carpeta / nombre)]
+
+
+def xls(carpeta: Path) -> list[Path]:
+    """Necesita LibreOffice."""
+    return _desde_xlsx(carpeta, "xls:MS Excel 97", "experiencia.xls")
+
+
+def ods(carpeta: Path) -> list[Path]:
+    """Necesita LibreOffice."""
+    return _desde_xlsx(carpeta, "ods", "experiencia.ods")
 
 
 def _imagen_bytes(formato: str, **opciones) -> bytes:
@@ -452,6 +472,8 @@ CASOS = {
     "odt": odt,
     "doc": doc,
     "xlsx_ancho": xlsx_ancho,
+    "xls": xls,
+    "ods": ods,
     "jpg": jpg,
     "png": png,
     "tiff_tres_paginas": tiff_tres_paginas,
@@ -463,4 +485,4 @@ CASOS = {
     "pdf_anclas": pdf_anclas,
 }
 
-CASOS_CON_LIBREOFFICE = {"odt", "doc"}
+CASOS_CON_LIBREOFFICE = {"odt", "doc", "xls", "ods"}

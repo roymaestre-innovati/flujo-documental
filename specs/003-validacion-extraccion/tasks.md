@@ -19,7 +19,7 @@ Dependencias del sistema: `libreoffice` (writer y calc) y Python 3.12 con `uv`. 
 - [x] **T02 — Esqueleto.** `servicios/normalizacion/` con `pyproject.toml` (uv, pytest), `__init__.py` con `VERSION = "0.1.0"`, `parametros.py`, `almacen.py` (interfaz y `AlmacenLocal`) y el comando `normalizar` que por ahora solo lista la entrega. Agregar la prueba que valida los ejemplos del contrato.
 - [x] **T03 — Fábrica de pruebas.** `tests/fabrica.py` con todos los casos de la tabla de pruebas del plan. Una prueba por caso que solo confirma que el archivo se fabricó.
 - [x] **T04 — Inventario.** Recorrido recursivo, descarte de archivos de sistema (por nombre y por contenido), SHA-256, duplicados por orden de ruta e `id_documento`. Requisitos R1 a R5.
-- [ ] **T05 — Tipo real.** `tipos.py` con la tabla del plan. Incluye la extensión falsa y los no soportados. Requisito R6.
+- [x] **T05 — Tipo real.** `tipos.py` con la tabla del plan. Incluye la extensión falsa y los no soportados. Requisito R6.
 - [ ] **T06 — Revisión del PDF.** Abrir, reparar una vez, detectar contraseña y restricciones, contar páginas. Requisitos R11 a R13 y R16.
 - [ ] **T07 — Conversión.** LibreOffice con perfil temporal y macros bloqueadas, con tiempo máximo y un reintento; imágenes con img2pdf, incluido el TIFF de varias páginas; Excel convertido y conservado como anexo. Requisitos R7 a R10.
 - [ ] **T08 — Firma digital.** Firmante, fecha, integridad, formato y `leida`. Casos: íntegro, modificado después de firmar, sin firma. Requisito R15.
@@ -97,4 +97,19 @@ Contrato escrito en `contracts/modulo3-normalizacion/v0/`, con los ejemplos vali
 - **Duplicados:** un archivo descartado nunca cuenta como original de una copia. Un archivo vacío sí entra al inventario, con la huella de cero bytes; T05 le dará su tipo.
 - **Enlaces simbólicos:** el recorrido no los sigue (decidido en T02). No quedan en el inventario ni como descartados.
 
-**Duda abierta.** Si dos archivos de la misma carpeta tienen nombres que solo se diferencian en cómo escriben las tildes (uno en NFC y otro en NFD), quedarían con la misma `ruta_origen` y el mismo `id_documento`. Pasa solo si alguien arma la carpeta a propósito: Mac no lo permite y en Windows es muy raro. Por ahora `inventariar` lanza `ErrorInventario` y no procesa la entrega, lo que choca con R17 (un documento con error no frena a los demás). Alternativas: agregar un sufijo a la segunda ruta, o dejar el segundo archivo como `error_entrada` con un código nuevo. La segunda cambia el contrato.
+**Duda resuelta con el usuario: sufijo.** Si dos archivos tienen nombres que solo se diferencian en cómo escriben las tildes (uno en NFC y otro en NFD), los dos quedarían con la misma `ruta_origen`. El primero por orden de la ruta en disco conserva el nombre; los siguientes llevan ` (2)`, ` (3)`… en el nombre, antes de la extensión, saltando cualquier ruta que ya exista en la entrega. Es determinista y no cambia el contrato. Solo queda `ErrorInventario` para el caso, prácticamente imposible, de dos rutas distintas cuyo SHA-256 coincida en los primeros 12 hex.
+
+### T05 — Tipo real (2026-11-04)
+
+`tipos.detectar(ruta)` devuelve el `tipo_origen` del contrato y, en las imágenes, el formato (jpeg, png o tiff), siguiendo la tabla del plan. Lo que no reconoce es `no_soportado`, nunca una excepción. La revisión de la cabecera AppleDouble pasó de `inventario.py` a `tipos.py`. `olefile` es ahora dependencia del paquete. La fábrica suma XLS y ODS (R9 los nombra). 149 pruebas en verde.
+
+**Decisiones que el plan no fijaba:**
+
+- **DOCX y XLSX se reconocen por su pieza principal** (`[Content_Types].xml` más `word/document.xml` o `xl/workbook.xml`), no solo por la carpeta `word/` o `xl/`. Así un ZIP que el oferente armó con una carpeta llamada `word/` no pasa por Word. Los DOCM y XLSM (con macros) tienen las mismas piezas y se tratan como DOCX y XLSX; LibreOffice los convierte sin ejecutar macros (T07).
+- **El `%PDF-` tiene que estar al comienzo del archivo**, como dice la tabla.
+
+**Dudas abiertas:**
+
+1. **Word o Excel con contraseña.** Un DOCX o XLSX protegido con contraseña llega como OLE con un flujo `EncryptedPackage`, y hoy queda `no_soportado`. El evaluador recibiría "el tipo de archivo no se puede leer, entregarlo en PDF", cuando lo que pasa es que tiene contraseña. Propuesta: reconocer `EncryptedPackage` (y la marca de cifrado de los DOC y XLS antiguos) y dejar el documento con `CONTRASENA`. Es un cambio pequeño y no toca el contrato, porque el código ya existe; falta decidir qué `tipo_origen` lleva, ya que no se sabe si era Word o Excel (¿`no_soportado`?).
+2. **PDF con bytes antes de `%PDF-`.** Acrobat abre PDF con hasta 1024 bytes de basura antes de la cabecera; aquí quedarían `no_soportado`. No se sabe si pasa en la muestra real: se verá en A3. Si pasa, la regla se amplía a "`%PDF-` en los primeros 1024 bytes".
+3. **Formatos fuera de la tabla:** RTF, PPTX, HEIC (fotos de iPhone), GIF, BMP y WEBP quedan `no_soportado`, con el aviso de entregarlos en PDF. HEIC y RTF podrían ser comunes entre oferentes; convendría confirmarlo con la muestra antes de agregarlos.

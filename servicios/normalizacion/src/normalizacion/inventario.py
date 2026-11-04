@@ -10,13 +10,12 @@ import unicodedata
 from dataclasses import dataclass
 from pathlib import Path
 
+from .tipos import es_appledouble
+
 ENTREGA_DEL_PROCESO = "PROCESO"
 
 MOTIVO_MAC = "archivo_sistema_mac"
 MOTIVO_WINDOWS = "archivo_sistema_windows"
-
-# Número mágico de los archivos AppleDouble (los `._*` de Mac).
-MAGICO_APPLEDOUBLE = bytes.fromhex("00051607")
 
 _BLOQUE = 1024 * 1024
 
@@ -88,11 +87,6 @@ def huella(ruta: Path) -> str:
     return sha.hexdigest()
 
 
-def es_appledouble(ruta: Path) -> bool:
-    with Path(ruta).open("rb") as archivo:
-        return archivo.read(len(MAGICO_APPLEDOUBLE)) == MAGICO_APPLEDOUBLE
-
-
 def motivo_descarte(ruta_origen: str, ruta: Path) -> str | None:
     """Motivo por el que un archivo de sistema se descarta, o None si es documento (R2).
 
@@ -113,18 +107,48 @@ def motivo_descarte(ruta_origen: str, ruta: Path) -> str | None:
     return None
 
 
+def _con_sufijo(ruta: str, numero: int) -> str:
+    """`a/carta.pdf` → `a/carta (2).pdf`. El sufijo va en el nombre, antes de la extensión."""
+    carpeta, _, nombre = ruta.rpartition("/")
+    base, punto, extension = nombre.rpartition(".")
+    if not base:  # sin extensión, o un nombre que empieza por punto
+        base, punto, extension = nombre, "", ""
+    nuevo = f"{base} ({numero}){punto}{extension}"
+    return f"{carpeta}/{nuevo}" if carpeta else nuevo
+
+
+def _rutas_unicas(relativas: list[str]) -> dict[str, str]:
+    """Ruta en disco → ruta_origen en NFC, sin repetir.
+
+    Dos nombres que solo se diferencian en cómo escriben las tildes (NFC y NFD)
+    darían la misma ruta_origen. El primero en orden de la ruta en disco la
+    conserva; los siguientes llevan un sufijo ` (2)`, ` (3)`… que no choque con
+    ninguna otra ruta de la entrega. Es determinista: la misma carpeta da siempre
+    los mismos sufijos.
+    """
+    normalizadas = {relativa: normalizar_ruta(relativa) for relativa in sorted(relativas)}
+    ocupadas = set(normalizadas.values())
+    asignadas: set[str] = set()
+    resultado = {}
+    for relativa, ruta_origen in normalizadas.items():
+        if ruta_origen in asignadas:
+            numero = 2
+            while _con_sufijo(ruta_origen, numero) in ocupadas:
+                numero += 1
+            ruta_origen = _con_sufijo(ruta_origen, numero)
+            ocupadas.add(ruta_origen)
+        asignadas.add(ruta_origen)
+        resultado[relativa] = ruta_origen
+    return resultado
+
+
 def inventariar(carpeta: Path, id_oferente: str | None) -> Inventario:
     """Inventario de una entrega. `id_oferente` es None en una entrega del proceso."""
     carpeta = Path(carpeta)
-    encontrados: dict[str, Path] = {}
-    for relativa in recorrer(carpeta):
-        ruta_origen = normalizar_ruta(relativa)
-        if ruta_origen in encontrados:
-            # Dos nombres que solo se diferencian en cómo escriben las tildes.
-            raise ErrorInventario(
-                "Dos archivos de la entrega tienen la misma ruta al normalizar las tildes (NFC)."
-            )
-        encontrados[ruta_origen] = carpeta / relativa
+    encontrados = {
+        ruta_origen: carpeta / relativa
+        for relativa, ruta_origen in _rutas_unicas(recorrer(carpeta)).items()
+    }
 
     archivos: list[Archivo] = []
     descartados: list[Descartado] = []

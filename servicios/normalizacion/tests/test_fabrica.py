@@ -30,7 +30,7 @@ def _tiene_imagen(pagina) -> bool:
 
 
 def test_todos_los_casos_estan_registrados():
-    assert len(fabrica.CASOS) == 24
+    assert len(fabrica.CASOS) == 26
     assert fabrica.CASOS_CON_LIBREOFFICE <= set(fabrica.CASOS)
 
 
@@ -158,6 +158,22 @@ def test_doc(tmp_path):
     assert olefile.isOleFile(str(ruta))
     with olefile.OleFileIO(str(ruta)) as ole:
         assert ole.exists("WordDocument")
+
+
+@pytest.mark.libreoffice
+def test_xls(tmp_path):
+    import olefile
+
+    ruta = _un_archivo(fabrica.xls(tmp_path))
+    with olefile.OleFileIO(str(ruta)) as ole:
+        assert ole.exists("Workbook") or ole.exists("Book")
+
+
+@pytest.mark.libreoffice
+def test_ods(tmp_path):
+    ruta = _un_archivo(fabrica.ods(tmp_path))
+    with zipfile.ZipFile(ruta) as zip_:
+        assert zip_.read("mimetype") == b"application/vnd.oasis.opendocument.spreadsheet"
 
 
 def test_xlsx_ancho(tmp_path):

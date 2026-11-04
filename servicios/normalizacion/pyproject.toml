@@ -3,7 +3,9 @@ name = "normalizacion"
 dynamic = ["version"]
 description = "Normalización y lectura de las entregas de documentos (módulo 3, spec 003)"
 requires-python = ">=3.12,<3.13"
-dependencies = []
+dependencies = [
+    "olefile>=0.47",
+]
 
 [project.scripts]
 normalizar = "normalizacion.cli:main"
@@ -19,7 +21,6 @@ dev = [
     "pikepdf>=10.17.0",
     "pyhanko>=0.38.1",
     "pillow>=13.0.0",
-    "olefile>=0.47",
 ]
 
 [build-system]

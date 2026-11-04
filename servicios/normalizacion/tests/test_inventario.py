@@ -5,13 +5,11 @@ import re
 import shutil
 import unicodedata
 
-import pytest
 
 import fabrica
 from normalizacion.inventario import (
     MOTIVO_MAC,
     MOTIVO_WINDOWS,
-    ErrorInventario,
     id_documento,
     inventariar,
 )
@@ -206,9 +204,33 @@ def test_r5_id_documento_normaliza_la_ruta():
     assert id_documento(unicodedata.normalize("NFD", nombre), "OF-002") == id_documento(nombre, "OF-002")
 
 
-def test_dos_nombres_iguales_al_normalizar_son_error(tmp_path):
+def test_dos_nombres_iguales_al_normalizar_llevan_sufijo(tmp_path):
     nombre = "declaración.pdf"
-    (tmp_path / unicodedata.normalize("NFC", nombre)).write_bytes(b"uno")
-    (tmp_path / unicodedata.normalize("NFD", nombre)).write_bytes(b"dos")
-    with pytest.raises(ErrorInventario):
-        inventariar(tmp_path, "OF-002")
+    nfc, nfd = (unicodedata.normalize(forma, nombre) for forma in ("NFC", "NFD"))
+    (tmp_path / nfc).write_bytes(b"uno")
+    (tmp_path / nfd).write_bytes(b"dos")
+    # Ya existe un archivo con el primer sufijo: el siguiente salta al (3).
+    (tmp_path / "declaración (2).pdf").write_bytes(b"tres")
+    archivos = _por_ruta(inventariar(tmp_path, "OF-002"))
+    assert sorted(archivos) == ["declaración (2).pdf", "declaración (3).pdf", "declaración.pdf"]
+    # El primero por orden de la ruta en disco (NFD) conserva el nombre.
+    assert archivos["declaración.pdf"].ruta.name == min(nfc, nfd)
+    assert archivos["declaración (3).pdf"].ruta.read_bytes() in (b"uno", b"dos")
+    assert len({a.id_documento for a in archivos.values()}) == 3
+    assert inventariar(tmp_path, "OF-002") == inventariar(tmp_path, "OF-002")
+
+
+def test_sufijo_en_carpeta_y_sin_extension(tmp_path):
+    for forma in ("NFC", "NFD"):
+        carpeta = tmp_path / unicodedata.normalize(forma, "presentación")
+        carpeta.mkdir()
+        (carpeta / "LEAME").write_bytes(forma.encode())
+    rutas = sorted(a.ruta_origen for a in inventariar(tmp_path, "OF-002").archivos)
+    assert rutas == ["presentación/LEAME", "presentación/LEAME (2)"]
+
+
+def test_sufijo_en_nombre_que_empieza_por_punto():
+    from normalizacion.inventario import _con_sufijo
+
+    assert _con_sufijo(".oculto", 2) == ".oculto (2)"
+    assert _con_sufijo("a/b.tar.gz", 2) == "a/b.tar (2).gz"
