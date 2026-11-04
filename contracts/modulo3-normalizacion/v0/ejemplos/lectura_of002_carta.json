@@ -1,0 +1,100 @@
+{
+  "contrato": "modulo3-normalizacion/0.1",
+  "id_documento": "OF-002-723c293af12b",
+  "hash_pdf": "c434aac28568422189e6cfcca41f43c41c47639cb9fed198e5669f05255d793d",
+  "version_normalizador": "0.1.0",
+  "version_parametros": "1",
+  "firma_digital": [
+    {
+      "firmante": "ANDRÉS FELIPE ROJAS MEJÍA",
+      "fecha": "2026-10-20T15:42:10-05:00",
+      "integro": true,
+      "formato": "adbe.pkcs7.detached",
+      "leida": true
+    }
+  ],
+  "palabras": "file:///salida/SR0000000001/OF-002/palabras/OF-002-723c293af12b.json",
+  "paginas": [
+    {
+      "pagina": 1,
+      "tipo": "texto",
+      "texto": "CARTA DE PRESENTACIÓN DE LA OFERTA\nProceso SR0000000001\nOferente: OFERENTE EJEMPLO LTDA\nAcepto las condiciones del proceso SI NO\n________________________\nFirma del representante legal\nMARTA LUCÍA PEREIRA GÓMEZ",
+      "origen_texto": "nativo",
+      "caracteres": 182,
+      "cobertura_imagen": 0.0,
+      "rotacion": 0,
+      "anclas": [
+        {
+          "tipo": "tabla_si_no",
+          "caja": [
+            72.0,
+            400.0,
+            300.0,
+            428.0
+          ],
+          "texto": "Acepto las condiciones del proceso SI NO"
+        },
+        {
+          "tipo": "casilla",
+          "caja": [
+            272.0,
+            416.0,
+            284.0,
+            428.0
+          ],
+          "texto": null
+        },
+        {
+          "tipo": "casilla",
+          "caja": [
+            288.0,
+            416.0,
+            300.0,
+            428.0
+          ],
+          "texto": null
+        },
+        {
+          "tipo": "linea_firma",
+          "caja": [
+            72.0,
+            640.0,
+            240.0,
+            668.0
+          ],
+          "texto": "Firma del representante legal"
+        }
+      ]
+    },
+    {
+      "pagina": 2,
+      "tipo": "escaneo_con_ocr",
+      "texto": "CERTIFICADO DE EXPERIENCIA\nOFERENTE EJEMPLO LTDA ejecutó el contrato 045 de 2024",
+      "origen_texto": "ocr_escaner",
+      "caracteres": 69,
+      "cobertura_imagen": 0.97,
+      "rotacion": 0,
+      "anclas": []
+    },
+    {
+      "pagina": 3,
+      "tipo": "imagen",
+      "texto": "",
+      "origen_texto": null,
+      "caracteres": 0,
+      "cobertura_imagen": 0.98,
+      "rotacion": 90,
+      "anclas": []
+    },
+    {
+      "pagina": 4,
+      "tipo": "vacia",
+      "texto": "",
+      "origen_texto": null,
+      "caracteres": 0,
+      "cobertura_imagen": 0.0,
+      "rotacion": 0,
+      "anclas": []
+    }
+  ]
+}

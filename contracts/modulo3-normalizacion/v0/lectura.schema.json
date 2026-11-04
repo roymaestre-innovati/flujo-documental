@@ -1,0 +1,83 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "modulo3-normalizacion/v0/lectura.schema.json",
+  "title": "Lectura por página de un documento normalizado",
+  "description": "Qué trae cada página del PDF normalizado: tipo, texto, origen del texto, cobertura de imagen, rotación y zonas visuales (R18 a R21). Es determinista: el mismo PDF con la misma version_parametros da siempre la misma lectura (R23). Las posiciones de cada palabra van aparte, en palabras.schema.json (R22).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["contrato", "id_documento", "hash_pdf", "version_normalizador", "version_parametros", "firma_digital", "palabras", "paginas"],
+  "properties": {
+    "contrato": {"const": "modulo3-normalizacion/0.1"},
+    "id_documento": {"type": "string", "minLength": 1},
+    "hash_pdf": {"type": "string", "pattern": "^[0-9a-f]{64}$", "description": "SHA-256 del PDF normalizado que se leyó. Si el PDF se usó tal cual (R11), coincide con el hash del original."},
+    "version_normalizador": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"},
+    "version_parametros": {"type": "string", "minLength": 1},
+    "firma_digital": {
+      "type": "array",
+      "description": "Las mismas firmas que la entrada del documento en el manifiesto.",
+      "items": {"$ref": "manifiesto.schema.json#/$defs/firma"}
+    },
+    "palabras": {"type": "string", "format": "uri", "description": "Archivo de palabras con su posición (palabras.schema.json)."},
+    "paginas": {
+      "type": "array",
+      "minItems": 1,
+      "description": "Una entrada por página del PDF normalizado, en orden y sin saltos.",
+      "items": {"$ref": "#/$defs/pagina"}
+    }
+  },
+  "$defs": {
+    "caja": {
+      "type": "array",
+      "description": "[x0, y0, x1, y1] en puntos PDF, con el origen arriba a la izquierda y sobre la página sin rotar.",
+      "items": {"type": "number", "minimum": 0},
+      "minItems": 4,
+      "maxItems": 4
+    },
+    "ancla": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["tipo", "caja", "texto"],
+      "properties": {
+        "tipo": {"enum": ["linea_firma", "casilla", "tabla_si_no"]},
+        "caja": {"$ref": "#/$defs/caja"},
+        "texto": {"type": ["string", "null"], "description": "Rótulo o línea de texto que dio lugar al ancla. null en una casilla, que no tiene texto propio."}
+      }
+    },
+    "pagina": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["pagina", "tipo", "texto", "origen_texto", "caracteres", "cobertura_imagen", "rotacion", "anclas"],
+      "properties": {
+        "pagina": {"type": "integer", "minimum": 1, "description": "Número sobre el PDF normalizado completo."},
+        "tipo": {"enum": ["texto", "escaneo_con_ocr", "imagen", "vacia"]},
+        "texto": {"type": "string", "description": "Texto de la página. Cadena vacía si no hay."},
+        "origen_texto": {
+          "enum": ["nativo", "ocr_escaner", "ocr_propio", null],
+          "description": "nativo en las páginas texto, ocr_escaner en las escaneo_con_ocr, null en imagen y vacia. ocr_propio está reservado para el experimento de OCR y no se produce en 0.1."
+        },
+        "caracteres": {"type": "integer", "minimum": 0, "description": "Caracteres del texto sin contar espacios en blanco."},
+        "cobertura_imagen": {"type": "number", "minimum": 0, "maximum": 1, "description": "Fracción del área de la página cubierta por imágenes."},
+        "rotacion": {"enum": [0, 90, 180, 270]},
+        "anclas": {"type": "array", "items": {"$ref": "#/$defs/ancla"}}
+      },
+      "allOf": [
+        {
+          "if": {"properties": {"tipo": {"const": "texto"}}},
+          "then": {"properties": {"origen_texto": {"const": "nativo"}}}
+        },
+        {
+          "if": {"properties": {"tipo": {"const": "escaneo_con_ocr"}}},
+          "then": {"properties": {"origen_texto": {"const": "ocr_escaner"}}}
+        },
+        {
+          "if": {"properties": {"tipo": {"enum": ["imagen", "vacia"]}}},
+          "then": {"properties": {"origen_texto": {"const": null}}}
+        },
+        {
+          "if": {"properties": {"tipo": {"const": "imagen"}}},
+          "then": {"properties": {"anclas": {"maxItems": 0}}}
+        }
+      ]
+    }
+  }
+}

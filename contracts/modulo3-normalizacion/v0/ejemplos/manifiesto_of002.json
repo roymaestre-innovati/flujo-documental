@@ -1,0 +1,92 @@
+{
+  "contrato": "modulo3-normalizacion/0.1",
+  "id_proceso": "SR0000000001",
+  "id_oferente": "OF-002",
+  "version_normalizador": "0.1.0",
+  "version_parametros": "1",
+  "ejecucion": {
+    "inicio": "2026-11-04T10:00:00Z",
+    "duracion_ms": 41200
+  },
+  "archivos": [
+    {
+      "id_documento": "OF-002-723c293af12b",
+      "ruta_origen": "carta_presentacion.pdf",
+      "hash": "c434aac28568422189e6cfcca41f43c41c47639cb9fed198e5669f05255d793d",
+      "tipo_origen": "pdf",
+      "estado": "normalizado",
+      "pdf": "file:///salida/SR0000000001/OF-002/pdf/OF-002-723c293af12b.pdf",
+      "anexo_nativo": null,
+      "lectura": "file:///salida/SR0000000001/OF-002/lectura/OF-002-723c293af12b.json",
+      "paginas": 4,
+      "paginas_sin_texto": [
+        3,
+        4
+      ],
+      "duplicado_de": null,
+      "restricciones": false,
+      "firma_digital": [
+        {
+          "firmante": "ANDRÉS FELIPE ROJAS MEJÍA",
+          "fecha": "2026-10-20T15:42:10-05:00",
+          "integro": true,
+          "formato": "adbe.pkcs7.detached",
+          "leida": true
+        }
+      ],
+      "error": null
+    },
+    {
+      "id_documento": "OF-002-3c69f7659b00",
+      "ruta_origen": "copias/carta_presentacion.pdf",
+      "hash": "c434aac28568422189e6cfcca41f43c41c47639cb9fed198e5669f05255d793d",
+      "tipo_origen": "pdf",
+      "estado": "duplicado",
+      "pdf": "file:///salida/SR0000000001/OF-002/pdf/OF-002-723c293af12b.pdf",
+      "anexo_nativo": null,
+      "lectura": "file:///salida/SR0000000001/OF-002/lectura/OF-002-723c293af12b.json",
+      "paginas": 4,
+      "paginas_sin_texto": [
+        3,
+        4
+      ],
+      "duplicado_de": "OF-002-723c293af12b",
+      "restricciones": false,
+      "firma_digital": [
+        {
+          "firmante": "ANDRÉS FELIPE ROJAS MEJÍA",
+          "fecha": "2026-10-20T15:42:10-05:00",
+          "integro": true,
+          "formato": "adbe.pkcs7.detached",
+          "leida": true
+        }
+      ],
+      "error": null
+    },
+    {
+      "id_documento": "OF-002-f2f986dae809",
+      "ruta_origen": "estados_financieros.pdf",
+      "hash": "716110d83cd4e1ccb954d85aa2a9873d4b62eb32c0e0cc5869aed9f7ee45a115",
+      "tipo_origen": "pdf",
+      "estado": "error_entrada",
+      "pdf": null,
+      "anexo_nativo": null,
+      "lectura": null,
+      "paginas": null,
+      "paginas_sin_texto": [],
+      "duplicado_de": null,
+      "restricciones": false,
+      "firma_digital": [],
+      "error": {
+        "codigo": "CONTRASENA",
+        "detalle": "El PDF pide contraseña para abrirse."
+      }
+    }
+  ],
+  "descartados": [
+    {
+      "ruta_origen": "__MACOSX/._carta_presentacion.pdf",
+      "motivo": "archivo_sistema_mac"
+    }
+  ]
+}
