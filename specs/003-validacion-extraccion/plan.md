@@ -1,6 +1,8 @@
 # Plan 003 — Normalización y lectura (primera entrega)
 
-Estado al 2026-11-04. Borrador para revisión. Implementa la parte de normalización y lectura de `spec.md`. La extracción tendrá su propio plan más adelante, en esta misma carpeta.
+Estado al 2026-11-04. **Implementado** (T01 a T13 de `tasks.md`). Implementa la parte de normalización y lectura de `spec.md`. La extracción tendrá su propio plan más adelante, en esta misma carpeta.
+
+Este plan se mantiene como se aprobó, salvo los ajustes marcados. Lo que cambió al implementar está resumido en "Lo que cambió al implementar", al final, y en detalle en las notas de `tasks.md`.
 
 ## Resumen
 
@@ -53,23 +55,31 @@ Cada pieza que se despliega por separado tiene su carpeta en `servicios/`. Esta 
 
 ```
 servicios/normalizacion/
+  README.md                  # cómo instalar, correr y probar
   pyproject.toml
-  Dockerfile                 # imagen del job: Python + LibreOffice
+  uv.lock
+  Dockerfile                 # imagen del job: Ubuntu 24.04, Python 3.12, LibreOffice (ajustado en T12)
+  Dockerfile.dockerignore    # solo entra a la imagen lo que se copia
   src/normalizacion/
-    __init__.py              # VERSION del normalizador
+    __init__.py              # VERSION del normalizador y versión del contrato
     cli.py                   # comando `normalizar`
     entrega.py               # orquesta una entrega: inventario → por archivo → manifiesto
     inventario.py            # recorrido, descarte de archivos de sistema, hash, duplicados, id_documento
-    tipos.py                 # detección del tipo real por contenido
+    tipos.py                 # detección del tipo real por contenido (y de Word o Excel con contraseña)
     conversion.py            # LibreOffice e img2pdf
     revision_pdf.py          # abre, repara, contraseña, restricciones, páginas
-    firma.py                 # firma digital con pyHanko
+    firma.py                 # firma digital con pikepdf y pyHanko
     lectura.py               # tipo de página, texto, cobertura, rotación
     anclas.py                # zonas visuales
     almacen.py               # interfaz de almacenamiento + implementación en disco
     parametros.py            # umbrales con su versión
+    errores.py               # códigos de error con su aviso para el evaluador (agregado)
+    registros.py             # registros en JSON sin datos personales (agregado)
+  scripts/
+    medir_muestra.py         # conteos de la muestra real, criterios A3 a A5 (T13)
   tests/
     conftest.py
+    contrato.py              # validadores de los esquemas del contrato
     fabrica.py               # genera los documentos sintéticos de prueba
     test_*.py
 contracts/modulo3-normalizacion/v0/
@@ -297,7 +307,7 @@ Todo con documentos sintéticos que fabrica `tests/fabrica.py` en una carpeta te
 ## Complejidad y excepciones
 
 - **img2pdf es LGPL-3.0.** No es AGPL y se usa como librería sin modificar, pero se anota para la respuesta de A-6. Si se rechaza, se cambia por Pillow; solo toca `conversion.py`.
-- **LibreOffice pesa** (unos 500 MB en la imagen). Es la forma más simple de convertir DOC, DOCX y XLS sin depender de Microsoft 365. Si A-1 resulta en SharePoint, se evalúa cambiarla por Graph API.
+- **LibreOffice pesa.** La imagen del job quedó en 1,2 GB, casi todo LibreOffice (se estimaban unos 500 MB). Es la forma más simple de convertir DOC, DOCX y XLS sin depender de Microsoft 365. Si A-1 resulta en SharePoint, se evalúa cambiarla por Graph API.
 - **Firmas `adbe.pkcs7.sha1` sin leer en v0** (Cámara de Comercio y RUP). Quedan como `leida: false`. Buscar otra herramienta queda para después, si negocio responde A-3 o A-4.
 
 ## Riesgos
@@ -305,3 +315,18 @@ Todo con documentos sintéticos que fabrica `tests/fabrica.py` en una carpeta te
 - Los umbrales (20 caracteres, 80 % de cobertura) salen de la exploración del diseño, no de una calibración. A4 los confirma con la muestra.
 - Puede que pdfplumber sea lento en PDF grandes (de 40 páginas o más). Si A5 no se cumple, la alternativa es pypdfium2 (Apache-2.0 o BSD) para el texto y las imágenes.
 - Las anclas se calibran con documentos sintéticos. Su efecto real se ve cuando la extracción las use (decisión 8).
+
+## Lo que cambió al implementar
+
+Resumen; el detalle y el porqué están en las notas de `tasks.md`.
+
+- **Contrato** (revisado con el usuario después de T01): el duplicado repite todos los datos del original; las rutas van en NFC; `restricciones` y `firma_digital` van en `null` cuando el documento no abre; campo nuevo `reparado`; `detalle` dice qué pedirle al oferente.
+- **Inventario:** los `._*` se descartan por contenido (cabecera AppleDouble), así que un documento no se pierde por su nombre. Dos nombres iguales al normalizar las tildes llevan un sufijo ` (2)`.
+- **Tipo real:** también reconoce Word y Excel con contraseña, que quedan `CONTRASENA` y no `NO_SOPORTADO`.
+- **Conversión:** el PDF convertido se deja sin fechas ni identificadores aleatorios, para que dos corridas den lo mismo.
+- **Firma digital:** pyHanko no lista las firmas `adbe.pkcs7.sha1`. Los campos de firma se buscan con pikepdf y pyHanko valida los que puede; los demás quedan `leida: false`.
+- **Lectura:** se lee una copia interna sin `/Rotate`, porque pdfplumber gira las coordenadas y desordena el texto de las páginas giradas. Las cajas se recortan al borde de la página. Una página que no se puede leer queda `vacia`.
+- **Anclas:** las palabras se agrupan en frases; hay tres parámetros nuevos (renglón, frase y grosor de línea).
+- **Entrega:** la idempotencia se decide con el manifiesto anterior. Ante un bug, el manifiesto no se escribe.
+- **Imagen:** Ubuntu 24.04 en vez de `python:3.12-slim`, confirmado por el usuario. uv se instala desde PyPI.
+

@@ -1,5 +1,7 @@
 # Handoff: pruebas del modelo semántico por tipo documental
 
+Para el estado de la implementación del flujo (normalización y lectura ya hechas), ver `contexto/HANDOFF-implementacion.md`. Este archivo trata solo de las pruebas del modelo semántico.
+
 Estado al 2026-10-29. Modelo publicado: **v21** (`extraccion_documental`, Cosmos DB). Proceso de prueba: SR5658940621, con 6 oferentes (AICOSS, BV, GOODS, LEVIN, LONJACUN, PWC).
 
 ## Qué estamos haciendo
