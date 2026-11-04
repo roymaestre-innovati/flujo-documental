@@ -1,0 +1,161 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "modulo3-normalizacion/v0/manifiesto.schema.json",
+  "title": "Manifiesto de una entrega normalizada",
+  "description": "Inventario de una entrega (de un oferente o del proceso): una entrada por archivo, con su huella, su estado y los enlaces al PDF normalizado y a su lectura. Dos corridas sobre la misma entrega dan el mismo manifiesto, salvo `ejecucion`.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["contrato", "id_proceso", "id_oferente", "version_normalizador", "version_parametros", "ejecucion", "archivos", "descartados"],
+  "properties": {
+    "contrato": {"const": "modulo3-normalizacion/0.1"},
+    "id_proceso": {"type": "string", "minLength": 1, "description": "Identificador del proceso de selección."},
+    "id_oferente": {"type": ["string", "null"], "minLength": 1, "description": "null en una entrega del proceso (condiciones, adendas, anexos)."},
+    "version_normalizador": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$", "description": "Versión del paquete normalizacion que produjo el manifiesto (R24)."},
+    "version_parametros": {"type": "string", "minLength": 1, "description": "Versión de los umbrales y palabras clave de lectura (R24)."},
+    "ejecucion": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["inicio", "duracion_ms"],
+      "description": "Lo único que cambia entre dos corridas de la misma entrega (R25).",
+      "properties": {
+        "inicio": {"type": "string", "format": "date-time"},
+        "duracion_ms": {"type": "integer", "minimum": 0}
+      }
+    },
+    "archivos": {
+      "type": "array",
+      "description": "Una entrada por archivo que no se descartó, ordenadas por ruta_origen.",
+      "items": {"$ref": "#/$defs/archivo"}
+    },
+    "descartados": {
+      "type": "array",
+      "description": "Archivos de sistema que no se procesan (R2), uno por archivo, ordenados por ruta_origen.",
+      "items": {"$ref": "#/$defs/descartado"}
+    }
+  },
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "ruta": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[^/\\\\].*$",
+      "description": "Ruta relativa dentro de la entrega, separada con `/`."
+    },
+    "tipo_origen": {"enum": ["pdf", "doc", "docx", "odt", "xls", "xlsx", "ods", "imagen", "no_soportado"]},
+    "archivo": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id_documento", "ruta_origen", "hash", "tipo_origen", "estado", "pdf", "anexo_nativo", "lectura", "paginas", "paginas_sin_texto", "duplicado_de", "restricciones", "firma_digital", "error"],
+      "properties": {
+        "id_documento": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Estable entre corridas (R5). Provisional hasta A-1: <id_oferente o PROCESO>-<primeros 12 hex del SHA-256 de ruta_origen>."
+        },
+        "ruta_origen": {"$ref": "#/$defs/ruta"},
+        "hash": {"$ref": "#/$defs/sha256", "description": "SHA-256 del archivo original (R3)."},
+        "tipo_origen": {"$ref": "#/$defs/tipo_origen", "description": "Tipo real, reconocido por el contenido (R6)."},
+        "estado": {"enum": ["normalizado", "duplicado", "error_entrada"]},
+        "pdf": {"type": ["string", "null"], "format": "uri", "description": "PDF normalizado."},
+        "anexo_nativo": {"type": ["string", "null"], "format": "uri", "description": "Hoja de cálculo original, solo para xls, xlsx y ods (R9)."},
+        "lectura": {"type": ["string", "null"], "format": "uri", "description": "Lectura por página (lectura.schema.json)."},
+        "paginas": {"type": ["integer", "null"], "minimum": 1},
+        "paginas_sin_texto": {
+          "type": "array",
+          "items": {"type": "integer", "minimum": 1},
+          "uniqueItems": true,
+          "description": "Páginas con 0 caracteres, contadas desde 1 y en orden. No es lo mismo que las páginas de tipo imagen."
+        },
+        "duplicado_de": {"type": ["string", "null"], "minLength": 1, "description": "id_documento del original (R4)."},
+        "restricciones": {"type": "boolean", "description": "El PDF trae restricciones de copia o impresión y se leyó igual (R13)."},
+        "firma_digital": {"type": "array", "items": {"$ref": "#/$defs/firma"}},
+        "error": {
+          "oneOf": [{"type": "null"}, {"$ref": "#/$defs/error"}]
+        }
+      },
+      "allOf": [
+        {
+          "if": {"properties": {"estado": {"const": "normalizado"}}},
+          "then": {
+            "properties": {
+              "pdf": {"type": "string"},
+              "lectura": {"type": "string"},
+              "paginas": {"type": "integer"},
+              "duplicado_de": {"type": "null"},
+              "error": {"type": "null"}
+            }
+          }
+        },
+        {
+          "if": {"properties": {"estado": {"const": "duplicado"}}},
+          "then": {
+            "description": "pdf, lectura y paginas apuntan a los del original; si el original tiene error, van en null.",
+            "properties": {
+              "duplicado_de": {"type": "string"},
+              "error": {"type": "null"}
+            }
+          }
+        },
+        {
+          "if": {"properties": {"estado": {"const": "error_entrada"}}},
+          "then": {
+            "properties": {
+              "pdf": {"type": "null"},
+              "anexo_nativo": {"type": "null"},
+              "lectura": {"type": "null"},
+              "paginas": {"type": "null"},
+              "paginas_sin_texto": {"maxItems": 0},
+              "duplicado_de": {"type": "null"},
+              "error": {"$ref": "#/$defs/error"}
+            }
+          }
+        },
+        {
+          "if": {"properties": {"tipo_origen": {"not": {"enum": ["xls", "xlsx", "ods"]}}}},
+          "then": {"properties": {"anexo_nativo": {"type": "null"}}}
+        },
+        {
+          "if": {"properties": {"tipo_origen": {"const": "no_soportado"}}},
+          "then": {"properties": {"estado": {"enum": ["error_entrada", "duplicado"]}}}
+        }
+      ]
+    },
+    "firma": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["firmante", "fecha", "integro", "formato", "leida"],
+      "description": "Una firma digital del PDF (R15). No se valida la confianza del certificado.",
+      "properties": {
+        "firmante": {"type": ["string", "null"], "description": "CN del certificado del firmante."},
+        "fecha": {"type": ["string", "null"], "format": "date-time", "description": "Hora de firma declarada."},
+        "integro": {"type": ["boolean", "null"], "description": "false si el documento se modificó después de firmarse."},
+        "formato": {"type": "string", "minLength": 1, "description": "Subfiltro de la firma: adbe.pkcs7.detached, ETSI.CAdES.detached, adbe.pkcs7.sha1…"},
+        "leida": {"type": "boolean", "description": "false: hay una firma que no se pudo leer. No es error del documento."}
+      },
+      "if": {"properties": {"leida": {"const": false}}},
+      "then": {"properties": {"firmante": {"type": "null"}, "fecha": {"type": "null"}, "integro": {"type": "null"}}},
+      "else": {"properties": {"firmante": {"type": "string"}, "fecha": {"type": "string"}, "integro": {"type": "boolean"}}}
+    },
+    "error": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["codigo", "detalle"],
+      "properties": {
+        "codigo": {"enum": ["CONTRASENA", "DANADO", "SIN_PAGINAS", "NO_SOPORTADO", "CONVERSION_FALLIDA"]},
+        "detalle": {"type": "string", "description": "Motivo legible para el evaluador. Nunca lleva texto del documento."}
+      }
+    },
+    "descartado": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ruta_origen", "motivo"],
+      "properties": {
+        "ruta_origen": {"$ref": "#/$defs/ruta"},
+        "motivo": {
+          "enum": ["archivo_sistema_mac", "archivo_sistema_windows"],
+          "description": "archivo_sistema_mac: .DS_Store, archivos dentro de __MACOSX y archivos ._* (AppleDouble). archivo_sistema_windows: Thumbs.db."
+        }
+      }
+    }
+  }
+}

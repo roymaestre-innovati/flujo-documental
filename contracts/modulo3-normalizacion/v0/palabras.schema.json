@@ -1,0 +1,37 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "modulo3-normalizacion/v0/palabras.schema.json",
+  "title": "Palabras con su posición de un documento normalizado",
+  "description": "Archivo aparte de la lectura porque pesa (R22). Las claves son cortas a propósito. Lleva una entrada por página del PDF normalizado, en orden, también las que no tienen palabras.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id_documento", "paginas"],
+  "properties": {
+    "id_documento": {"type": "string", "minLength": 1},
+    "paginas": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["pagina", "palabras"],
+        "properties": {
+          "pagina": {"type": "integer", "minimum": 1},
+          "palabras": {
+            "type": "array",
+            "description": "En orden de lectura.",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["t", "caja"],
+              "properties": {
+                "t": {"type": "string", "minLength": 1, "description": "La palabra."},
+                "caja": {"$ref": "lectura.schema.json#/$defs/caja"}
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
