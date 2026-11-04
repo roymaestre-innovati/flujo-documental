@@ -100,7 +100,7 @@ Cuando un oferente entrega su oferta, los documentos llegan como él los armó: 
 | Registros (logs) | Nunca llevan texto de las páginas ni nombres de archivo completos: solo identificadores, huellas, conteos y motivos de error |
 | Pruebas | Solo con documentos sintéticos generados por las pruebas. Los documentos reales de la muestra no se suben al repositorio |
 
-Antes de procesar documentos reales en un ambiente compartido se corre el checklist de habeas data (constitución, principio 6).
+Antes de procesar documentos reales en un ambiente compartido se corre el checklist de habeas data (constitución, principio 6). El borrador para cumplimiento está en `checklist-habeas-data.md`, en esta carpeta.
 
 ## Criterios de aceptación
 
