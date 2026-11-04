@@ -24,7 +24,7 @@ Dependencias del sistema: `libreoffice` (writer y calc) y Python 3.12 con `uv`. 
 - [x] **T07 — Conversión.** LibreOffice con perfil temporal y macros bloqueadas, con tiempo máximo y un reintento; imágenes con img2pdf, incluido el TIFF de varias páginas; Excel convertido y conservado como anexo. Requisitos R7 a R10.
 - [x] **T08 — Firma digital.** Firmante, fecha, integridad, formato y `leida`. Casos: íntegro, modificado después de firmar, sin firma. Requisito R15.
 - [x] **T09 — Lectura.** Texto, caracteres, cobertura de imagen (grilla de 200 × 200), rotación, tipo de página, origen del texto y archivo de palabras. Requisitos R14 y R18 a R20, R22 y R23.
-- [ ] **T10 — Anclas.** `linea_firma`, `casilla` y `tabla_si_no`, según el plan. Requisito R21.
+- [x] **T10 — Anclas.** `linea_firma`, `casilla` y `tabla_si_no`, según el plan. Requisito R21.
 - [ ] **T11 — Entrega completa.** `entrega.py` une todo y escribe manifiesto, PDF, anexos, lecturas y palabras en el almacén. Aislamiento de errores (R17), errores de clase 4 relanzados al final, idempotencia y `--forzar`, y registros sin datos personales. Prueba de punta a punta con una entrega sintética que trae todos los casos, validada contra el contrato. Prueba de determinismo (R24 y R25, criterio A2).
 - [ ] **T12 — Imagen del job.** `Dockerfile` (Python 3.12 slim, LibreOffice writer y calc, uv) que corre `normalizar`. Comprobar que las pruebas pasan dentro de la imagen.
 - [ ] **T13 — Script de la muestra.** `scripts/medir_muestra.py <carpeta>`: corre `normalizar` sobre cada oferente de una carpeta e imprime solo conteos (páginas únicas, duplicados, restricciones, firmas, descartados, proporción de tipos de página y tiempo por oferente), para los criterios A3 a A5. No se corre en la nube: lo corre el usuario con la muestra real.
@@ -176,3 +176,23 @@ Contrato escrito en `contracts/modulo3-normalizacion/v0/`, con los ejemplos vali
 - **Página que no se puede leer** (decisión del usuario): queda `vacia`, sin texto ni palabras, y el registro anota el número de página. Si pdfplumber no puede abrir el documento entero, todas las páginas quedan `vacia`.
 
 **Para revisar con la muestra (A4):** la página que cae en la regla 2 por ser "una foto chica en una página blanca" (el plan ya lo acepta en v0) y si `extract_text()` con sus valores por defecto junta bien las columnas de tablas anchas.
+
+### T10 — Anclas (2026-11-04)
+
+`anclas.buscar()` encuentra las líneas de firma, las casillas y las tablas SI/NO de una página, y la lectura las incluye en cada página que no es `imagen`. Trabaja sobre la página sin rotar, así que una página girada da las mismas anclas. 332 pruebas en verde.
+
+**Decisiones que el plan no fijaba:**
+
+- **Frases.** Las palabras se agrupan en renglones (bordes superiores a 3 puntos o menos) y, dentro del renglón, en frases (huecos de 10 puntos o menos). Hace falta porque dos rótulos en el mismo renglón ("Firma del representante legal" y "Firma del revisor fiscal") son de líneas distintas.
+- **Línea de firma.** Las candidatas son las líneas dibujadas horizontales (también los rectángulos de 1,5 puntos de alto o menos) y las palabras con 8 o más `_`. Cada una toma como rótulo la frase más cercana, a menos de 60 puntos, que tiene una palabra que empieza por firma, representante, revisor o contador. La caja une la línea y el rótulo, y `texto` es el rótulo.
+- **"Una palabra que empieza por firma"** (el plan la pone como tercera candidata): se tomó como una frase cuya **primera** palabra empieza por "firma" y que no es ya el rótulo de una línea. Así "Firma del oferente:" cuenta, pero "la firma del contrato", en medio de un párrafo, no.
+- **Casilla:** "casi cuadrado" es que los lados difieren a lo más 20 % (fijado en T02). Un rectángulo repetido (borde y relleno) cuenta una vez.
+- **Tabla SI/NO:** "SI" y "NO" tienen que estar como palabras sueltas en el mismo renglón, sin mayúsculas ni tildes (decisión del usuario). "Celda de tabla" es cualquier rectángulo que no sea una línea. La caja une el renglón y las casillas de ese mismo renglón, no las del renglón de al lado aunque estén a menos de 20 puntos.
+- **Orden:** de arriba abajo y de izquierda a derecha.
+- **Parámetros nuevos:** `tolerancia_renglon` (3), `separacion_max_frase` (10) y `grosor_max_linea` (1,5). `version_parametros` sigue en `"1"`, porque todavía no se ha procesado nada real con ella; desde la primera corrida con la muestra, cualquier cambio la sube.
+
+**Para calibrar con la muestra:**
+
+1. **Falsos positivos.** Los bordes horizontales de una tabla cuentan como línea si hay un rótulo con "representante" o "contador" cerca, y "si" y "no" son palabras comunes: un renglón como "si el oferente no presenta…" dentro de una tabla cuenta como tabla SI/NO. Un falso positivo cuesta poco (la extracción manda la imagen de la página), pero conviene medirlo.
+2. **Casillas que no son rectángulos:** las casillas escritas como carácter (☐, ☑ o Wingdings), las dibujadas con curvas y los campos de formulario (casillas de AcroForm) no se detectan.
+3. **Escaneos con OCR:** en las páginas `escaneo_con_ocr` las anclas salen de las palabras del escáner, que pueden venir mal ubicadas.

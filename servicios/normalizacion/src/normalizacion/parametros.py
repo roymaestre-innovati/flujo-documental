@@ -26,6 +26,12 @@ class Parametros:
     tolerancia_cuadrado_casilla: float
     palabras_si_no: tuple[str, str]
     distancia_si_no: float
+    tolerancia_renglon: float
+    """Dos palabras están en el mismo renglón si sus bordes superiores difieren a lo más esto."""
+    separacion_max_frase: float
+    """Dos palabras seguidas de un renglón son de la misma frase si las separa a lo más esto."""
+    grosor_max_linea: float
+    """Un rectángulo así de delgado se trata como una línea dibujada."""
 
     # Conversión (plan, "Conversión")
     tiempo_max_conversion_s: int
@@ -46,6 +52,9 @@ PARAMETROS = Parametros(
     tolerancia_cuadrado_casilla=0.2,
     palabras_si_no=("si", "no"),
     distancia_si_no=20.0,
+    tolerancia_renglon=3.0,
+    separacion_max_frase=10.0,
+    grosor_max_linea=1.5,
     tiempo_max_conversion_s=120,
     reintentos_conversion=1,
 )
