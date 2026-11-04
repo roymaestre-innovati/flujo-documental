@@ -1,17 +1,60 @@
-"""Inventario de una entrega.
+"""Inventario de una entrega (R1 a R5).
 
-Por ahora solo recorre la carpeta (R1). El descarte de archivos de sistema, la
-huella, los duplicados y el `id_documento` llegan en T04.
+Recorre la carpeta, descarta los archivos de sistema, calcula la huella de cada
+archivo, marca las copias exactas y le da a cada documento un identificador
+estable. No abre ni convierte nada: eso viene después, archivo por archivo.
 """
 
+import hashlib
+import unicodedata
+from dataclasses import dataclass
 from pathlib import Path
+
+ENTREGA_DEL_PROCESO = "PROCESO"
+
+MOTIVO_MAC = "archivo_sistema_mac"
+MOTIVO_WINDOWS = "archivo_sistema_windows"
+
+# Número mágico de los archivos AppleDouble (los `._*` de Mac).
+MAGICO_APPLEDOUBLE = bytes.fromhex("00051607")
+
+_BLOQUE = 1024 * 1024
+
+
+class ErrorInventario(Exception):
+    """La entrega no se puede inventariar de forma estable."""
+
+
+@dataclass(frozen=True)
+class Archivo:
+    id_documento: str
+    ruta_origen: str
+    """Ruta relativa con `/`, normalizada a NFC. Es la que va al manifiesto."""
+    ruta: Path
+    """Dónde está el archivo en disco, con el nombre tal como llegó."""
+    hash: str
+    duplicado_de: str | None
+
+
+@dataclass(frozen=True)
+class Descartado:
+    ruta_origen: str
+    motivo: str
+
+
+@dataclass(frozen=True)
+class Inventario:
+    archivos: list[Archivo]
+    """Ordenados por ruta_origen."""
+    descartados: list[Descartado]
+    """Ordenados por ruta_origen."""
 
 
 def recorrer(carpeta: Path) -> list[str]:
     """Rutas relativas de todos los archivos de la entrega, con `/` y ordenadas.
 
-    Recorre las carpetas anidadas. No sigue enlaces simbólicos, para no salir de
-    la entrega.
+    Son los nombres tal como están en disco, sin normalizar. Recorre las carpetas
+    anidadas y no sigue enlaces simbólicos, para no salir de la entrega.
     """
     carpeta = Path(carpeta)
     if not carpeta.is_dir():
@@ -23,3 +66,89 @@ def recorrer(carpeta: Path) -> list[str]:
             if ruta.is_file() and not ruta.is_symlink():
                 rutas.append(ruta.relative_to(carpeta).as_posix())
     return sorted(rutas)
+
+
+def normalizar_ruta(ruta: str) -> str:
+    """NFC, para que la misma entrega dé lo mismo venga de Mac o de Windows."""
+    return unicodedata.normalize("NFC", ruta)
+
+
+def id_documento(ruta_origen: str, id_oferente: str | None) -> str:
+    """`<id_oferente o PROCESO>-<12 hex del SHA-256 de la ruta en UTF-8 y NFC>` (R5)."""
+    huella_ruta = hashlib.sha256(normalizar_ruta(ruta_origen).encode("utf-8")).hexdigest()
+    return f"{id_oferente or ENTREGA_DEL_PROCESO}-{huella_ruta[:12]}"
+
+
+def huella(ruta: Path) -> str:
+    """SHA-256 del archivo (R3)."""
+    sha = hashlib.sha256()
+    with Path(ruta).open("rb") as archivo:
+        while bloque := archivo.read(_BLOQUE):
+            sha.update(bloque)
+    return sha.hexdigest()
+
+
+def es_appledouble(ruta: Path) -> bool:
+    with Path(ruta).open("rb") as archivo:
+        return archivo.read(len(MAGICO_APPLEDOUBLE)) == MAGICO_APPLEDOUBLE
+
+
+def motivo_descarte(ruta_origen: str, ruta: Path) -> str | None:
+    """Motivo por el que un archivo de sistema se descarta, o None si es documento (R2).
+
+    - `.DS_Store` y todo lo que esté dentro de una carpeta `__MACOSX`: por nombre.
+    - `Thumbs.db`: por nombre, sin importar mayúsculas (Windows no las distingue).
+    - Archivos AppleDouble (los `._*`): por contenido, porque llevan la extensión
+      del original. Un `._algo` que no es AppleDouble se trata como documento, y
+      un AppleDouble con nombre normal se descarta igual.
+    """
+    partes = ruta_origen.split("/")
+    nombre = partes[-1]
+    if "__MACOSX" in partes[:-1] or nombre == ".DS_Store":
+        return MOTIVO_MAC
+    if nombre.casefold() == "thumbs.db":
+        return MOTIVO_WINDOWS
+    if es_appledouble(ruta):
+        return MOTIVO_MAC
+    return None
+
+
+def inventariar(carpeta: Path, id_oferente: str | None) -> Inventario:
+    """Inventario de una entrega. `id_oferente` es None en una entrega del proceso."""
+    carpeta = Path(carpeta)
+    encontrados: dict[str, Path] = {}
+    for relativa in recorrer(carpeta):
+        ruta_origen = normalizar_ruta(relativa)
+        if ruta_origen in encontrados:
+            # Dos nombres que solo se diferencian en cómo escriben las tildes.
+            raise ErrorInventario(
+                "Dos archivos de la entrega tienen la misma ruta al normalizar las tildes (NFC)."
+            )
+        encontrados[ruta_origen] = carpeta / relativa
+
+    archivos: list[Archivo] = []
+    descartados: list[Descartado] = []
+    originales: dict[str, str] = {}
+    identificadores: set[str] = set()
+    for ruta_origen in sorted(encontrados):
+        ruta = encontrados[ruta_origen]
+        motivo = motivo_descarte(ruta_origen, ruta)
+        if motivo is not None:
+            descartados.append(Descartado(ruta_origen, motivo))
+            continue
+        identificador = id_documento(ruta_origen, id_oferente)
+        if identificador in identificadores:
+            raise ErrorInventario("Dos archivos de la entrega dieron el mismo id_documento.")
+        identificadores.add(identificador)
+        huella_archivo = huella(ruta)
+        duplicado_de = originales.setdefault(huella_archivo, identificador)
+        archivos.append(
+            Archivo(
+                id_documento=identificador,
+                ruta_origen=ruta_origen,
+                ruta=ruta,
+                hash=huella_archivo,
+                duplicado_de=None if duplicado_de == identificador else duplicado_de,
+            )
+        )
+    return Inventario(archivos=archivos, descartados=descartados)

@@ -2,8 +2,8 @@
 
     normalizar <carpeta_entrega> --proceso SR0000000001 [--oferente OF-002] --salida <carpeta> [--forzar]
 
-Por ahora (T02) solo recorre la entrega e imprime cuántos archivos trae. No
-imprime nombres de archivo, porque pueden traer nombres de personas (principio 6).
+Por ahora (T04) solo hace el inventario e imprime los conteos. No imprime
+nombres de archivo, porque pueden traer nombres de personas (principio 6).
 """
 
 import argparse
@@ -11,7 +11,7 @@ import sys
 from pathlib import Path
 
 from . import VERSION
-from .inventario import recorrer
+from .inventario import ENTREGA_DEL_PROCESO, inventariar
 from .parametros import VERSION_PARAMETROS
 
 
@@ -34,9 +34,13 @@ def _argumentos(argv: list[str] | None) -> argparse.Namespace:
 
 def main(argv: list[str] | None = None) -> int:
     argumentos = _argumentos(argv)
-    rutas = recorrer(argumentos.carpeta_entrega)
-    entrega = argumentos.oferente or "PROCESO"
-    print(f"Entrega {argumentos.proceso}/{entrega}: {len(rutas)} archivos.")
+    inventario = inventariar(argumentos.carpeta_entrega, argumentos.oferente)
+    duplicados = sum(1 for archivo in inventario.archivos if archivo.duplicado_de)
+    entrega = argumentos.oferente or ENTREGA_DEL_PROCESO
+    print(
+        f"Entrega {argumentos.proceso}/{entrega}: {len(inventario.archivos)} archivos, "
+        f"{duplicados} duplicados, {len(inventario.descartados)} descartados."
+    )
     return 0
 
 
