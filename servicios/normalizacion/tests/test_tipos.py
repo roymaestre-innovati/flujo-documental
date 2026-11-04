@@ -26,6 +26,7 @@ ESPERADOS = {
     "pdf_escaneo_con_ocr": TipoReal(PDF),
     "pdf_vacio": TipoReal(PDF),
     "pdf_rotado": TipoReal(PDF),
+    "pdf_sin_paginas": TipoReal(PDF),
     "pdf_con_contrasena": TipoReal(PDF),
     "pdf_solo_restricciones": TipoReal(PDF),
     "pdf_danado_reparable": TipoReal(PDF),
@@ -117,3 +118,77 @@ def test_ooxml_con_contenido_minimo(tmp_path):
         ruta = tmp_path / f"archivo.{esperado}"
         ruta.write_bytes(_zip(piezas))
         assert detectar(ruta) == TipoReal(esperado)
+
+
+# Documentos de Office con contraseña -----------------------------------------
+
+
+@pytest.mark.parametrize("caso", ["docx_con_contrasena", "xlsx_con_contrasena"])
+def test_ooxml_con_contrasena(tmp_path, caso):
+    (ruta,) = fabrica.CASOS[caso](tmp_path)
+    assert detectar(ruta) == TipoReal(NO_SOPORTADO, cifrado=True)
+
+
+def test_los_documentos_sin_contrasena_no_salen_cifrados(tmp_path):
+    for caso in ("docx", "xlsx_ancho", "pdf_con_contrasena"):
+        (ruta,) = fabrica.CASOS[caso](tmp_path / caso)
+        assert not detectar(ruta).cifrado
+
+
+def _marcar_en_ole(ruta, flujo, cambio):
+    """Cambia bytes de un flujo OLE sin cambiar su tamaño."""
+    import olefile
+
+    with olefile.OleFileIO(str(ruta), write_mode=True) as ole:
+        datos = bytearray(ole.openstream(flujo).read())
+        cambio(datos)
+        ole.write_stream(flujo, bytes(datos))
+
+
+@pytest.mark.libreoffice
+def test_doc_con_contrasena(tmp_path):
+    (ruta,) = fabrica.doc(tmp_path)
+    assert detectar(ruta) == TipoReal(DOC)
+
+    def marcar(datos):
+        datos[11] |= 0x01  # bit fEncrypted (0x0100) de las banderas del FIB
+
+    _marcar_en_ole(ruta, "WordDocument", marcar)
+    assert detectar(ruta) == TipoReal(DOC, cifrado=True)
+
+
+@pytest.mark.libreoffice
+def test_xls_con_contrasena(tmp_path):
+    import struct
+
+    (ruta,) = fabrica.xls(tmp_path)
+    assert detectar(ruta) == TipoReal(XLS)
+
+    def marcar(datos):
+        (largo_bof,) = struct.unpack_from("<H", datos, 2)
+        struct.pack_into("<H", datos, 4 + largo_bof, 0x002F)  # FILEPASS después del BOF
+
+    _marcar_en_ole(ruta, "Workbook", marcar)
+    assert detectar(ruta) == TipoReal(XLS, cifrado=True)
+
+
+@pytest.mark.parametrize(("mimetype", "esperado"), [
+    (b"application/vnd.oasis.opendocument.text", ODT),
+    (b"application/vnd.oasis.opendocument.spreadsheet", ODS),
+])
+def test_odf_con_contrasena(tmp_path, mimetype, esperado):
+    manifiesto = (
+        b'<manifest:manifest xmlns:manifest="urn:oasis:names:tc:opendocument:xmlns:manifest:1.0">'
+        b'<manifest:file-entry manifest:full-path="content.xml">'
+        b'<manifest:encryption-data manifest:checksum-type="SHA1/1K"/>'
+        b"</manifest:file-entry></manifest:manifest>"
+    )
+    ruta = tmp_path / f"cifrado.{esperado}"
+    ruta.write_bytes(_zip({"mimetype": mimetype, "META-INF/manifest.xml": manifiesto}))
+    assert detectar(ruta) == TipoReal(esperado, cifrado=True)
+
+
+@pytest.mark.libreoffice
+def test_odt_sin_contrasena_no_sale_cifrado(tmp_path):
+    (ruta,) = fabrica.odt(tmp_path)
+    assert detectar(ruta) == TipoReal(ODT)

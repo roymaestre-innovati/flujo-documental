@@ -30,7 +30,7 @@ def _tiene_imagen(pagina) -> bool:
 
 
 def test_todos_los_casos_estan_registrados():
-    assert len(fabrica.CASOS) == 26
+    assert len(fabrica.CASOS) == 29
     assert fabrica.CASOS_CON_LIBREOFFICE <= set(fabrica.CASOS)
 
 
@@ -70,6 +70,12 @@ def test_pdf_vacio(tmp_path):
         assert len(pdf.pages) == 1
         assert not _tiene_imagen(pdf.pages[0])
         assert b"Tj" not in _texto_contenido(pdf.pages[0])
+
+
+def test_pdf_sin_paginas(tmp_path):
+    ruta = _un_archivo(fabrica.pdf_sin_paginas(tmp_path))
+    with pikepdf.open(ruta) as pdf:
+        assert len(pdf.pages) == 0
 
 
 def test_pdf_rotado(tmp_path):
@@ -174,6 +180,22 @@ def test_ods(tmp_path):
     ruta = _un_archivo(fabrica.ods(tmp_path))
     with zipfile.ZipFile(ruta) as zip_:
         assert zip_.read("mimetype") == b"application/vnd.oasis.opendocument.spreadsheet"
+
+
+@pytest.mark.parametrize("caso", ["docx_con_contrasena", "xlsx_con_contrasena"])
+def test_office_con_contrasena(tmp_path, caso):
+    import msoffcrypto
+    import olefile
+
+    ruta = _un_archivo(fabrica.CASOS[caso](tmp_path))
+    with olefile.OleFileIO(str(ruta)) as ole:
+        assert ole.exists("EncryptedPackage")
+    with ruta.open("rb") as archivo:
+        documento = msoffcrypto.OfficeFile(archivo)
+        documento.load_key(password=fabrica.CONTRASENA_USUARIO)
+        descifrado = io.BytesIO()
+        documento.decrypt(descifrado)
+    assert zipfile.is_zipfile(descifrado)
 
 
 def test_xlsx_ancho(tmp_path):

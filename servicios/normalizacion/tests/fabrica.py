@@ -140,6 +140,13 @@ def _con_pikepdf(datos: bytes, cambio, **guardar) -> bytes:
     return salida.getvalue()
 
 
+def pdf_sin_paginas(carpeta: Path) -> list[Path]:
+    """Un PDF bien formado, pero sin ninguna página."""
+    salida = io.BytesIO()
+    pikepdf.new().save(salida, deterministic_id=True)
+    return [_guardar(carpeta / "anexo_sin_paginas.pdf", salida.getvalue())]
+
+
 def pdf_rotado(carpeta: Path) -> list[Path]:
     def rotar(pdf):
         pdf.pages[0].obj.Rotate = 90
@@ -333,6 +340,23 @@ def xlsx_ancho(carpeta: Path) -> list[Path]:
     return [_guardar(carpeta / "experiencia.xlsx", xlsx_bytes())]
 
 
+def _cifrar_ooxml(datos: bytes) -> bytes:
+    """DOCX o XLSX protegido con contraseña, como lo deja Office (EncryptedPackage)."""
+    from msoffcrypto.format.ooxml import OOXMLFile
+
+    salida = io.BytesIO()
+    OOXMLFile(io.BytesIO(datos)).encrypt(CONTRASENA_USUARIO, salida)
+    return salida.getvalue()
+
+
+def docx_con_contrasena(carpeta: Path) -> list[Path]:
+    return [_guardar(carpeta / "pacto_anticorrupcion.docx", _cifrar_ooxml(docx_bytes()))]
+
+
+def xlsx_con_contrasena(carpeta: Path) -> list[Path]:
+    return [_guardar(carpeta / "estados_financieros.xlsx", _cifrar_ooxml(xlsx_bytes()))]
+
+
 def _desde_xlsx(carpeta: Path, formato: str, nombre: str) -> list[Path]:
     with tempfile.TemporaryDirectory() as temporal:
         origen = _guardar(Path(temporal) / "experiencia.xlsx", xlsx_bytes())
@@ -461,6 +485,7 @@ CASOS = {
     "pdf_escaneo_sin_texto": pdf_escaneo_sin_texto,
     "pdf_escaneo_con_ocr": pdf_escaneo_con_ocr,
     "pdf_vacio": pdf_vacio,
+    "pdf_sin_paginas": pdf_sin_paginas,
     "pdf_rotado": pdf_rotado,
     "pdf_con_contrasena": pdf_con_contrasena,
     "pdf_solo_restricciones": pdf_solo_restricciones,
@@ -474,6 +499,8 @@ CASOS = {
     "xlsx_ancho": xlsx_ancho,
     "xls": xls,
     "ods": ods,
+    "docx_con_contrasena": docx_con_contrasena,
+    "xlsx_con_contrasena": xlsx_con_contrasena,
     "jpg": jpg,
     "png": png,
     "tiff_tres_paginas": tiff_tres_paginas,
