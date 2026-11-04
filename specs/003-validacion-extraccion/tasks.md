@@ -25,7 +25,7 @@ Dependencias del sistema: `libreoffice` (writer y calc) y Python 3.12 con `uv`. 
 - [x] **T08 — Firma digital.** Firmante, fecha, integridad, formato y `leida`. Casos: íntegro, modificado después de firmar, sin firma. Requisito R15.
 - [x] **T09 — Lectura.** Texto, caracteres, cobertura de imagen (grilla de 200 × 200), rotación, tipo de página, origen del texto y archivo de palabras. Requisitos R14 y R18 a R20, R22 y R23.
 - [x] **T10 — Anclas.** `linea_firma`, `casilla` y `tabla_si_no`, según el plan. Requisito R21.
-- [ ] **T11 — Entrega completa.** `entrega.py` une todo y escribe manifiesto, PDF, anexos, lecturas y palabras en el almacén. Aislamiento de errores (R17), errores de clase 4 relanzados al final, idempotencia y `--forzar`, y registros sin datos personales. Prueba de punta a punta con una entrega sintética que trae todos los casos, validada contra el contrato. Prueba de determinismo (R24 y R25, criterio A2).
+- [x] **T11 — Entrega completa.** `entrega.py` une todo y escribe manifiesto, PDF, anexos, lecturas y palabras en el almacén. Aislamiento de errores (R17), errores de clase 4 relanzados al final, idempotencia y `--forzar`, y registros sin datos personales. Prueba de punta a punta con una entrega sintética que trae todos los casos, validada contra el contrato. Prueba de determinismo (R24 y R25, criterio A2).
 - [ ] **T12 — Imagen del job.** `Dockerfile` (Python 3.12 slim, LibreOffice writer y calc, uv) que corre `normalizar`. Comprobar que las pruebas pasan dentro de la imagen.
 - [ ] **T13 — Script de la muestra.** `scripts/medir_muestra.py <carpeta>`: corre `normalizar` sobre cada oferente de una carpeta e imprime solo conteos (páginas únicas, duplicados, restricciones, firmas, descartados, proporción de tipos de página y tiempo por oferente), para los criterios A3 a A5. No se corre en la nube: lo corre el usuario con la muestra real.
 
@@ -196,3 +196,26 @@ Contrato escrito en `contracts/modulo3-normalizacion/v0/`, con los ejemplos vali
 1. **Falsos positivos.** Los bordes horizontales de una tabla cuentan como línea si hay un rótulo con "representante" o "contador" cerca, y "si" y "no" son palabras comunes: un renglón como "si el oferente no presenta…" dentro de una tabla cuenta como tabla SI/NO. Un falso positivo cuesta poco (la extracción manda la imagen de la página), pero conviene medirlo.
 2. **Casillas que no son rectángulos:** las casillas escritas como carácter (☐, ☑ o Wingdings), las dibujadas con curvas y los campos de formulario (casillas de AcroForm) no se detectan.
 3. **Escaneos con OCR:** en las páginas `escaneo_con_ocr` las anclas salen de las palabras del escáner, que pueden venir mal ubicadas.
+
+### T11 — Entrega completa (2026-11-04)
+
+`entrega.normalizar_entrega(carpeta, id_proceso, id_oferente, almacen)` une todas las piezas, escribe en el almacén el PDF, el anexo, la lectura y las palabras de cada documento y, al final, el manifiesto. Devuelve el manifiesto y los conteos por tipo de página. El comando `normalizar` la usa e imprime el resumen. `registros.py` escribe los registros en JSON. 378 pruebas en verde (sin LibreOffice: 316 y 62 saltadas).
+
+La prueba de punta a punta arma una entrega con todos los casos de la fábrica, cada uno en su subcarpeta, y comprueba:
+
+- que el manifiesto, cada lectura y cada archivo de palabras cumplen el contrato y son coherentes entre sí (huella del PDF, páginas, páginas sin texto, firmas);
+- el estado, el tipo y el error de cada caso;
+- el determinismo: dos corridas dan exactamente los mismos archivos, salvo `ejecucion` en el manifiesto (A2).
+
+A mano, con el comando: 32 archivos (8 conversiones con LibreOffice) en unos 10 s, y la segunda corrida reusa los 24 normalizados.
+
+**Decisiones que el plan no fijaba:**
+
+- **Ante un bug (clase 4) el manifiesto no se escribe.** El plan dice que la excepción "se relanza al final, después de escribir lo que sí se pudo". Se escriben los PDF, lecturas y palabras de los demás documentos, pero no el manifiesto: si se escribiera sin el documento que falló, el orquestador podría dar la entrega por terminada. `ErrorEntrega` lleva solo los `id_documento` que fallaron. Si falla el original de una copia, la copia también cuenta como fallida.
+- **Idempotencia por el manifiesto anterior, no por la lectura.** El plan dice reusar si "ya existe la lectura con el mismo hash", pero la lectura guarda la huella del PDF normalizado, que en un Word o una imagen no es la del original. Se reusa un documento si el manifiesto anterior lo tiene `normalizado`, con la misma huella del original, la misma versión del normalizador y de los parámetros, y si su PDF, lectura, palabras y anexo siguen en el almacén. Los documentos con error se vuelven a intentar siempre, porque una conversión puede haber fallado por algo pasajero. Consecuencia: después de una corrida con bug (sin manifiesto), el reintento procesa todo de nuevo.
+- **La firma se lee del PDF original** del oferente, también cuando el normalizado es la copia reparada (decidido en T08).
+- **PDF convertido que no pasa la revisión:** si sale sin páginas, `SIN_PAGINAS`; si no abre, `CONVERSION_FALLIDA`. Los convertidos llevan `restricciones: false` y `firma_digital: []`: las firmas digitales dentro de un Word no se leen.
+- **Copia de un documento con error:** repite los `null` del original, pero con `error: null`, porque el contrato lo exige en un `duplicado`.
+- **Formato de los archivos:** el manifiesto y la lectura van en JSON con sangría; las palabras van compactas, porque es el archivo pesado. `ejecucion.inicio` va en UTC, con segundos.
+- **Registros:** una línea JSON por evento en stderr, con `id_proceso`, `id_oferente`, `id_documento` y `hash` (12 caracteres) tomados del contexto. De una excepción se anota solo el tipo y el lugar del código (`ValueError en lectura.py:120`), nunca su mensaje, que puede traer rutas o texto del documento.
+- **Sin LibreOffice instalado,** cada Word o Excel falla como bug y la entrega termina con `ErrorEntrega`. Es un problema de la imagen (T12), no del documento.
