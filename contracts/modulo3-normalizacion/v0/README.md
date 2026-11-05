@@ -51,7 +51,7 @@ Los enlaces (`pdf`, `anexo_nativo`, `lectura`, `palabras`) son URI. En esta vers
 - **`paginas_sin_texto`** son las páginas con 0 caracteres. No es lo mismo que las páginas de tipo `imagen`.
 - **Anclas.** `linea_firma`, `casilla` y `tabla_si_no`. `texto` es el rótulo o la línea que dio lugar al ancla, y va en `null` en una casilla. Las páginas `imagen` no tienen anclas.
 - **Cajas.** `[x0, y0, x1, y1]` en puntos PDF, con el origen arriba a la izquierda y sobre la página sin rotar.
-- **Firma digital.** Por firma: `firmante`, `fecha`, `integro`, `formato` y `leida`. Si `leida` es `false`, hay una firma que no se pudo leer, y `firmante`, `fecha` e `integro` van en `null`. Una firma sin leer no es error del documento. No se valida la confianza del certificado.
+- **Firma digital.** Por firma: `firmante`, `fecha`, `integro`, `formato` y `leida`. Si `leida` es `false`, hay una firma que no se pudo leer, y `firmante`, `fecha` e `integro` van en `null`. Una firma sin leer no es error del documento. No se valida la confianza del certificado. Un sello de tiempo del documento (`/DocTimeStamp`, formato `ETSI.RFC3161`) no va en la lista: no tiene firmante, así que no es una firma de persona.
 - **Errores.** El error llega al evaluador por medio del orquestador, como una tarea "documento con error", y él decide si pide subsanación por Ariba. Por eso `detalle` dice qué pasó y qué pedirle al oferente, sin que el evaluador tenga que abrir el archivo. Nunca lleva texto del documento.
 
   | Código | Qué pasó | Ejemplo de `detalle` |
@@ -81,6 +81,7 @@ Las dudas sobre este borrador están en "Notas de implementación" de `specs/003
 Cambios dentro de 0.1, antes de que nadie lo use:
 
 - 2026-11-04, revisión del borrador: el duplicado repite todos los datos del original; rutas en NFC; `restricciones` y `firma_digital` en `null` cuando el documento no abre; campo nuevo `reparado`; `detalle` con lo que hay que pedir al oferente.
+- 2026-11-05, después de medir la muestra real: los sellos de tiempo del documento no se cuentan en `firma_digital`. El esquema no cambia.
 
 ## Validar los ejemplos
 

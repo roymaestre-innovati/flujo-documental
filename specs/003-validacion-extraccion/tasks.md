@@ -2,7 +2,7 @@
 
 Sale de `plan.md`. Cada tarea termina con sus pruebas en verde y un commit propio.
 
-**Estado al 2026-11-05: T01 a T13 hechas** y fusionadas en `main` (387 pruebas). Primera medición con la muestra real en `resultados-muestra.md`. Las tareas que pueden salir de ella (sello de tiempo, PowerPoint) y lo que queda abierto están en `contexto/HANDOFF-implementacion.md`.
+**Estado al 2026-11-05: T01 a T13 hechas** y fusionadas en `main` (387 pruebas). Primera medición con la muestra real en `resultados-muestra.md`. De ella salen tres tareas nuevas, **T14 a T16**, con las decisiones del usuario en "Decisiones tras la medición", al final de este archivo.
 
 ## Para quien implemente
 
@@ -30,6 +30,22 @@ Dependencias del sistema: `libreoffice` (writer y calc) y Python 3.12 con `uv`. 
 - [x] **T11 — Entrega completa.** `entrega.py` une todo y escribe manifiesto, PDF, anexos, lecturas y palabras en el almacén. Aislamiento de errores (R17), errores de clase 4 relanzados al final, idempotencia y `--forzar`, y registros sin datos personales. Prueba de punta a punta con una entrega sintética que trae todos los casos, validada contra el contrato. Prueba de determinismo (R24 y R25, criterio A2).
 - [x] **T12 — Imagen del job.** `Dockerfile` (Python 3.12 slim, LibreOffice writer y calc, uv) que corre `normalizar`. Comprobar que las pruebas pasan dentro de la imagen.
 - [x] **T13 — Script de la muestra.** `scripts/medir_muestra.py <carpeta>`: corre `normalizar` sobre cada oferente de una carpeta e imprime solo conteos (páginas únicas, duplicados, restricciones, firmas, descartados, proporción de tipos de página y tiempo por oferente), para los criterios A3 a A5. No se corre en la nube: lo corre el usuario con la muestra real.
+
+### Después de la medición con la muestra real
+
+Orden acordado: T14, T16 y T15. Mismo flujo que T01 a T13: una rama por tarea, pruebas en verde, notas aquí, y alto para revisión.
+
+- [x] **T14 — Sello de tiempo.** Un sello de tiempo del documento (`/Type /DocTimeStamp`, subfiltro `ETSI.RFC3161`) no se cuenta en `firma_digital`: no tiene firmante, así que no es una firma de persona. Hoy aparece como "firma no leída". El esquema no cambia; se anota en el README del contrato. La fábrica suma un PDF firmado con un sello de tiempo encima, y la prueba comprueba que solo queda la firma. En la muestra, el PDF de OF-006 que trae el sello también trae una firma CAdES, así que sigue contando como PDF firmado.
+- [ ] **T16 — Vínculos externos en Excel.** Antes de convertir un `xlsx`, quitar de la copia que va a LibreOffice los vínculos a otros libros: las partes `xl/externalLinks/`, `<externalReferences>` en `xl/workbook.xml` y sus entradas en `xl/_rels/workbook.xml.rels` y `[Content_Types].xml`. El original queda intacto como anexo (R9). Motivo: un Excel de OF-007 con 201 vínculos (2,9 MB de datos guardados) tardó 64 s en convertirse en la máquina local; sin los vínculos tarda 1,9 s y el PDF sale igual (mismas páginas y mismo texto, sin `#REF`), porque el Excel guarda el último valor de cada fórmula. No era la red ni la actualización de vínculos: sin red tarda lo mismo, y con la opción de no actualizar vínculos de LibreOffice también. La fábrica suma un `xlsx` con muchos vínculos externos; las pruebas comprueban que el texto del PDF no cambia y que el anexo es el original byte a byte. Los `xls` y `ods` no se tocan.
+- [ ] **T15 — PowerPoint.** Convertir `pptx`, `ppt` y `odp` con LibreOffice, igual que los Word: cada diapositiva queda como una página y las notas del orador no salen. Toca:
+    - el contrato: los tres valores nuevos en `tipo_origen`;
+    - `tipos.py`: ZIP con `ppt/presentation.xml` es `pptx`, OLE con el flujo `PowerPoint Document` es `ppt`, ZIP con `mimetype` de presentación OpenDocument es `odp`;
+    - `conversion.py`: un grupo `PRESENTACIONES`, sin anexo nativo;
+    - el `Dockerfile`: `libreoffice-impress-nogui`;
+    - la fábrica: un `pptx` mínimo, y el `ppt` y el `odp` convertidos desde él con LibreOffice;
+    - las dependencias del sistema de este archivo y del README del servicio.
+
+**Al cerrar las tres,** `VERSION` pasa a `0.2.0`, porque cambia el resultado del normalizador, y se repite la medición solo de OF-006 y OF-007. `version_parametros` sigue en 1: no cambia ningún umbral.
 
 ## Notas de implementación
 
@@ -268,3 +284,26 @@ La carpeta trae una subcarpeta por oferente, con sus archivos tal como los entre
 - **La salida se borra:** los PDF, lecturas y palabras traen datos personales, así que por defecto van a una carpeta temporal que se borra al terminar. Con `--salida` se conservan; esa carpeta no se sube al repositorio.
 - **Qué se cuenta:** "páginas únicas" son las páginas de los documentos normalizados, sin los duplicados. "PDF con restricciones" y "PDF con firma digital" cuentan documentos normalizados; de las firmas se cuentan además las leídas, las no leídas y las no íntegras. También van los descartados por motivo, los errores por código, los reparados y los convertidos.
 - **Falla inesperada en un oferente:** se marca en la tabla, se siguen los demás y el script sale con código 1.
+
+### Decisiones tras la medición (2026-11-05)
+
+Revisadas una por una con el usuario a partir de `resultados-muestra.md`:
+
+| Tema | Decisión | Por qué |
+|---|---|---|
+| ZIP y RAR (13 en la muestra) | No se toca el código | Fueron un error al armar la carpeta de prueba: en la versión final no llegan comprimidos |
+| Firmas `adbe.pkcs7.detached` con el algoritmo mal declarado (2, OF-007) | Quedan `leida: false` y se anota. Si se repiten en más oferentes, se agrega la tolerancia | El programa que firmó puso el algoritmo de firma (sha256 con RSA) donde va el de resumen, y pyHanko no lo reconoce. El revisor la abre en Adobe |
+| Firma CAdES de OF-006 marcada no íntegra | Queda no íntegra | La parte firmada está intacta, pero cambios posteriores tocan la estructura interna del PDF. Es preferible una falsa alarma que se revisa en Adobe a dejar pasar un cambio real |
+| Sello de tiempo `ETSI.RFC3161` | No se cuenta como firma (T14) | No tiene firmante |
+| PowerPoint (2 PPTX en OF-007) | Se soporta con LibreOffice (T15) | Se convierte sin problema, igual que los Word |
+| Excel que tardó 85 s | Se diagnosticó: eran 201 vínculos externos. Se quitan antes de convertir (T16) | Ver T16 |
+
+### T14 — Sello de tiempo (2026-11-05)
+
+`firma._campos_firmados` salta los campos cuyo valor es un sello de tiempo del documento: `/Type /DocTimeStamp` o subfiltro `ETSI.RFC3161` (basta con uno de los dos). Nota en el README del contrato; el esquema no cambia. 391 pruebas en verde.
+
+- **Fábrica:** `pdf_firmado_con_sello_de_tiempo` es el firmado de siempre con un sello encima, y `sellar(datos)` agrega el sello a cualquier PDF. El sellador de prueba de pyHanko solo acepta claves RSA, así que `_firmante(rsa=True)` genera una; el firmante de siempre sigue con curva elíptica.
+- **Pruebas:** el firmado con sello deja una sola firma, leída e íntegra (el sello no rompe la integridad de la firma anterior); un PDF que solo tiene un sello queda sin firmas (`[]`); la entrega completa incluye el caso nuevo.
+- **Con el PDF real de OF-006:** antes daba `ETSI.CAdES.detached` y `ETSI.RFC3161`; ahora solo la CAdES, que sigue no íntegra (decisión de arriba).
+- **Sin cambio en `VERSION`** todavía: sube a `0.2.0` al cerrar T14 a T16, como dice la lista de tareas.
+
