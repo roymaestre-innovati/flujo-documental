@@ -2,7 +2,7 @@
 
 Sale de `plan.md`. Cada tarea termina con sus pruebas en verde y un commit propio.
 
-**Estado al 2026-11-04: T01 a T13 hechas** y fusionadas en `main` (387 pruebas). Lo que queda abierto está en `contexto/HANDOFF-implementacion.md`, sección "Pendiente".
+**Estado al 2026-11-05: T01 a T13 hechas** y fusionadas en `main` (387 pruebas). Primera medición con la muestra real en `resultados-muestra.md`. Las tareas que pueden salir de ella (sello de tiempo, PowerPoint) y lo que queda abierto están en `contexto/HANDOFF-implementacion.md`.
 
 ## Para quien implemente
 
