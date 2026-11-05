@@ -30,7 +30,7 @@ def _tiene_imagen(pagina) -> bool:
 
 
 def test_todos_los_casos_estan_registrados():
-    assert len(fabrica.CASOS) == 34
+    assert len(fabrica.CASOS) == 37
     assert fabrica.CASOS_CON_LIBREOFFICE <= set(fabrica.CASOS)
 
 
@@ -207,6 +207,32 @@ def test_ods(tmp_path):
     ruta = _un_archivo(fabrica.ods(tmp_path))
     with zipfile.ZipFile(ruta) as zip_:
         assert zip_.read("mimetype") == b"application/vnd.oasis.opendocument.spreadsheet"
+
+
+def test_pptx(tmp_path):
+    ruta = _un_archivo(fabrica.pptx(tmp_path))
+    with zipfile.ZipFile(ruta) as zip_:
+        nombres = zip_.namelist()
+        assert "ppt/presentation.xml" in nombres
+        assert sum(n.startswith("ppt/slides/slide") and n.endswith(".xml") for n in nombres) == 2
+        assert fabrica.OFERENTE in zip_.read("ppt/slides/slide1.xml").decode("utf-8")
+        assert fabrica.NOTA_DEL_ORADOR in zip_.read("ppt/notesSlides/notesSlide1.xml").decode("utf-8")
+
+
+@pytest.mark.libreoffice
+def test_ppt(tmp_path):
+    import olefile
+
+    ruta = _un_archivo(fabrica.ppt(tmp_path))
+    with olefile.OleFileIO(str(ruta)) as ole:
+        assert ole.exists("PowerPoint Document")
+
+
+@pytest.mark.libreoffice
+def test_odp(tmp_path):
+    ruta = _un_archivo(fabrica.odp(tmp_path))
+    with zipfile.ZipFile(ruta) as zip_:
+        assert zip_.read("mimetype") == b"application/vnd.oasis.opendocument.presentation"
 
 
 @pytest.mark.parametrize("caso", ["docx_con_contrasena", "xlsx_con_contrasena"])

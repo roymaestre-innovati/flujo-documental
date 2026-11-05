@@ -1,8 +1,8 @@
 {
-  "contrato": "modulo3-normalizacion/0.1",
+  "contrato": "modulo3-normalizacion/0.2",
   "id_documento": "OF-002-723c293af12b",
   "hash_pdf": "c434aac28568422189e6cfcca41f43c41c47639cb9fed198e5669f05255d793d",
-  "version_normalizador": "0.1.0",
+  "version_normalizador": "0.2.0",
   "version_parametros": "1",
   "firma_digital": [
     {

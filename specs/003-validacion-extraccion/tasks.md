@@ -13,7 +13,7 @@ Sale de `plan.md`. Cada tarea termina con sus pruebas en verde y un commit propi
 - Escribir en español: código con nombres en español, como en el contrato, y documentos en prosa.
 - Si algo del plan no se puede hacer como está escrito, anotarlo en "Notas de implementación", al final de este archivo, y seguir con la alternativa más simple.
 
-Dependencias del sistema: `libreoffice` (writer y calc) y Python 3.12 con `uv`. En Debian o Ubuntu: `apt-get install -y libreoffice-writer libreoffice-calc`.
+Dependencias del sistema: `libreoffice` (writer, calc e impress) y Python 3.12 con `uv`. En Debian o Ubuntu: `apt-get install -y libreoffice-writer libreoffice-calc libreoffice-impress`.
 
 ## Tareas
 
@@ -37,7 +37,7 @@ Orden acordado: T14, T16 y T15. Mismo flujo que T01 a T13: una rama por tarea, p
 
 - [x] **T14 — Sello de tiempo.** Un sello de tiempo del documento (`/Type /DocTimeStamp`, subfiltro `ETSI.RFC3161`) no se cuenta en `firma_digital`: no tiene firmante, así que no es una firma de persona. Hoy aparece como "firma no leída". El esquema no cambia; se anota en el README del contrato. La fábrica suma un PDF firmado con un sello de tiempo encima, y la prueba comprueba que solo queda la firma. En la muestra, el PDF de OF-006 que trae el sello también trae una firma CAdES, así que sigue contando como PDF firmado.
 - [x] **T16 — Vínculos externos en Excel.** Antes de convertir un `xlsx`, quitar de la copia que va a LibreOffice los vínculos a otros libros: las partes `xl/externalLinks/`, `<externalReferences>` en `xl/workbook.xml` y sus entradas en `xl/_rels/workbook.xml.rels` y `[Content_Types].xml`. El original queda intacto como anexo (R9). Motivo: un Excel de OF-007 con 201 vínculos (2,9 MB de datos guardados) tardó 64 s en convertirse en la máquina local; sin los vínculos tarda 1,9 s y el PDF sale igual (mismas páginas y mismo texto, sin `#REF`), porque el Excel guarda el último valor de cada fórmula. No era la red ni la actualización de vínculos: sin red tarda lo mismo, y con la opción de no actualizar vínculos de LibreOffice también. La fábrica suma un `xlsx` con muchos vínculos externos; las pruebas comprueban que el texto del PDF no cambia y que el anexo es el original byte a byte. Los `xls` y `ods` no se tocan.
-- [ ] **T15 — PowerPoint.** Convertir `pptx`, `ppt` y `odp` con LibreOffice, igual que los Word: cada diapositiva queda como una página y las notas del orador no salen. Toca:
+- [x] **T15 — PowerPoint.** Convertir `pptx`, `ppt` y `odp` con LibreOffice, igual que los Word: cada diapositiva queda como una página y las notas del orador no salen. Toca:
     - el contrato: los tres valores nuevos en `tipo_origen`;
     - `tipos.py`: ZIP con `ppt/presentation.xml` es `pptx`, OLE con el flujo `PowerPoint Document` es `ppt`, ZIP con `mimetype` de presentación OpenDocument es `odp`;
     - `conversion.py`: un grupo `PRESENTACIONES`, sin anexo nativo;
@@ -326,4 +326,16 @@ Revisadas una por una con el usuario a partir de `resultados-muestra.md`:
 - **Solo `xlsx`** (incluye los `xlsm`, que se detectan como `xlsx`). Los `xls` y `ods` guardan los vínculos de otra forma y no aparecieron en la muestra.
 - **Los nombres definidos que apuntan a otros libros se dejan.** En el Excel real de 201 vínculos había 2.185; quitarlos no cambió el tiempo, y sin los vínculos LibreOffice los ignora sin errores en el PDF.
 - **El caso de la fábrica (`xlsx_con_vinculos`, 50 vínculos) comprueba que el resultado es correcto, no la velocidad.** Con vínculos inventados LibreOffice no se pone lento (1,7 s con 200, con muchas hojas o con nombres definidos); no se encontró qué rasgo exacto de los reales lo frena, y no hizo falta: el arreglo se midió con los archivos reales. Las pruebas comprueban que se quitan las partes, que el Excel limpio abre, que el PDF muestra el último valor de una fórmula que apuntaba a otro libro, sin `#REF` ni `#NAME`, que el anexo es el original byte a byte y que el original no cambia.
+
+### T15 — PowerPoint (2026-11-05)
+
+`pptx`, `ppt` y `odp` se convierten con LibreOffice, como los Word: una página por diapositiva, sin anexo, y sin las notas del orador. El contrato sube a `modulo3-normalizacion/0.2` (decisión del usuario: un consumidor que valide contra 0.1 rechazaría los tipos nuevos) y `VERSION` a `0.2.0`, como estaba previsto al cerrar T14 a T16. 413 pruebas en verde, también dentro de la imagen.
+
+- **`tipos.py`:** ZIP con `[Content_Types].xml` y `ppt/presentation.xml` es `pptx`; OLE con el flujo `PowerPoint Document` es `ppt`; ZIP con `mimetype` de presentación OpenDocument es `odp`, y el ODP con contraseña se marca como los ODT y ODS. Grupo nuevo `PRESENTACIONES`.
+- **Un PPT con contraseña no se reconoce como cifrado:** queda `ppt` y LibreOffice no lo abre, así que termina en `CONVERSION_FALLIDA`, no en `CONTRASENA`. Un PPTX con contraseña sí queda en `CONTRASENA`, porque es el mismo `EncryptedPackage` de los DOCX y XLSX. Detectar el cifrado de PPT pide leer los registros del formato binario; no vale la pena mientras no aparezca.
+- **Contrato:** `tipo_origen` suma los tres valores; versión 0.2 en los esquemas, los ejemplos y el README, con la nota del cambio.
+- **Imagen:** `libreoffice-impress-nogui`. La imagen de pruebas queda en 936 MB.
+- **Arreglo de paso en la imagen:** la etapa de pruebas no copiaba `scripts/`, así que desde T13 la prueba de `medir_muestra.py` fallaba dentro de la imagen. Ahora se copia.
+- **Fábrica:** `pptx` (dos diapositivas, con notas del orador en la primera), hecho con `python-pptx`, que entra solo como dependencia de desarrollo; `ppt` y `odp` salen de él con LibreOffice. La prueba de conversión comprueba 2 páginas, el texto de las diapositivas y que la nota no aparece. La prueba de "no soportados" usaba un ODP; ahora usa un dibujo ODG, que sigue sin soporte.
+- **Con los PPTX reales de OF-007:** los dos se convierten (20 y 10 páginas, 4,4 s y 2,8 s).
 

@@ -1,6 +1,6 @@
-"""Conversión a PDF de Word, hojas de cálculo e imágenes (R7 a R10).
+"""Conversión a PDF de Word, hojas de cálculo, presentaciones e imágenes (R7 a R10).
 
-- Word y hojas de cálculo: LibreOffice sin interfaz, con un perfil temporal propio
+- Word, hojas de cálculo y presentaciones (T15): LibreOffice sin interfaz, con un perfil temporal propio
   por conversión y las macros bloqueadas. Tiempo máximo y un reintento.
 - Imágenes: img2pdf, una página por imagen o por cuadro del TIFF, sin volver a
   comprimir. Antes se valida con Pillow que la imagen abre.
@@ -31,7 +31,7 @@ from PIL import Image
 
 from .errores import CONTRASENA, CONVERSION_FALLIDA, DANADO, NO_SOPORTADO, ErrorDocumento, error_documento
 from .parametros import PARAMETROS
-from .tipos import HOJAS_DE_CALCULO, IMAGEN, NO_SOPORTADO as TIPO_NO_SOPORTADO, PDF, WORD, XLSX, TipoReal
+from .tipos import HOJAS_DE_CALCULO, IMAGEN, NO_SOPORTADO as TIPO_NO_SOPORTADO, PDF, PRESENTACIONES, WORD, XLSX, TipoReal
 
 registro = logging.getLogger(__name__)
 
@@ -84,7 +84,7 @@ def convertir(
     original = Path(ruta).read_bytes()
     if tipo.tipo_origen == IMAGEN:
         return _convertir_imagen(original)
-    if tipo.tipo_origen in WORD | HOJAS_DE_CALCULO:
+    if tipo.tipo_origen in WORD | HOJAS_DE_CALCULO | PRESENTACIONES:
         para_convertir = sin_vinculos_externos(original) if tipo.tipo_origen == XLSX else original
         try:
             datos = convertir_con_libreoffice(

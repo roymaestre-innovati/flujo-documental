@@ -18,15 +18,20 @@ ODT = "odt"
 XLS = "xls"
 XLSX = "xlsx"
 ODS = "ods"
+PPT = "ppt"
+PPTX = "pptx"
+ODP = "odp"
 IMAGEN = "imagen"
 NO_SOPORTADO = "no_soportado"
 
-TIPOS_ORIGEN = (PDF, DOC, DOCX, ODT, XLS, XLSX, ODS, IMAGEN, NO_SOPORTADO)
+TIPOS_ORIGEN = (PDF, DOC, DOCX, ODT, XLS, XLSX, ODS, PPT, PPTX, ODP, IMAGEN, NO_SOPORTADO)
 """Los valores de `tipo_origen` del contrato."""
 
 WORD = frozenset({DOC, DOCX, ODT})
 HOJAS_DE_CALCULO = frozenset({XLS, XLSX, ODS})
 """Se convierten a PDF y además se conserva el original como anexo (R9)."""
+PRESENTACIONES = frozenset({PPT, PPTX, ODP})
+"""Se convierten a PDF como los Word: una página por diapositiva, sin anexo (T15)."""
 
 MAGICO_PDF = b"%PDF-"
 MAGICO_ZIP = b"PK\x03\x04"
@@ -44,6 +49,7 @@ _IMAGENES = (
 _MIMETYPES_ODF = {
     b"application/vnd.oasis.opendocument.text": ODT,
     b"application/vnd.oasis.opendocument.spreadsheet": ODS,
+    b"application/vnd.oasis.opendocument.presentation": ODP,
 }
 
 _LONGITUD_CABECERA = 8
@@ -59,8 +65,8 @@ class TipoReal:
     """Word o Excel protegido con contraseña: el documento queda con error CONTRASENA.
 
     Un DOCX o XLSX cifrado es un OLE con un flujo `EncryptedPackage`, y no se
-    sabe si era Word o Excel: queda `no_soportado` con `cifrado` en True. Los DOC,
-    XLS, ODT y ODS cifrados conservan su tipo. Los PDF no se marcan aquí: su
+    sabe si era Word, Excel o PowerPoint: queda `no_soportado` con `cifrado` en True.
+    Los DOC, XLS, ODT, ODS y ODP cifrados conservan su tipo. Los PDF no se marcan aquí: su
     contraseña la revisa `revision_pdf`.
     """
 
@@ -90,7 +96,8 @@ def detectar(ruta: Path) -> TipoReal:
 
 
 def _tipo_zip(ruta: Path) -> TipoReal:
-    """DOCX, XLSX, ODT u ODS según lo que trae el ZIP. Un ZIP cualquiera no se soporta."""
+    """DOCX, XLSX, PPTX, ODT, ODS u ODP según lo que trae el ZIP. Un ZIP cualquiera
+    no se soporta."""
     try:
         with zipfile.ZipFile(ruta) as zip_:
             nombres = set(zip_.namelist())
@@ -107,6 +114,8 @@ def _tipo_zip(ruta: Path) -> TipoReal:
             return TipoReal(DOCX)
         if "xl/workbook.xml" in nombres:
             return TipoReal(XLSX)
+        if "ppt/presentation.xml" in nombres:
+            return TipoReal(PPTX)
     return TipoReal(NO_SOPORTADO)
 
 
@@ -125,7 +134,10 @@ _DOC_FENCRYPTED = 0x0100
 
 
 def _tipo_ole(ruta: Path) -> TipoReal:
-    """DOC o XLS según los flujos del archivo OLE. Los demás OLE no se soportan."""
+    """DOC, XLS o PPT según los flujos del archivo OLE. Los demás OLE no se soportan.
+
+    Un PPT con contraseña no se distingue aquí: LibreOffice no lo abre y queda con
+    error de conversión."""
     try:
         with olefile.OleFileIO(str(ruta)) as ole:
             if ole.exists("EncryptedPackage"):
@@ -135,6 +147,8 @@ def _tipo_ole(ruta: Path) -> TipoReal:
             for flujo in ("Workbook", "Book"):
                 if ole.exists(flujo):
                     return TipoReal(XLS, cifrado=_xls_cifrado(ole, flujo))
+            if ole.exists("PowerPoint Document"):
+                return TipoReal(PPT)
     except (OSError, ValueError, IndexError, TypeError, struct.error):
         pass
     return TipoReal(NO_SOPORTADO)

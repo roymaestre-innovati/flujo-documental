@@ -12,8 +12,11 @@ from normalizacion.tipos import (
     IMAGEN,
     NO_SOPORTADO,
     ODS,
+    ODP,
     ODT,
     PDF,
+    PPT,
+    PPTX,
     XLS,
     XLSX,
     TipoReal,
@@ -47,6 +50,9 @@ ESPERADOS = {
     "odt_con_macro": TipoReal(ODT),
     "tiff_tres_paginas": TipoReal(IMAGEN, "tiff"),
     "extension_falsa": TipoReal(DOCX),
+    "pptx": TipoReal(PPTX),
+    "ppt": TipoReal(PPT),
+    "odp": TipoReal(ODP),
 }
 
 
@@ -89,7 +95,7 @@ NO_SOPORTADOS = {
     "zip_cualquiera.zip": _zip({"notas.txt": b"x"}),
     "zip_con_carpeta_word.docx": _zip({"word/notas.txt": b"x"}),
     "zip_word_sin_content_types.docx": _zip({"word/document.xml": b"<x/>"}),
-    "presentacion.odp": _zip({"mimetype": b"application/vnd.oasis.opendocument.presentation"}),
+    "dibujo.odg": _zip({"mimetype": b"application/vnd.oasis.opendocument.graphics"}),
     "zip_roto.docx": b"PK\x03\x04" + bytes(100),
     "ole_roto.doc": bytes.fromhex("D0CF11E0A1B11AE1") + bytes(100),
     "appledouble.pdf": fabrica.CABECERA_APPLEDOUBLE + bytes(64),
@@ -178,6 +184,7 @@ def test_xls_con_contrasena(tmp_path):
 @pytest.mark.parametrize(("mimetype", "esperado"), [
     (b"application/vnd.oasis.opendocument.text", ODT),
     (b"application/vnd.oasis.opendocument.spreadsheet", ODS),
+    (b"application/vnd.oasis.opendocument.presentation", ODP),
 ])
 def test_odf_con_contrasena(tmp_path, mimetype, esperado):
     manifiesto = (

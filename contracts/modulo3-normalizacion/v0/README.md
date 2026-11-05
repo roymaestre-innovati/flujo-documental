@@ -1,4 +1,4 @@
-# Contrato del módulo 3 — normalización y lectura (v0, borrador 0.1)
+# Contrato del módulo 3 — normalización y lectura (v0, versión 0.2)
 
 Contrato de salida de la pieza que normaliza y lee una entrega: la carpeta de documentos de un oferente, o la del proceso (condiciones, adendas, anexos). Lo usan el clasificador (A-5), la unidad de extracción (cambio 2 del contrato 0.2) y el orquestador (iniciativa 005). Sale de `specs/003-validacion-extraccion/spec.md` y `plan.md`; el diseño está en `contexto/flujo-documental-opcion-a.md`, pasos 1 y 2.
 
@@ -60,7 +60,7 @@ Los enlaces (`pdf`, `anexo_nativo`, `lectura`, `palabras`) son URI. En esta vers
   | `DANADO` | El archivo no abre y no se pudo reparar | El archivo está dañado y no se pudo reparar. Si se pide subsanación, el oferente debe entregarlo de nuevo. |
   | `SIN_PAGINAS` | El documento abre pero no tiene páginas | El documento no tiene páginas. Si se pide subsanación, el oferente debe entregarlo de nuevo. |
   | `NO_SOPORTADO` | El tipo de archivo no se puede leer | El tipo de archivo no se puede leer. Si se pide subsanación, el oferente debe entregarlo en PDF. |
-  | `CONVERSION_FALLIDA` | El Word, Excel o imagen no se pudo pasar a PDF | No se pudo convertir el archivo a PDF. Si se pide subsanación, el oferente debe entregarlo en PDF. |
+  | `CONVERSION_FALLIDA` | El Word, Excel, PowerPoint o imagen no se pudo pasar a PDF | No se pudo convertir el archivo a PDF. Si se pide subsanación, el oferente debe entregarlo en PDF. |
 - **Motivos de descarte.** `archivo_sistema_mac` (`.DS_Store`, todo lo que está dentro de `__MACOSX` y los archivos `._*`) y `archivo_sistema_windows` (`Thumbs.db`). Un registro por archivo.
 - **Trazabilidad.** El manifiesto y la lectura llevan `version_normalizador` y `version_parametros` (R24).
 
@@ -76,7 +76,11 @@ Las dudas sobre este borrador están en "Notas de implementación" de `specs/003
 
 ## Versionado
 
-`contrato` lleva la versión (`modulo3-normalizacion/0.1`). Mientras sea 0.x se puede cambiar de forma incompatible avisando a los equipos. Desde la 1.0, un cambio incompatible exige una versión mayor nueva, sin editar la vigente (principio 5).
+`contrato` lleva la versión (`modulo3-normalizacion/0.2`). Mientras sea 0.x se puede cambiar de forma incompatible avisando a los equipos. Desde la 1.0, un cambio incompatible exige una versión mayor nueva, sin editar la vigente (principio 5).
+
+Cambios:
+
+- **0.2 (2026-11-05):** `tipo_origen` suma `ppt`, `pptx` y `odp`. Las presentaciones se convierten a PDF, una página por diapositiva, sin anexo; las notas del orador no salen. Un consumidor que valide contra 0.1 rechazaría esos valores, por eso sube la versión. `version_normalizador` pasa a `0.2.0`.
 
 Cambios dentro de 0.1, antes de que nadie lo use:
 

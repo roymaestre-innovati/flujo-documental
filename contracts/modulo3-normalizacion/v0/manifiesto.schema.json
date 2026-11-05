@@ -7,7 +7,7 @@
   "additionalProperties": false,
   "required": ["contrato", "id_proceso", "id_oferente", "version_normalizador", "version_parametros", "ejecucion", "archivos", "descartados"],
   "properties": {
-    "contrato": {"const": "modulo3-normalizacion/0.1"},
+    "contrato": {"const": "modulo3-normalizacion/0.2"},
     "id_proceso": {"type": "string", "minLength": 1, "description": "Identificador del proceso de selección."},
     "id_oferente": {"type": ["string", "null"], "minLength": 1, "description": "null en una entrega del proceso (condiciones, adendas, anexos)."},
     "version_normalizador": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$", "description": "Versión del paquete normalizacion que produjo el manifiesto (R24)."},
@@ -41,7 +41,7 @@
       "pattern": "^[^/\\\\].*$",
       "description": "Ruta relativa dentro de la entrega, separada con `/` y normalizada a Unicode NFC, para que la misma entrega dé lo mismo venga de Mac o de Windows."
     },
-    "tipo_origen": {"enum": ["pdf", "doc", "docx", "odt", "xls", "xlsx", "ods", "imagen", "no_soportado"]},
+    "tipo_origen": {"enum": ["pdf", "doc", "docx", "odt", "xls", "xlsx", "ods", "ppt", "pptx", "odp", "imagen", "no_soportado"]},
     "archivo": {
       "type": "object",
       "additionalProperties": false,

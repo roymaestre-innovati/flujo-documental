@@ -168,9 +168,9 @@ def test_r18_campos_de_la_lectura(tmp_path):
     firmas = leer_firmas(datos)
     resultado = _valida(_leer(datos, firmas))
     lectura = resultado.lectura
-    assert lectura["contrato"] == "modulo3-normalizacion/0.1"
+    assert lectura["contrato"] == "modulo3-normalizacion/0.2"
     assert lectura["hash_pdf"] == hashlib.sha256(datos).hexdigest()
-    assert lectura["version_normalizador"] == "0.1.0" and lectura["version_parametros"] == "1"
+    assert lectura["version_normalizador"] == "0.2.0" and lectura["version_parametros"] == "1"
     assert lectura["firma_digital"] == [firma.como_dict() for firma in firmas]
     assert lectura["palabras"] == URI_PALABRAS
     (pagina,) = lectura["paginas"]
