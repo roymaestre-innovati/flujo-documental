@@ -433,6 +433,75 @@ def xlsx_ancho(carpeta: Path) -> list[Path]:
     return [_guardar(carpeta / "experiencia.xlsx", xlsx_bytes())]
 
 
+VALOR_VINCULADO = 4567
+"""Valor que el Excel con vínculos guarda como último resultado de su fórmula."""
+
+
+def xlsx_con_vinculos_bytes(vinculos: int = 50) -> bytes:
+    """Una hoja con una fórmula que apunta a otro libro, más `vinculos` vínculos a
+    otros libros, cada uno con sus datos guardados. Así quedan los Excel armados
+    copiando hojas de otros archivos (en la muestra real, uno con 201 tardó 64 s en
+    convertirse). Como en Excel, la fórmula guarda su último valor."""
+    from openpyxl import Workbook
+
+    libro = Workbook()
+    hoja = libro.active
+    hoja.title = "Resumen"
+    hoja.append(["Indicador", "Valor"])
+    hoja.append(["Capital de trabajo", 0])
+    hoja.column_dimensions["A"].width = 30
+    base = io.BytesIO()
+    libro.save(base)
+
+    principal = "http://schemas.openxmlformats.org/spreadsheetml/2006/main"
+    relaciones = "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+    paquete = "http://schemas.openxmlformats.org/package/2006/relationships"
+    tipo_vinculo = "application/vnd.openxmlformats-officedocument.spreadsheetml.externalLink+xml"
+    filas = "".join(f'<row r="{f}"><cell r="A{f}"><v>{f * 7}</v></cell></row>' for f in range(1, 201))
+
+    entrada = zipfile.ZipFile(base)
+    salida = io.BytesIO()
+    with zipfile.ZipFile(salida, "w", zipfile.ZIP_DEFLATED) as zip_:
+        for info in entrada.infolist():
+            datos = entrada.read(info.filename).decode("utf-8")
+            if info.filename == "xl/worksheets/sheet1.xml":
+                datos = datos.replace('<c r="B2" t="n"><v>0</v></c>', f'<c r="B2"><f>[1]Datos!$A$1</f><v>{VALOR_VINCULADO}</v></c>')
+                assert f"<v>{VALOR_VINCULADO}</v>" in datos
+            elif info.filename == "xl/workbook.xml":
+                referencias = "".join(f'<externalReference r:id="rIdV{n}"/>' for n in range(1, vinculos + 1))
+                datos = datos.replace("</sheets>", f'</sheets><externalReferences xmlns:r="{relaciones}">{referencias}</externalReferences>')
+            elif info.filename == "xl/_rels/workbook.xml.rels":
+                nuevas = "".join(
+                    f'<Relationship Id="rIdV{n}" Type="{relaciones}/externalLink" Target="externalLinks/externalLink{n}.xml"/>'
+                    for n in range(1, vinculos + 1)
+                )
+                datos = datos.replace("</Relationships>", nuevas + "</Relationships>")
+            elif info.filename == "[Content_Types].xml":
+                nuevas = "".join(
+                    f'<Override PartName="/xl/externalLinks/externalLink{n}.xml" ContentType="{tipo_vinculo}"/>'
+                    for n in range(1, vinculos + 1)
+                )
+                datos = datos.replace("</Types>", nuevas + "</Types>")
+            zip_.writestr(info, datos)
+        for n in range(1, vinculos + 1):
+            zip_.writestr(
+                f"xl/externalLinks/externalLink{n}.xml",
+                f'<externalLink xmlns="{principal}" xmlns:r="{relaciones}"><externalBook r:id="rId1">'
+                f'<sheetNames><sheetName val="Datos"/></sheetNames>'
+                f'<sheetDataSet><sheetData sheetId="0">{filas}</sheetData></sheetDataSet></externalBook></externalLink>',
+            )
+            zip_.writestr(
+                f"xl/externalLinks/_rels/externalLink{n}.xml.rels",
+                f'<Relationships xmlns="{paquete}"><Relationship Id="rId1" Type="{relaciones}/externalLinkPath" '
+                f'Target="file:///C:/Plantillas/libro{n}.xlsx" TargetMode="External"/></Relationships>',
+            )
+    return salida.getvalue()
+
+
+def xlsx_con_vinculos(carpeta: Path) -> list[Path]:
+    return [_guardar(carpeta / "indicadores_financieros.xlsx", xlsx_con_vinculos_bytes())]
+
+
 def _cifrar_ooxml(datos: bytes) -> bytes:
     """DOCX o XLSX protegido con contraseña, como lo deja Office (EncryptedPackage)."""
     from msoffcrypto.format.ooxml import OOXMLFile
@@ -588,6 +657,7 @@ CASOS = {
     "pdf_modificado_despues_de_firmar": pdf_modificado_despues_de_firmar,
     "pdf_firma_ilegible": pdf_firma_ilegible,
     "pdf_firmado_con_sello_de_tiempo": pdf_firmado_con_sello_de_tiempo,
+    "xlsx_con_vinculos": xlsx_con_vinculos,
     "docx": docx,
     "odt": odt,
     "doc": doc,

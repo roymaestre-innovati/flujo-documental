@@ -4,7 +4,9 @@
   por conversión y las macros bloqueadas. Tiempo máximo y un reintento.
 - Imágenes: img2pdf, una página por imagen o por cuadro del TIFF, sin volver a
   comprimir. Antes se valida con Pillow que la imagen abre.
-- Hojas de cálculo: además del PDF, se conserva el original como anexo (R9).
+- Hojas de cálculo: además del PDF, se conserva el original como anexo (R9). A un
+  `xlsx` se le quitan antes los vínculos a otros libros, solo en la copia que va a
+  LibreOffice (T16).
 
 El original nunca se modifica (R10): todo se hace sobre copias en carpetas
 temporales. El PDF que sale se deja sin fechas ni identificadores aleatorios,
@@ -14,10 +16,12 @@ para que convertir dos veces el mismo archivo dé los mismos bytes (R25).
 import io
 import logging
 import os
+import re
 import shutil
 import signal
 import subprocess
 import tempfile
+import zipfile
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -27,7 +31,7 @@ from PIL import Image
 
 from .errores import CONTRASENA, CONVERSION_FALLIDA, DANADO, NO_SOPORTADO, ErrorDocumento, error_documento
 from .parametros import PARAMETROS
-from .tipos import HOJAS_DE_CALCULO, IMAGEN, NO_SOPORTADO as TIPO_NO_SOPORTADO, PDF, WORD, TipoReal
+from .tipos import HOJAS_DE_CALCULO, IMAGEN, NO_SOPORTADO as TIPO_NO_SOPORTADO, PDF, WORD, XLSX, TipoReal
 
 registro = logging.getLogger(__name__)
 
@@ -81,9 +85,10 @@ def convertir(
     if tipo.tipo_origen == IMAGEN:
         return _convertir_imagen(original)
     if tipo.tipo_origen in WORD | HOJAS_DE_CALCULO:
+        para_convertir = sin_vinculos_externos(original) if tipo.tipo_origen == XLSX else original
         try:
             datos = convertir_con_libreoffice(
-                original,
+                para_convertir,
                 tipo.tipo_origen,
                 soffice=soffice,
                 tiempo_max_s=PARAMETROS.tiempo_max_conversion_s if tiempo_max_s is None else tiempo_max_s,
@@ -116,6 +121,48 @@ def pdf_reproducible(datos: bytes) -> bytes:
         salida = io.BytesIO()
         pdf.save(salida, deterministic_id=True)
     return salida.getvalue()
+
+
+# ---------------------------------------------------------------------------
+# Vínculos a otros libros (T16)
+
+_PARTE_VINCULO = re.compile(r"xl/externalLinks/(_rels/)?externalLink\d+\.xml(\.rels)?$")
+_REFERENCIAS = re.compile(
+    rb"<(\w+:)?externalReferences\b[^>]*/>|<(\w+:)?externalReferences\b.*?</(\w+:)?externalReferences>", re.S
+)
+_ENTRADAS = re.compile(rb"<(Relationship|Override)\b[^>]*externalLink[^>]*/>")
+
+
+def sin_vinculos_externos(datos: bytes) -> bytes:
+    """Copia del `xlsx` sin vínculos a otros libros.
+
+    Hay Excel armados copiando hojas de otros archivos que arrastran cientos de
+    vínculos, y LibreOffice tarda en procesarlos: uno real, con 201, tardaba 64 s
+    en convertirse y sin ellos 1,9 s, con el mismo PDF. El PDF no cambia porque
+    cada fórmula guarda su último valor, y eso es lo que se imprime.
+
+    Devuelve los mismos bytes si el archivo no tiene vínculos o no es un ZIP que se
+    pueda leer (de ese caso se encarga LibreOffice).
+    """
+    try:
+        with zipfile.ZipFile(io.BytesIO(datos)) as entrada:
+            partes = entrada.infolist()
+            if not any(_PARTE_VINCULO.match(parte.filename) for parte in partes):
+                return datos
+            salida = io.BytesIO()
+            with zipfile.ZipFile(salida, "w", zipfile.ZIP_DEFLATED) as copia:
+                for parte in partes:
+                    if _PARTE_VINCULO.match(parte.filename):
+                        continue
+                    contenido = entrada.read(parte.filename)
+                    if parte.filename == "xl/workbook.xml":
+                        contenido = _REFERENCIAS.sub(b"", contenido)
+                    elif parte.filename in ("xl/_rels/workbook.xml.rels", "[Content_Types].xml"):
+                        contenido = _ENTRADAS.sub(b"", contenido)
+                    copia.writestr(parte, contenido)
+            return salida.getvalue()
+    except (zipfile.BadZipFile, KeyError, OSError, ValueError):
+        return datos
 
 
 # ---------------------------------------------------------------------------

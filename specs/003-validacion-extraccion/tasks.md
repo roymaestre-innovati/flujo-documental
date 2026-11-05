@@ -36,7 +36,7 @@ Dependencias del sistema: `libreoffice` (writer y calc) y Python 3.12 con `uv`. 
 Orden acordado: T14, T16 y T15. Mismo flujo que T01 a T13: una rama por tarea, pruebas en verde, notas aquí, y alto para revisión.
 
 - [x] **T14 — Sello de tiempo.** Un sello de tiempo del documento (`/Type /DocTimeStamp`, subfiltro `ETSI.RFC3161`) no se cuenta en `firma_digital`: no tiene firmante, así que no es una firma de persona. Hoy aparece como "firma no leída". El esquema no cambia; se anota en el README del contrato. La fábrica suma un PDF firmado con un sello de tiempo encima, y la prueba comprueba que solo queda la firma. En la muestra, el PDF de OF-006 que trae el sello también trae una firma CAdES, así que sigue contando como PDF firmado.
-- [ ] **T16 — Vínculos externos en Excel.** Antes de convertir un `xlsx`, quitar de la copia que va a LibreOffice los vínculos a otros libros: las partes `xl/externalLinks/`, `<externalReferences>` en `xl/workbook.xml` y sus entradas en `xl/_rels/workbook.xml.rels` y `[Content_Types].xml`. El original queda intacto como anexo (R9). Motivo: un Excel de OF-007 con 201 vínculos (2,9 MB de datos guardados) tardó 64 s en convertirse en la máquina local; sin los vínculos tarda 1,9 s y el PDF sale igual (mismas páginas y mismo texto, sin `#REF`), porque el Excel guarda el último valor de cada fórmula. No era la red ni la actualización de vínculos: sin red tarda lo mismo, y con la opción de no actualizar vínculos de LibreOffice también. La fábrica suma un `xlsx` con muchos vínculos externos; las pruebas comprueban que el texto del PDF no cambia y que el anexo es el original byte a byte. Los `xls` y `ods` no se tocan.
+- [x] **T16 — Vínculos externos en Excel.** Antes de convertir un `xlsx`, quitar de la copia que va a LibreOffice los vínculos a otros libros: las partes `xl/externalLinks/`, `<externalReferences>` en `xl/workbook.xml` y sus entradas en `xl/_rels/workbook.xml.rels` y `[Content_Types].xml`. El original queda intacto como anexo (R9). Motivo: un Excel de OF-007 con 201 vínculos (2,9 MB de datos guardados) tardó 64 s en convertirse en la máquina local; sin los vínculos tarda 1,9 s y el PDF sale igual (mismas páginas y mismo texto, sin `#REF`), porque el Excel guarda el último valor de cada fórmula. No era la red ni la actualización de vínculos: sin red tarda lo mismo, y con la opción de no actualizar vínculos de LibreOffice también. La fábrica suma un `xlsx` con muchos vínculos externos; las pruebas comprueban que el texto del PDF no cambia y que el anexo es el original byte a byte. Los `xls` y `ods` no se tocan.
 - [ ] **T15 — PowerPoint.** Convertir `pptx`, `ppt` y `odp` con LibreOffice, igual que los Word: cada diapositiva queda como una página y las notas del orador no salen. Toca:
     - el contrato: los tres valores nuevos en `tipo_origen`;
     - `tipos.py`: ZIP con `ppt/presentation.xml` es `pptx`, OLE con el flujo `PowerPoint Document` es `ppt`, ZIP con `mimetype` de presentación OpenDocument es `odp`;
@@ -306,4 +306,24 @@ Revisadas una por una con el usuario a partir de `resultados-muestra.md`:
 - **Pruebas:** el firmado con sello deja una sola firma, leída e íntegra (el sello no rompe la integridad de la firma anterior); un PDF que solo tiene un sello queda sin firmas (`[]`); la entrega completa incluye el caso nuevo.
 - **Con el PDF real de OF-006:** antes daba `ETSI.CAdES.detached` y `ETSI.RFC3161`; ahora solo la CAdES, que sigue no íntegra (decisión de arriba).
 - **Sin cambio en `VERSION`** todavía: sube a `0.2.0` al cerrar T14 a T16, como dice la lista de tareas.
+
+### T16 — Vínculos externos en Excel (2026-11-05)
+
+`conversion.sin_vinculos_externos(datos)` quita de la copia de un `xlsx` las partes `xl/externalLinks/`, el bloque `<externalReferences>` de `xl/workbook.xml` y sus entradas en `xl/_rels/workbook.xml.rels` y `[Content_Types].xml`. `convertir` la usa solo con `xlsx`; el anexo sigue siendo el original. Si el archivo no tiene vínculos, o no es un ZIP que se pueda leer, devuelve los mismos bytes y LibreOffice recibe el archivo tal cual. 399 pruebas en verde.
+
+**Con los Excel reales** (11 en las dos muestras; 5 tienen vínculos):
+
+| Excel | Antes | Después | PDF |
+|---|---|---|---|
+| OF-007, 1 página, 201 vínculos | 64 a 68 s | 1,9 s | Igual |
+| OF-007, 47 páginas | 22 s | 3,3 s | Igual; ver abajo |
+| Los otros 3 con vínculos | 1,7 a 2 s | Igual | Igual |
+
+**Hallazgo: con vínculos, LibreOffice no siempre da el mismo PDF.** El Excel de 47 páginas, convertido 4 veces tal cual, dio un texto distinto en una de ellas; sin vínculos, las 4 dieron el mismo. Así que T16 también ayuda al determinismo (R25), no solo al tiempo.
+
+**Decisiones que la tarea no fijaba:**
+
+- **Solo `xlsx`** (incluye los `xlsm`, que se detectan como `xlsx`). Los `xls` y `ods` guardan los vínculos de otra forma y no aparecieron en la muestra.
+- **Los nombres definidos que apuntan a otros libros se dejan.** En el Excel real de 201 vínculos había 2.185; quitarlos no cambió el tiempo, y sin los vínculos LibreOffice los ignora sin errores en el PDF.
+- **El caso de la fábrica (`xlsx_con_vinculos`, 50 vínculos) comprueba que el resultado es correcto, no la velocidad.** Con vínculos inventados LibreOffice no se pone lento (1,7 s con 200, con muchas hojas o con nombres definidos); no se encontró qué rasgo exacto de los reales lo frena, y no hizo falta: el arreglo se midió con los archivos reales. Las pruebas comprueban que se quitan las partes, que el Excel limpio abre, que el PDF muestra el último valor de una fórmula que apuntaba a otro libro, sin `#REF` ni `#NAME`, que el anexo es el original byte a byte y que el original no cambia.
 
