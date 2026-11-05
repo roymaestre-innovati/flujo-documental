@@ -12,8 +12,8 @@ Qué se pidió y por qué: `specs/003-validacion-extraccion/` (`spec.md`, `plan.
 ## Requisitos
 
 - Python 3.12 y [uv](https://docs.astral.sh/uv/). uv descarga Python 3.12 si no está.
-- LibreOffice, con el comando `soffice` en el PATH. Solo hace falta para convertir Word y hojas de cálculo; sin él, esas pruebas se saltan.
-  - Ubuntu o Debian: `sudo apt-get install -y libreoffice-writer libreoffice-calc`
+- LibreOffice, con el comando `soffice` en el PATH. Solo hace falta para convertir Word, hojas de cálculo y presentaciones; sin él, esas pruebas se saltan.
+  - Ubuntu o Debian: `sudo apt-get install -y libreoffice-writer libreoffice-calc libreoffice-impress`
   - Mac: `brew install --cask libreoffice`. El instalador no pone `soffice` en el PATH; hay que agregarlo:
 
     ```bash
@@ -34,7 +34,7 @@ uv sync
 uv run pytest -q
 ```
 
-Son unas 390 pruebas, en un minuto y medio con LibreOffice. Todas usan documentos inventados que fabrica `tests/fabrica.py` en una carpeta temporal: en el repositorio no hay documentos reales.
+Son unas 410 pruebas, en un minuto y medio con LibreOffice. Todas usan documentos inventados que fabrica `tests/fabrica.py` en una carpeta temporal: en el repositorio no hay documentos reales.
 
 ## Usar
 
@@ -91,8 +91,8 @@ La imagen corre con el usuario 10001: la carpeta de salida tiene que admitir esc
 |---|---|
 | `entrega.py` | Une todo: inventario, cada archivo y el manifiesto. Idempotencia y manejo de errores |
 | `inventario.py` | Recorrido, descarte de archivos de sistema, huella, duplicados e `id_documento` |
-| `tipos.py` | Tipo real por contenido; Word o Excel con contraseña |
-| `conversion.py` | Word y hojas de cálculo con LibreOffice; imágenes con img2pdf |
+| `tipos.py` | Tipo real por contenido; Word, Excel o PowerPoint con contraseña |
+| `conversion.py` | Word, hojas de cálculo y presentaciones con LibreOffice; imágenes con img2pdf |
 | `revision_pdf.py` | Abre, repara, contraseña, restricciones y páginas |
 | `firma.py` | Firma digital (pikepdf para encontrarlas, pyHanko para validarlas) |
 | `lectura.py` | Tipo de página, texto, cobertura, rotación y palabras |

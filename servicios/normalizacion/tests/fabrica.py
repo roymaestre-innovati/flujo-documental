@@ -433,6 +433,48 @@ def xlsx_ancho(carpeta: Path) -> list[Path]:
     return [_guardar(carpeta / "experiencia.xlsx", xlsx_bytes())]
 
 
+NOTA_DEL_ORADOR = "Recordar mencionar el cronograma"
+"""Texto de las notas del orador: no sale en el PDF."""
+
+
+def pptx_bytes() -> bytes:
+    """Presentación de dos diapositivas, con notas del orador en la primera."""
+    from pptx import Presentation
+
+    presentacion = Presentation()
+    for titulo, cuerpo in (
+        ("Metodología de trabajo", f"Propuesta de {OFERENTE}"),
+        ("Cronograma", "Fase 1: diagnóstico. Fase 2: ejecución."),
+    ):
+        diapositiva = presentacion.slides.add_slide(presentacion.slide_layouts[1])
+        diapositiva.shapes.title.text = titulo
+        diapositiva.placeholders[1].text = cuerpo
+    presentacion.slides[0].notes_slide.notes_text_frame.text = NOTA_DEL_ORADOR
+    salida = io.BytesIO()
+    presentacion.save(salida)
+    return salida.getvalue()
+
+
+def pptx(carpeta: Path) -> list[Path]:
+    return [_guardar(carpeta / "presentacion_metodologia.pptx", pptx_bytes())]
+
+
+def _desde_pptx(carpeta: Path, formato: str, nombre: str) -> list[Path]:
+    with tempfile.TemporaryDirectory() as temporal:
+        origen = _guardar(Path(temporal) / "presentacion_metodologia.pptx", pptx_bytes())
+        return [convertir_con_libreoffice(origen, formato, carpeta / nombre)]
+
+
+def ppt(carpeta: Path) -> list[Path]:
+    """Necesita LibreOffice."""
+    return _desde_pptx(carpeta, "ppt:MS PowerPoint 97", "presentacion_metodologia.ppt")
+
+
+def odp(carpeta: Path) -> list[Path]:
+    """Necesita LibreOffice."""
+    return _desde_pptx(carpeta, "odp", "presentacion_metodologia.odp")
+
+
 VALOR_VINCULADO = 4567
 """Valor que el Excel con vínculos guarda como último resultado de su fórmula."""
 
@@ -658,6 +700,9 @@ CASOS = {
     "pdf_firma_ilegible": pdf_firma_ilegible,
     "pdf_firmado_con_sello_de_tiempo": pdf_firmado_con_sello_de_tiempo,
     "xlsx_con_vinculos": xlsx_con_vinculos,
+    "pptx": pptx,
+    "ppt": ppt,
+    "odp": odp,
     "docx": docx,
     "odt": odt,
     "doc": doc,
@@ -679,4 +724,4 @@ CASOS = {
     "pdf_anclas": pdf_anclas,
 }
 
-CASOS_CON_LIBREOFFICE = {"odt", "doc", "xls", "ods", "odt_con_macro"}
+CASOS_CON_LIBREOFFICE = {"odt", "doc", "xls", "ods", "odt_con_macro", "ppt", "odp"}

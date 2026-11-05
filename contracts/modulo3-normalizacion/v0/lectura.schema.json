@@ -7,7 +7,7 @@
   "additionalProperties": false,
   "required": ["contrato", "id_documento", "hash_pdf", "version_normalizador", "version_parametros", "firma_digital", "palabras", "paginas"],
   "properties": {
-    "contrato": {"const": "modulo3-normalizacion/0.1"},
+    "contrato": {"const": "modulo3-normalizacion/0.2"},
     "id_documento": {"type": "string", "minLength": 1},
     "hash_pdf": {"type": "string", "pattern": "^[0-9a-f]{64}$", "description": "SHA-256 del PDF normalizado que se leyó. Si el PDF se usó tal cual (R11), coincide con el hash del original."},
     "version_normalizador": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"},

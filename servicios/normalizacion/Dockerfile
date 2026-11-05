@@ -8,7 +8,7 @@
 #   docker run --rm normalizacion-pruebas
 #
 # Etapas:
-#   base    Ubuntu 24.04 con Python 3.12, LibreOffice 24.2 (Writer y Calc, sin
+#   base    Ubuntu 24.04 con Python 3.12, LibreOffice 24.2 (Writer, Calc e Impress, sin
 #           interfaz), fuentes y uv.
 #   pruebas base + dependencias de desarrollo, pruebas y contrato. Corre pytest.
 #   job     base + solo las dependencias del paquete. Corre `normalizar`.
@@ -37,7 +37,7 @@ ENV DEBIAN_FRONTEND=noninteractive \
     PATH=/opt/venv/bin:$PATH
 
 # LibreOffice sin interfaz gráfica (las variantes -nogui pesan menos). Fuentes con
-# las mismas medidas que las de Office, para que los Word y Excel conserven su
+# las mismas medidas que las de Office, para que los Word, Excel y PowerPoint conserven su
 # paginación al convertirse: Liberation (Arial, Times New Roman, Courier New),
 # Carlito (Calibri) y Caladea (Cambria). Sin ellas el texto sale más ancho y se
 # sale de la página.
@@ -48,6 +48,7 @@ RUN apt-get update \
         python3-pip \
         libreoffice-writer-nogui \
         libreoffice-calc-nogui \
+        libreoffice-impress-nogui \
         fonts-liberation \
         fonts-crosextra-carlito \
         fonts-crosextra-caladea \
@@ -70,6 +71,7 @@ RUN uv sync --frozen --no-install-project
 COPY contracts/modulo3-normalizacion /app/contracts/modulo3-normalizacion
 COPY servicios/normalizacion/src ./src
 COPY servicios/normalizacion/tests ./tests
+COPY servicios/normalizacion/scripts ./scripts
 RUN uv sync --frozen
 
 CMD ["pytest", "-q", "-p", "no:cacheprovider"]

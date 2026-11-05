@@ -93,6 +93,22 @@ def test_r9_hoja_de_calculo_a_pdf_con_anexo(tmp_path, caso):
     assert _paginas(conversion.datos) > 1
 
 
+# T15: presentaciones -----------------------------------------------------------------
+
+
+@pytest.mark.libreoffice
+@pytest.mark.parametrize("caso", ["pptx", "ppt", "odp"])
+def test_t15_presentacion_a_pdf(tmp_path, caso):
+    _, conversion = _convertir_caso(tmp_path, caso)
+    assert conversion.ok
+    assert conversion.anexo is None
+    # Una página por diapositiva; las notas del orador no salen.
+    assert _paginas(conversion.datos) == 2
+    texto = _texto(conversion.datos)
+    assert fabrica.OFERENTE in texto and "Cronograma" in texto
+    assert fabrica.NOTA_DEL_ORADOR not in texto
+
+
 # T16: vínculos a otros libros -----------------------------------------------------------
 
 
@@ -153,7 +169,7 @@ def test_r10_el_original_no_cambia(tmp_path, caso):
 
 
 @pytest.mark.libreoffice
-@pytest.mark.parametrize("caso", ["docx", "xlsx_ancho", "tiff_tres_paginas", "png_transparente"])
+@pytest.mark.parametrize("caso", ["docx", "xlsx_ancho", "pptx", "tiff_tres_paginas", "png_transparente"])
 def test_r25_convertir_dos_veces_da_los_mismos_bytes(tmp_path, caso):
     (ruta,) = fabrica.CASOS[caso](tmp_path)
     assert convertir(ruta, detectar(ruta)).datos == convertir(ruta, detectar(ruta)).datos

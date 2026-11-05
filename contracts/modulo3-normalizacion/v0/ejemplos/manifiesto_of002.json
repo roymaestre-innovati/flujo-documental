@@ -1,8 +1,8 @@
 {
-  "contrato": "modulo3-normalizacion/0.1",
+  "contrato": "modulo3-normalizacion/0.2",
   "id_proceso": "SR0000000001",
   "id_oferente": "OF-002",
-  "version_normalizador": "0.1.0",
+  "version_normalizador": "0.2.0",
   "version_parametros": "1",
   "ejecucion": {
     "inicio": "2026-11-04T10:00:00Z",
