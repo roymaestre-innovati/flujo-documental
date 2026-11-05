@@ -195,15 +195,17 @@ def pdf_danado_irreparable(carpeta: Path) -> list[Path]:
 # Firma digital
 
 
-def _firmante():
-    """Certificado autofirmado, generado en la prueba, y su firmante de pyHanko."""
+def _firmante(rsa: bool = False):
+    """Certificado autofirmado, generado en la prueba, y su firmante de pyHanko.
+    Con `rsa`, la clave es RSA: el sellador de tiempo de prueba de pyHanko solo
+    acepta RSA."""
     from cryptography import x509
     from cryptography.hazmat.primitives import hashes, serialization
-    from cryptography.hazmat.primitives.asymmetric import ec
+    from cryptography.hazmat.primitives.asymmetric import ec, rsa as rsa_
     from cryptography.x509.oid import NameOID
     from pyhanko.sign import signers
 
-    clave = ec.generate_private_key(ec.SECP256R1())
+    clave = rsa_.generate_private_key(65537, 2048) if rsa else ec.generate_private_key(ec.SECP256R1())
     nombre = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, FIRMANTE_DIGITAL)])
     desde = datetime.datetime(2026, 1, 1, tzinfo=datetime.timezone.utc)
     certificado = (
@@ -252,6 +254,24 @@ def pdf_firma_ilegible(carpeta: Path) -> list[Path]:
     datos = pdf_firmado_bytes()
     assert datos.count(viejo) == 1
     return [_guardar(carpeta / "certificado_camara_comercio.pdf", datos.replace(viejo, nuevo))]
+
+
+def pdf_firmado_con_sello_de_tiempo(carpeta: Path) -> list[Path]:
+    """El firmado, más un sello de tiempo del documento (`ETSI.RFC3161`) encima, como
+    los que agregan algunos servicios de firma. El sello no tiene firmante."""
+    return [_guardar(carpeta / "certificacion_con_sello_de_tiempo.pdf", sellar(pdf_firmado_bytes()))]
+
+
+def sellar(datos: bytes) -> bytes:
+    """El PDF con un sello de tiempo del documento agregado en una actualización."""
+    from pyhanko.pdf_utils.incremental_writer import IncrementalPdfFileWriter
+    from pyhanko.sign import signers
+    from pyhanko.sign.timestamps.dummy_client import DummyTimeStamper
+
+    autoridad = _firmante(rsa=True)
+    sellador = DummyTimeStamper(tsa_cert=autoridad.signing_cert, tsa_key=autoridad.signing_key)
+    escritor = IncrementalPdfFileWriter(io.BytesIO(datos))
+    return signers.PdfTimeStamper(sellador).timestamp_pdf(escritor, "sha256").getvalue()
 
 
 def pdf_modificado_despues_de_firmar(carpeta: Path) -> list[Path]:
@@ -567,6 +587,7 @@ CASOS = {
     "pdf_firmado": pdf_firmado,
     "pdf_modificado_despues_de_firmar": pdf_modificado_despues_de_firmar,
     "pdf_firma_ilegible": pdf_firma_ilegible,
+    "pdf_firmado_con_sello_de_tiempo": pdf_firmado_con_sello_de_tiempo,
     "docx": docx,
     "odt": odt,
     "doc": doc,

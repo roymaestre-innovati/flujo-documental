@@ -117,6 +117,7 @@ ESPERADOS = {
     "pdf_firmado": ("normalizado", "pdf", None),
     "pdf_modificado_despues_de_firmar": ("normalizado", "pdf", None),
     "pdf_firma_ilegible": ("normalizado", "pdf", None),
+    "pdf_firmado_con_sello_de_tiempo": ("normalizado", "pdf", None),
     "docx": ("normalizado", "docx", None),
     "odt": ("normalizado", "odt", None),
     "doc": ("normalizado", "doc", None),
@@ -178,6 +179,8 @@ def test_entrega_completa_detalles(entrega_completa):
     assert firma["leida"] and firma["integro"] is False
     (firma,) = entrada("pdf_firma_ilegible")["firma_digital"]
     assert firma == {"firmante": None, "fecha": None, "integro": None, "formato": "adbe.pkcs7.sha1", "leida": False}
+    (firma,) = entrada("pdf_firmado_con_sello_de_tiempo")["firma_digital"]
+    assert firma["leida"] and firma["formato"] == "adbe.pkcs7.detached"
     assert entrada("docx")["firma_digital"] == []
     # R9: la hoja de cálculo trae su original como anexo.
     for caso, extension in (("xlsx_ancho", "xlsx"), ("xls", "xls"), ("ods", "ods")):

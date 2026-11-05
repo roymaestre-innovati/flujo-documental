@@ -11,6 +11,9 @@ Las firmas se buscan en dos pasos. pikepdf lista todos los campos de firma con s
 formato; pyHanko valida los que puede. pyHanko ni siquiera lista algunas firmas
 (por ejemplo, las `adbe.pkcs7.sha1` de la Cámara de Comercio), y sin el primer paso
 el manifiesto diría "sin firma" cuando hay una firma que no se pudo leer.
+
+Un sello de tiempo del documento (`/DocTimeStamp`, `ETSI.RFC3161`) usa el mismo tipo
+de campo, pero no es una firma: no tiene firmante. No se cuenta (T14).
 """
 
 import io
@@ -61,6 +64,10 @@ def _nombre_campo(campo: pikepdf.Dictionary, padre: str) -> str:
     return f"{padre}.{propio}" if padre and propio else (propio or padre)
 
 
+def _es_sello_de_tiempo(valor: pikepdf.Dictionary) -> bool:
+    return valor.get("/Type") == pikepdf.Name.DocTimeStamp or valor.get("/SubFilter") == pikepdf.Name("/ETSI.RFC3161")
+
+
 def _campos_firmados(datos: bytes) -> list[tuple[str, str]]:
     """(nombre completo del campo, formato) de cada campo de firma con firma, en el
     orden del formulario."""
@@ -82,7 +89,11 @@ def _campos_firmados(datos: bytes) -> list[tuple[str, str]]:
                     vistos.add(campo.objgen)
                 nombre = _nombre_campo(campo, padre)
                 valor = campo.get("/V")
-                if campo.get("/FT") == pikepdf.Name.Sig and isinstance(valor, pikepdf.Dictionary):
+                if (
+                    campo.get("/FT") == pikepdf.Name.Sig
+                    and isinstance(valor, pikepdf.Dictionary)
+                    and not _es_sello_de_tiempo(valor)
+                ):
                     formato = str(valor.get("/SubFilter", "/desconocido")).lstrip("/")
                     encontrados.append((nombre, formato))
                 hijos = [(hijo, nombre) for hijo in campo.get("/Kids", [])]

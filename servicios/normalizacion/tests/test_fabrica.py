@@ -30,7 +30,7 @@ def _tiene_imagen(pagina) -> bool:
 
 
 def test_todos_los_casos_estan_registrados():
-    assert len(fabrica.CASOS) == 32
+    assert len(fabrica.CASOS) == 33
     assert fabrica.CASOS_CON_LIBREOFFICE <= set(fabrica.CASOS)
 
 
@@ -147,6 +147,14 @@ def test_pdf_firma_ilegible(tmp_path):
     with pikepdf.open(ruta) as pdf:
         (campo,) = pdf.Root.AcroForm.Fields
         assert campo.V.SubFilter == "/adbe.pkcs7.sha1"
+
+
+def test_pdf_firmado_con_sello_de_tiempo(tmp_path):
+    ruta = _un_archivo(fabrica.pdf_firmado_con_sello_de_tiempo(tmp_path))
+    with pikepdf.open(ruta) as pdf:
+        valores = [campo.V for campo in pdf.Root.AcroForm.Fields]
+        assert [str(v.SubFilter) for v in valores] == ["/adbe.pkcs7.detached", "/ETSI.RFC3161"]
+        assert valores[1].Type == "/DocTimeStamp"
 
 
 def test_docx(tmp_path):

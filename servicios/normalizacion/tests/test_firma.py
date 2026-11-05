@@ -56,6 +56,20 @@ def test_modificado_despues_de_firmar(tmp_path):
     _cumple_el_contrato(firma)
 
 
+def test_el_sello_de_tiempo_no_cuenta_como_firma(tmp_path):
+    # T14: un sello de tiempo del documento no tiene firmante; solo queda la firma.
+    (firma,) = _firmas_del_caso(tmp_path, "pdf_firmado_con_sello_de_tiempo")
+    assert firma.leida is True
+    assert firma.integro is True
+    assert firma.firmante == fabrica.FIRMANTE_DIGITAL
+    assert firma.formato == "adbe.pkcs7.detached"
+    _cumple_el_contrato(firma)
+
+
+def test_solo_un_sello_de_tiempo_es_sin_firma(tmp_path):
+    assert leer_firmas(fabrica.sellar(fabrica.pdf_texto_bytes())) == []
+
+
 def test_firma_que_no_se_puede_leer(tmp_path):
     (firma,) = _firmas_del_caso(tmp_path, "pdf_firma_ilegible")
     assert firma == FirmaDigital(firmante=None, fecha=None, integro=None, formato="adbe.pkcs7.sha1", leida=False)
