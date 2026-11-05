@@ -30,7 +30,7 @@ def _tiene_imagen(pagina) -> bool:
 
 
 def test_todos_los_casos_estan_registrados():
-    assert len(fabrica.CASOS) == 33
+    assert len(fabrica.CASOS) == 34
     assert fabrica.CASOS_CON_LIBREOFFICE <= set(fabrica.CASOS)
 
 
@@ -155,6 +155,18 @@ def test_pdf_firmado_con_sello_de_tiempo(tmp_path):
         valores = [campo.V for campo in pdf.Root.AcroForm.Fields]
         assert [str(v.SubFilter) for v in valores] == ["/adbe.pkcs7.detached", "/ETSI.RFC3161"]
         assert valores[1].Type == "/DocTimeStamp"
+
+
+def test_xlsx_con_vinculos(tmp_path):
+    ruta = _un_archivo(fabrica.xlsx_con_vinculos(tmp_path))
+    with zipfile.ZipFile(ruta) as zip_:
+        nombres = zip_.namelist()
+        assert sum(n.startswith("xl/externalLinks/externalLink") for n in nombres) == 50
+        assert "<externalReferences" in zip_.read("xl/workbook.xml").decode("utf-8")
+    from openpyxl import load_workbook
+
+    libro = load_workbook(ruta)
+    assert libro["Resumen"]["B2"].value == "=[1]Datos!$A$1"
 
 
 def test_docx(tmp_path):

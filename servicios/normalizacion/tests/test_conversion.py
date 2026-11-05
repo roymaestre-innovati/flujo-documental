@@ -9,7 +9,7 @@ import pikepdf
 import pytest
 
 import fabrica
-from normalizacion.conversion import CONFIGURACION_SEGURA, convertir, pdf_reproducible
+from normalizacion.conversion import CONFIGURACION_SEGURA, convertir, pdf_reproducible, sin_vinculos_externos
 from normalizacion.errores import CONTRASENA, CONVERSION_FALLIDA, DANADO, NO_SOPORTADO, error_documento
 from normalizacion.tipos import detectar
 
@@ -93,11 +93,54 @@ def test_r9_hoja_de_calculo_a_pdf_con_anexo(tmp_path, caso):
     assert _paginas(conversion.datos) > 1
 
 
+# T16: vínculos a otros libros -----------------------------------------------------------
+
+
+def _texto(datos):
+    import pdfplumber
+
+    with pdfplumber.open(io.BytesIO(datos)) as pdf:
+        return "\n".join(pagina.extract_text() or "" for pagina in pdf.pages)
+
+
+def test_sin_vinculos_externos_quita_las_partes():
+    import zipfile
+
+    from openpyxl import load_workbook
+
+    limpio = sin_vinculos_externos(fabrica.xlsx_con_vinculos_bytes())
+    with zipfile.ZipFile(io.BytesIO(limpio)) as zip_:
+        assert not [n for n in zip_.namelist() if "externalLink" in n]
+        for parte in ("xl/workbook.xml", "xl/_rels/workbook.xml.rels", "[Content_Types].xml"):
+            assert "externalLink" not in zip_.read(parte).decode("utf-8")
+            assert "externalReference" not in zip_.read(parte).decode("utf-8")
+    # Sigue siendo un Excel que abre, con la fórmula y su último valor.
+    hoja = load_workbook(io.BytesIO(limpio))["Resumen"]
+    assert hoja["A2"].value == "Capital de trabajo"
+
+
+@pytest.mark.parametrize("datos", [fabrica.xlsx_bytes(), b"no es un zip", b""], ids=["sin_vinculos", "no_zip", "vacio"])
+def test_sin_vinculos_externos_no_toca_lo_demas(datos):
+    assert sin_vinculos_externos(datos) is datos
+
+
+@pytest.mark.libreoffice
+def test_t16_excel_con_vinculos_conserva_el_valor_y_el_anexo(tmp_path):
+    ruta, conversion = _convertir_caso(tmp_path, "xlsx_con_vinculos")
+    assert conversion.ok
+    # El anexo es el original, con sus vínculos (R9).
+    assert conversion.anexo == ruta.read_bytes()
+    texto = _texto(conversion.datos)
+    assert "Capital de trabajo" in texto
+    assert str(fabrica.VALOR_VINCULADO) in texto
+    assert "#REF" not in texto and "#NAME" not in texto
+
+
 # R10: el original no se toca ----------------------------------------------------------
 
 
 @pytest.mark.libreoffice
-@pytest.mark.parametrize("caso", ["docx", "xlsx_ancho", "jpg", "png_transparente"])
+@pytest.mark.parametrize("caso", ["docx", "xlsx_ancho", "xlsx_con_vinculos", "jpg", "png_transparente"])
 def test_r10_el_original_no_cambia(tmp_path, caso):
     (ruta,) = fabrica.CASOS[caso](tmp_path)
     antes = hashlib.sha256(ruta.read_bytes()).hexdigest()

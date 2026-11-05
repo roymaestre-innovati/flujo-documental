@@ -23,7 +23,7 @@ PROCESO = "SR0000000001"
 OFERENTE = "OF-002"
 
 # Casos que necesitan LibreOffice para convertirse en la entrega.
-CONVERTIDOS_CON_LIBREOFFICE = {"docx", "odt", "doc", "xlsx_ancho", "xls", "ods", "odt_con_macro", "extension_falsa"}
+CONVERTIDOS_CON_LIBREOFFICE = {"docx", "odt", "doc", "xlsx_ancho", "xlsx_con_vinculos", "xls", "ods", "odt_con_macro", "extension_falsa"}
 CASOS_SIN_LIBREOFFICE = [c for c in fabrica.CASOS if c not in CONVERTIDOS_CON_LIBREOFFICE | fabrica.CASOS_CON_LIBREOFFICE]
 
 
@@ -122,6 +122,7 @@ ESPERADOS = {
     "odt": ("normalizado", "odt", None),
     "doc": ("normalizado", "doc", None),
     "xlsx_ancho": ("normalizado", "xlsx", None),
+    "xlsx_con_vinculos": ("normalizado", "xlsx", None),
     "xls": ("normalizado", "xls", None),
     "ods": ("normalizado", "ods", None),
     "docx_con_contrasena": ("error_entrada", "no_soportado", "CONTRASENA"),
