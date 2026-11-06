@@ -55,7 +55,7 @@ No entran al contrato la marca `subsanacion` ni el orden por precio: los lleva e
 Desde esta carpeta:
 
 ```bash
-uv run -q --with jsonschema --with rfc3987 python3 -c "
+uv run -q --with jsonschema --with rfc3987 --with rfc3339-validator python3 -c "
 import json, glob
 from jsonschema import Draft202012Validator
 for k in ('entrada', 'salida'):
