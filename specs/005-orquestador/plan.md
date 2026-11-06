@@ -127,7 +127,7 @@ Un archivo de datos, `versiones.json`, con las vigentes: `modelo_extraccion`, `o
 
 ### Umbrales (R12, R13)
 
-`umbrales.json`, con versión: un umbral por TD (0,85 a 0,95, según la ontología), un valor por defecto y el piso de 0,75. Lo carga la versión fijada en el proceso, no la vigente.
+`datos/umbrales/<versión>.json`: un umbral por TD que se extrae (0,85 a 0,95, según la matriz) y el piso de 0,75. Sin valor por defecto: un TD sin umbral es un error de datos. Lo carga la versión fijada en el proceso, no la vigente.
 
 ### Validación de la respuesta del clasificador (R11)
 
@@ -176,9 +176,10 @@ servicios/orquestador/
   pyproject.toml                # depende de normalizacion por ruta
   src/orquestador/
     __init__.py                 # VERSION
-    datos/versiones.json
-    datos/umbrales.json
-    datos/tipos_documentales.json   # TD-01 a TD-35, TD-98 y TD-99
+    datos/versiones.json            # las vigentes
+    datos/umbrales/<versión>.json   # un archivo por versión; los publicados no se editan
+    datos/tipos_documentales/<versión>.json   # TD-01 a TD-35, TD-98 y TD-99
+    datos.py  contratos.py
     cola.py  estado.py  origen.py  clasificador.py  reloj.py   # interfaces y versiones locales
     errores.py                  # clases de error y bucle común
     apertura.py                 # procesos-listos
