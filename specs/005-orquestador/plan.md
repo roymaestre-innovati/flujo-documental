@@ -1,6 +1,6 @@
 # Plan 005 — Orquestador, entrega 1: del aviso a la cola de extracción
 
-Estado al 2026-11-06. **Propuesto, por revisar.** Implementa la entrega 1 de `spec.md`. Decisiones del usuario que lo enmarcan (2026-11-06):
+Estado al 2026-11-06. **Acordado y en construcción** (T01 a T04 de `tasks.md`). Los ajustes que salieron al implementar ya están en el texto y explicados en las notas de `tasks.md`. Implementa la entrega 1 de `spec.md`. Decisiones del usuario que lo enmarcan (2026-11-06):
 
 - La entrega 1 llega hasta publicar las solicitudes de extracción. La vuelta de los resultados va en la entrega 2.
 - Todo se prueba en la máquina del equipo, con interfaces que tienen una versión en memoria. Service Bus, Cosmos y OneLake reales van en la entrega 2.
@@ -87,9 +87,9 @@ No son frontera entre módulos, así que no van a `contracts/`. Se validan con `
 | `clasificar` | `id_proceso`, `entrega`, `id_documento` | `id_documento` + `hash` + versión de la ontología |
 | `extraer` | Solicitud del contrato 0.2 | `id_segmento` + TD + versión del modelo (D22) |
 
-Todos llevan `intento` (empieza en 1), para contar los reintentos sin depender de la cola.
+Los reintentos se cuentan con `intento` (empieza en 1) y `esperas` en las **propiedades** del mensaje, no en el cuerpo, como las application properties de Service Bus. Así no dependen de la cola y el cuerpo sigue cumpliendo su contrato: el aviso del módulo 1 no admite campos extra.
 
-**Una cola más que el diseño.** El diagrama del paso 4 va de `procesos-listos` directo al worker que normaliza. Aquí la apertura reparte el proceso en un mensaje `normalizar` por entrega. Así cada oferente se normaliza en paralelo y por separado (R6), cada mensaje dura lo de un oferente (de 3 a 43 s el típico, 149 s el más grande de la muestra) y no lo de todo el proceso, y una falla solo repite su entrega. El bloqueo de un mensaje de Service Bus dura como máximo 5 minutos y hay que renovarlo si el trabajo tarda más; con mensajes por entrega casi nunca hace falta, pero el bucle lo renueva igual.
+**Una cola más que el diseño.** El diagrama del paso 4 va de `procesos-listos` directo al worker que normaliza. Aquí la apertura reparte el proceso en un mensaje `normalizar` por entrega. Así cada oferente se normaliza en paralelo y por separado (R6), cada mensaje dura lo de un oferente (de 3 a 43 s el típico, 149 s el más grande de la muestra) y no lo de todo el proceso, y una falla solo repite su entrega. El bloqueo de un mensaje de Service Bus dura como máximo 5 minutos y hay que renovarlo si el trabajo tarda más; con mensajes por entrega casi nunca hace falta, pero el bucle de la entrega 2 lo renueva igual (en memoria no hay bloqueo que venza).
 
 Detalles de la cola `normalizar` (acordados el 2026-11-06):
 

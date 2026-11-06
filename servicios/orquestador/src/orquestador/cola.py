@@ -9,9 +9,10 @@ Se imita lo que importa de Service Bus:
 - se puede publicar con demora;
 - cada cola tiene su cola de errores (dead-letter).
 
-El cuerpo de cada mensaje es un dict que se pueda pasar a JSON. Los mensajes
-internos llevan `intento` en el cuerpo (plan, "Mensajes internos"), así los
-reintentos no dependen de la cola.
+El cuerpo de cada mensaje es un dict que se pueda pasar a JSON. Aparte van las
+`propiedades`, como las application properties de Service Bus: ahí el bucle
+lleva `intento` y `esperas`, sin tocar el cuerpo, que debe seguir cumpliendo su
+contrato (el aviso del módulo 1 no admite campos extra).
 """
 
 import copy
@@ -20,7 +21,7 @@ import itertools
 import json
 from abc import ABC, abstractmethod
 from collections import defaultdict
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from .reloj import Reloj, RelojSistema
 
@@ -40,6 +41,7 @@ class Mensaje:
     id: str
     cola: str
     cuerpo: dict
+    propiedades: dict = field(default_factory=dict)
     entregas: int = 0
     """Cuántas veces se recibió. Service Bus lo lleva como DeliveryCount."""
     visible_desde: datetime.datetime | None = None
@@ -54,7 +56,7 @@ class MensajeEnErrores:
 
 class Cola(ABC):
     @abstractmethod
-    def publicar(self, cola: str, cuerpo: dict, demora_s: float = 0) -> str:
+    def publicar(self, cola: str, cuerpo: dict, demora_s: float = 0, propiedades: dict | None = None) -> str:
         """Publica un mensaje y devuelve su id. Con demora, no se ve hasta que pase."""
 
     @abstractmethod
@@ -99,14 +101,16 @@ class ColaEnMemoria(Cola):
         if cola not in COLAS:
             raise ErrorCola(f"Cola desconocida: {cola}")
 
-    def publicar(self, cola: str, cuerpo: dict, demora_s: float = 0) -> str:
+    def publicar(self, cola: str, cuerpo: dict, demora_s: float = 0, propiedades: dict | None = None) -> str:
         self._revisar_cola(cola)
         if demora_s < 0:
             raise ErrorCola("La demora no puede ser negativa")
         # Como en Service Bus, el mensaje viaja serializado: se copia y debe ser JSON.
         cuerpo = json.loads(json.dumps(cuerpo, ensure_ascii=False))
+        propiedades = json.loads(json.dumps(propiedades or {}, ensure_ascii=False))
         visible = self._reloj.ahora() + datetime.timedelta(seconds=demora_s)
-        mensaje = Mensaje(id=f"m{next(self._ids):06d}", cola=cola, cuerpo=cuerpo, visible_desde=visible)
+        mensaje = Mensaje(id=f"m{next(self._ids):06d}", cola=cola, cuerpo=cuerpo, propiedades=propiedades,
+                          visible_desde=visible)
         self._colas[cola].append(mensaje)
         return mensaje.id
 

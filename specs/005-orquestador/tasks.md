@@ -2,7 +2,7 @@
 
 Sale de `plan.md`. Cada tarea termina con sus pruebas en verde y un commit propio.
 
-**Estado al 2026-11-06:** T01 y T02 fusionadas; T03 hecha, en revisión.
+**Estado al 2026-11-06:** T01 a T03 fusionadas; T04 hecha, en revisión.
 
 ## Para quien implemente
 
@@ -18,13 +18,13 @@ Sale de `plan.md`. Cada tarea termina con sus pruebas en verde y un commit propi
 - [x] **T01 — Contratos.** Escribir `contracts/modulo5-orquestador/v0/` (`README.md`, `proceso-listo.schema.json`, `clasificacion-solicitud.schema.json`, `clasificacion-respuesta.schema.json` y ejemplos: un aviso con y sin lista de archivos, una solicitud, y respuestas normal, compuesta, dudosa e inválida) y `contracts/modulo3-extraccion/v0.2/` (`README.md`, `entrada.schema.json` y `salida.schema.json` con los ocho cambios del plan, y los ejemplos de TD-16 y TD-29 pasados a 0.2, más uno de un documento del proceso sin oferente). Validar los ejemplos contra los esquemas. `v0/` de extracción no se toca. **Detenerse aquí para revisión del usuario** (principio 5), incluido el cambio de `id_documento` a `id_segmento`.
 - [x] **T02 — Esqueleto.** `servicios/orquestador/` con `pyproject.toml` (uv, pytest, `normalizacion` como dependencia de ruta), `VERSION = "0.1.0"`, los datos (`versiones.json`, `umbrales.json`, `tipos_documentales.json`) y las interfaces con su versión local: `ColaEnMemoria`, `EstadoEnMemoria`, `OrigenLocal`, `ClasificadorFalso` y el reloj. Prueba que valida los ejemplos de los contratos.
 - [x] **T03 — Estado.** Las cinco entidades, sus transiciones permitidas, el cambio condicional con historial y `consultar(id_proceso)`. Una transición no permitida es un bug (clase 4). Requisitos R24 a R26 y R28.
-- [ ] **T04 — Bucle y errores.** El bucle común que corre un manejador sobre un mensaje y traduce cada excepción a su clase: reintentos con demora creciente, espera pedida por el servicio sin contar intento, cola de errores, `error_proceso`, registro de alerta y `reenviar_errores`. Se prueba con manejadores de juguete. Requisitos R18 a R21 y R23.
+- [x] **T04 — Bucle y errores.** El bucle común que corre un manejador sobre un mensaje y traduce cada excepción a su clase: reintentos con demora creciente, espera pedida por el servicio sin contar intento, cola de errores, `error_proceso`, registro de alerta y `reenviar_errores`. Se prueba con manejadores de juguete. Requisitos R18 a R21 y R23.
 - [ ] **T05 — Apertura.** Manejador de `procesos-listos`: valida el aviso, abre el proceso con `crear_si_no_existe`, fija las versiones, reparte las entregas (con la lista de archivos del aviso, sin leer el origen, o listando las carpetas) y publica un `normalizar` por entrega. Requisitos R1 a R5.
 - [ ] **T06 — Normalizar.** Manejador de `normalizar`: baja los originales de `Origen` a una carpeta temporal que se borra al terminar, llama a `normalizar_entrega` con la versión fijada, registra cada documento, crea la tarea `documento_con_error` por cada `error_entrada` y publica un `clasificar` por documento normalizado. `ErrorEntrega` es clase 4. Como máximo 2 entregas a la vez (`paralelo_normalizar`), también en la versión local. Requisitos R3, R6 a R8.
 - [ ] **T07 — Clasificar.** Manejador de `clasificar`: arma la solicitud del contrato, llama al clasificador, valida la respuesta (un reintento), aplica los umbrales fijados, crea los segmentos y las tareas de clasificación. Las copias toman los segmentos del original. TD-98 y TD-99 quedan `sin_extraccion`. Requisitos R9 a R14.
 - [ ] **T08 — Solicitudes de extracción.** Por cada segmento que se extrae, arma la solicitud 0.2, la valida contra el esquema y la publica en `extraer`. Incluye los documentos del proceso sin oferente. Requisitos R16 y R17.
 - [ ] **T09 — Tareas.** Resolver una tarea de clasificación (asigna TD, registra quién y publica la solicitud) y `escalar_fallas(ahora)` para las 24 horas. Requisitos R15 y R22.
-- [ ] **T10 — Punta a punta.** Comando `orquestar` y prueba de punta a punta con un proceso inventado (proceso y dos oferentes, con copia, contraseña, dudosa, baja confianza y TD-99). Prueba de mensajes repetidos: cada mensaje entregado dos veces da el mismo estado y las mismas solicitudes. README del servicio. Criterios A2 y A3.
+- [ ] **T10 — Punta a punta.** Comando `orquestar` y prueba de punta a punta con un proceso inventado (proceso y dos oferentes, con copia, contraseña, dudosa, baja confianza y TD-99). Prueba de mensajes repetidos: cada mensaje entregado dos veces da el mismo estado y las mismas solicitudes. README del servicio completo (ya existe uno parcial). Criterios A2 y A3.
 - [ ] **T11 — Corrida con la muestra.** `scripts/correr_muestra.py`: convierte `manifiesto.csv` de la clasificación manual al CSV del clasificador falso y corre `orquestar` sobre la muestra, imprimiendo solo conteos (criterio A4). Lo corre el usuario en su máquina; se le dan los comandos y cuánto tarda.
 
 **Al cerrar la entrega:** actualizar el estado en `spec.md`, `plan.md` (sección "Lo que cambió al implementar"), el README del repo y `contexto/HANDOFF-implementacion.md`.
@@ -73,4 +73,17 @@ Lo que se decidió al escribir y conviene revisar:
 6. **`cambiar` con mensaje repetido:** si el registro ya está en el estado pedido, no hace nada y responde `aplicado=False`. Si está en otro estado, `EstadoInesperado`, y quien llama decide qué hacer. Si otro trabajador lo cambió entre la lectura y la escritura, relee y decide de nuevo, hasta 5 veces.
 7. **Una transición que no existe es un bug** (`TransicionNoPermitida`, clase 4), igual que crear con un estado inicial que no corresponde.
 8. **`consultar`** devuelve, por entrega, el estado del oferente, los documentos y segmentos por estado, las tareas abiertas y `en_curso`: cuántos registros siguen en un estado intermedio. El "¿oferente completo?" de la decisión 15 se arma con eso en la entrega 2, cuando se sumen los estados de la extracción.
+
+### T04 — Bucle y errores (2026-11-06)
+
+`errores.py` (clases de error, `procesar_uno` y `reenviar_errores`), `parametros.py` y `registros.py`. 79 pruebas, con manejadores de juguete.
+
+1. **`intento` y `esperas` van en las propiedades del mensaje, no en el cuerpo.** El plan los ponía en el cuerpo, pero el aviso del módulo 1 no admite campos extra (`additionalProperties: false`) y dejaría de cumplir su contrato al reintentarse. La cola en memoria suma `propiedades`, como las application properties de Service Bus. Plan ajustado.
+2. **Cada manejador tiene `procesar` y `al_fallar`.** El bucle no sabe qué entidad toca cada mensaje: cuando se agotan los reintentos o hay un bug, llama a `al_fallar` del manejador, que deja su entidad en `error_proceso`. Si `al_fallar` también falla, el mensaje va a errores igual y queda registrado.
+3. **Reintentar es publicar de nuevo y completar el original**, en ese orden. Si el trabajador se cae entre los dos, el mensaje se repite, y lo absorbe la idempotencia de cada manejador.
+4. **Esperas pedidas por el servicio:** no cuentan como intento, pero hay un tope de 20 (`max_esperas`), para que un servicio que siempre pide esperar no deje el mensaje dando vueltas para siempre. Pasado el tope sigue como una falla transitoria normal.
+5. **Demoras:** 2, 4 y 8 minutos, como parámetro (`demora_base_s`). Una falla transitoria agotada son 4 intentos en total.
+6. **Motivos sin datos personales:** solo el tipo de la excepción y el lugar del código (`KeyError en clasificar.py:42`), nunca su mensaje, con la misma función que la normalización. La alerta va al registro `orquestador.alertas` con nivel ERROR y los identificadores del mensaje.
+7. **Renovar el bloqueo** de Service Bus queda para el bucle de la entrega 2: en memoria no vence.
+8. **`reenviar_errores`** publica de nuevo desde el primer intento y conserva las demás propiedades.
 

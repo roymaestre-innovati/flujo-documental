@@ -1,5 +1,7 @@
 # Contrato del módulo 3 — extracción (v0, borrador 0.1)
 
+> **Reemplazada por la 0.2** (`../v0.2/`), que es la que usa el orquestador. Esta carpeta queda como estaba (principio 5).
+
 Contrato entre el orquestador y la unidad de extracción documental. Es una propuesta del equipo de extracción para discutir con orquestación, clasificación, el módulo 1 y el módulo 4. Las decisiones que lo sustentan están en `contexto/refinamiento-grill-me-2.md` (D1 a D24).
 
 ## Archivos
