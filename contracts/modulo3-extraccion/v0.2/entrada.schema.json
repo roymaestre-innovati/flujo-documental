@@ -1,0 +1,143 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "modulo3-extraccion/v0.2/entrada.schema.json",
+  "title": "Solicitud de extracción de un segmento de documento",
+  "description": "Una solicitud = un segmento: archivo + rango de páginas + tipo documental, tal como lo deja el orquestador después de clasificar. Llega por la cola extraer de Service Bus (cambio 1).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contrato",
+    "id_proceso",
+    "id_oferente",
+    "id_segmento",
+    "id_documento",
+    "archivo",
+    "paginas",
+    "tipo_documental",
+    "lectura",
+    "anexos",
+    "clasificacion_dudosa"
+  ],
+  "properties": {
+    "contrato": {
+      "const": "modulo3-extraccion/0.2"
+    },
+    "id_proceso": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Identificador del proceso de contratación (lo asigna el orquestador)."
+    },
+    "id_oferente": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "minLength": 1,
+      "description": "null en un documento del proceso (condiciones, adendas, anexos), que no tiene oferente (cambio 6)."
+    },
+    "id_segmento": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Identificador del segmento, lo asigna el orquestador: <id_documento>-p<desde>-<hasta>. En 0.1 se llamaba id_documento."
+    },
+    "id_documento": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Identificador del archivo normalizado al que pertenece el segmento, tal como sale en el manifiesto de la normalización (modulo3-normalizacion)."
+    },
+    "archivo": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "uri"
+      ],
+      "description": "El PDF normalizado completo (paso 1). Las páginas se cuentan sobre él.",
+      "properties": {
+        "uri": {
+          "type": "string",
+          "format": "uri"
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$",
+          "description": "Opcional: permite detectar que el archivo cambió detrás de la misma URI."
+        }
+      }
+    },
+    "paginas": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "desde",
+        "hasta"
+      ],
+      "description": "Rango de páginas del segmento, numeradas sobre el archivo completo, desde 1.",
+      "properties": {
+        "desde": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "hasta": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "tipo_documental": {
+      "type": "string",
+      "pattern": "^TD-[0-9]{2}$",
+      "not": {
+        "enum": [
+          "TD-98",
+          "TD-99"
+        ]
+      },
+      "description": "Sección del modelo semántico. TD-98 (desempate) y TD-99 (sin tipo) no se envían (cambio 7)."
+    },
+    "lectura": {
+      "type": "string",
+      "format": "uri",
+      "description": "Lectura por página del PDF normalizado (modulo3-normalizacion, lectura.schema.json). La extracción la usa en vez de volver a leer el PDF (cambio 2)."
+    },
+    "anexos": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "format": "uri"
+      },
+      "description": "Hoja de cálculo original cuando el documento era un Excel (anexo_nativo del manifiesto). Vacía si no hay (cambio 3)."
+    },
+    "clasificacion_dudosa": {
+      "type": "boolean",
+      "description": "true si la confianza de la clasificación quedó entre 0,75 y el umbral del TD. La extracción manda todo el documento a revisión con el motivo CLASIFICACION_DUDOSA (cambio 4). El umbral lo aplica solo el orquestador."
+    },
+    "tipo_oferente": {
+      "enum": [
+        "PJ_NAL",
+        "PJ_EXT",
+        "PN",
+        "EP"
+      ],
+      "description": "Si no llega, los campos condicionales quedan con la condición sin evaluar (O3)."
+    },
+    "version_modelo": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Versión del modelo fijada al abrir el proceso. El orquestador la manda siempre. Si no llega, la extracción usa la registrada para el proceso, nunca la vigente (cambio 5, principio 7)."
+    },
+    "confianza_clasificacion": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "minimum": 0,
+      "maximum": 1,
+      "description": "Confianza que dio el clasificador. null si el tipo lo asignó una persona en una tarea de clasificación."
+    },
+    "forzar_reproceso": {
+      "type": "boolean",
+      "default": false,
+      "description": "Ignora el resultado guardado para la misma clave de idempotencia (D22). Solo lo activa el comando reprocesar del orquestador, que registra quién lo pidió y por qué (cambio 8)."
+    }
+  }
+}

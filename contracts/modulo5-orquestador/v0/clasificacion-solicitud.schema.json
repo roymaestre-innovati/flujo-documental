@@ -1,0 +1,80 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "modulo5-orquestador/v0/clasificacion-solicitud.schema.json",
+  "title": "Solicitud de clasificación de un documento",
+  "description": "Una solicitud por documento normalizado (decisión 11). Las copias exactas no se mandan: toman el resultado del original. El transporte está pendiente de C1.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contrato",
+    "id_proceso",
+    "id_oferente",
+    "id_documento",
+    "pdf",
+    "paginas",
+    "ruta_origen",
+    "lectura",
+    "version_ontologia"
+  ],
+  "properties": {
+    "contrato": {
+      "const": "modulo5-orquestador/0.1"
+    },
+    "id_proceso": {
+      "type": "string",
+      "minLength": 1
+    },
+    "id_oferente": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "minLength": 1,
+      "description": "null en un documento del proceso (condiciones, adendas, anexos)."
+    },
+    "id_documento": {
+      "type": "string",
+      "minLength": 1,
+      "description": "El del manifiesto de la normalización. La respuesta lo devuelve igual."
+    },
+    "pdf": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "uri",
+        "sha256"
+      ],
+      "description": "El PDF normalizado. Hay que clasificar este, con esta paginación (C3).",
+      "properties": {
+        "uri": {
+          "type": "string",
+          "format": "uri"
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    },
+    "paginas": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Páginas del PDF normalizado."
+    },
+    "ruta_origen": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Ruta con que el oferente entregó el archivo, incluido el nombre. Las carpetas ayudan a reconocer, por ejemplo, los soportes de desempate."
+    },
+    "lectura": {
+      "type": "string",
+      "format": "uri",
+      "description": "Lectura por página del paso 2 (modulo3-normalizacion, lectura.schema.json): texto, tipo de página y anclas. Se puede usar o no (A-5)."
+    },
+    "version_ontologia": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Versión de la ontología fijada al abrir el proceso. Todos los documentos del proceso se clasifican con la misma (principio 7)."
+    }
+  }
+}

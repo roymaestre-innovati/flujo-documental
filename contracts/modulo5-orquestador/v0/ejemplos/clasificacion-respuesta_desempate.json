@@ -1,0 +1,21 @@
+{
+  "contrato": "modulo5-orquestador/0.1",
+  "id_documento": "OF-003-1f8e4c0b7a25",
+  "version_ontologia": "1",
+  "segmentos": [
+    {
+      "pagina_inicio": 1,
+      "pagina_fin": 1,
+      "tipo_documental": "TD-98",
+      "subtipo": "emprendimiento_mujeres",
+      "confianza": 0.91
+    },
+    {
+      "pagina_inicio": 2,
+      "pagina_fin": 3,
+      "tipo_documental": "TD-99",
+      "subtipo": null,
+      "confianza": 0.88
+    }
+  ]
+}

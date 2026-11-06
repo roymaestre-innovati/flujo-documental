@@ -1,0 +1,62 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "modulo5-orquestador/v0/proceso-listo.schema.json",
+  "title": "Aviso de proceso listo",
+  "description": "Lo publica el módulo 1 en la cola procesos-listos cuando dejó en el datalake todos los documentos de un proceso: los del proceso y los de todos los oferentes (paso 0, decisiones 33 y 34). Un aviso por proceso.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contrato",
+    "id_proceso",
+    "ruta",
+    "fecha"
+  ],
+  "properties": {
+    "contrato": {
+      "const": "modulo5-orquestador/0.1"
+    },
+    "id_proceso": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Identificador del proceso de selección (por confirmar si es el de Ariba, A-1)."
+    },
+    "ruta": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Carpeta del proceso dentro de la sección Files del lakehouse en OneLake, sin barra inicial."
+    },
+    "fecha": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Cuándo quedó completo el proceso en el datalake."
+    },
+    "archivos": {
+      "type": "array",
+      "minItems": 1,
+      "description": "Opcional. Si llega, el orquestador reparte con esta lista y no lista la carpeta. Si no llega, la carpeta trae PROCESO/ y una subcarpeta por oferente, nombrada con su identificador.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "ruta",
+          "id_oferente"
+        ],
+        "properties": {
+          "ruta": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Ruta del archivo, relativa a la ruta del proceso."
+          },
+          "id_oferente": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "minLength": 1,
+            "description": "null en un documento del proceso (condiciones, adendas, anexos)."
+          }
+        }
+      }
+    }
+  }
+}

@@ -2,11 +2,13 @@
 
 Fecha: 2026-11-05. Criterios A3 a A5 de la entrega 1 (iniciativa 003). Solo conteos: ningún nombre ni contenido de los documentos.
 
+**Entrega 1 cerrada.** Hubo dos mediciones: la primera con el normalizador 0.1.0 y la segunda con el 0.2.0, después de las tareas T14 a T16 que salieron de la primera.
+
 ## Resumen
 
-La normalización funciona con documentos reales: en 7 oferentes y 1.004 páginas no hubo fallas del programa. La proporción de tipos de página coincide con el diseño, así que los umbrales no cambian.
+La normalización funciona con documentos reales: en 7 oferentes y 1.034 páginas no hubo fallas del programa. La proporción de tipos de página coincide con el diseño, así que los umbrales no cambian.
 
-Quedan cuatro puntos abiertos: archivos comprimidos (ZIP y RAR) que el diseño no esperaba, PowerPoint sin soporte, tres formatos de firma que no se leen y un Excel que tarda 85 s en convertirse. Ninguno impide seguir; cada uno tiene una recomendación al final.
+La primera medición dejó cuatro hallazgos. Se resolvieron así: los ZIP y RAR fueron un error al armar la carpeta de prueba (en producción no llegan); los PowerPoint ahora se convierten (T15); el sello de tiempo ya no cuenta como firma (T14); y el Excel lento se debía a 201 vínculos a otros libros, que ahora se quitan antes de convertir (T16). La segunda medición lo confirma.
 
 ## Cómo se midió
 
@@ -19,7 +21,7 @@ Se corrió `scripts/medir_muestra.py` (normalizador 0.1.0, parámetros versión 
 
 El detalle de firmas, comprimidos y tiempos sale de los manifiestos guardados, sin volver a procesar.
 
-## Resultados frente al diseño
+## Resultados frente al diseño (primera medición)
 
 ### A3. Conteos
 
@@ -37,7 +39,7 @@ La muestra 1 se parece a la que suponía el diseño: los PDF con restricciones s
 | Convertidos a PDF | 5 (5 Excel) | 14 (8 Word, 6 Excel) | — |
 | Reparados | 0 | 0 | — |
 
-Las 451 páginas de la muestra 1 son un 9 % más que las 415 del diseño; la diferencia puede venir de las 5 hojas de Excel convertidas.
+Las 451 páginas de la muestra 1 son un 9 % más que las 415 del diseño. Los 5 Excel convertidos solo suman 6 páginas, así que no lo explican; puede ser que el conteo del diseño se hiciera de otra forma. Un ZIP de OF-001 traía 3 PDF que no estaban sueltos en la carpeta y no se midieron, y los RAR de OF-002 no se abrieron: los conteos de esos dos oferentes quedan un poco cortos.
 
 ### A4. Tipos de página
 
@@ -68,7 +70,27 @@ Solo OF-007 pasa de lejos el minuto que espera el diseño: 310 s para 553 págin
 
 En los PDF el ritmo es parejo, unos 0,3 s por página. De los 310 s de OF-007, 156 s son PDF, 21 s son Word y 134 s son Excel, casi todo en dos archivos (85 s y 37 s). El promedio de los 7 oferentes es de unos 69 s.
 
-## Hallazgos
+## Segunda medición (normalizador 0.2.0)
+
+Después de T14 a T16 se repitió la medición de las dos muestras. Todo cambió como se esperaba:
+
+| Medida | Primera (0.1.0) | Segunda (0.2.0) |
+| --- | --- | --- |
+| Muestra 1, firmas leídas / no leídas / no íntegras | 3 / 4 / 2 | 3 / 3 / 2 |
+| Muestra 1, tiempo total | 171 s | 117 s |
+| Muestra 1, oferente más lento | 61 s | 43 s |
+| OF-007, errores `NO_SOPORTADO` | 3 (1 RAR, 2 PPTX) | 1 (el RAR) |
+| OF-007, convertidos a PDF | 14 | 16 |
+| OF-007, páginas | 553 | 583 |
+| OF-007, tiempo | 310 s | 149 s |
+
+El resto de los conteos de la muestra 1 no cambió (451 páginas, 8 copias, 15 PDF con restricciones, 6 con firma digital, misma proporción de tipos de página).
+
+Los tiempos bajaron más de lo que explica T16: la muestra 1 también bajó un 32 %, y ahí T16 casi no influye. La primera corrida se hizo con la máquina más cargada. Lo que sí se debe a T16 son unos 80 s de OF-007, medidos archivo por archivo (el Excel de 201 vínculos pasó de 64 s a 1,9 s, y el de 47 páginas de 22 s a 3,3 s).
+
+En OF-007, de las 30 páginas de PowerPoint, 25 quedaron como `texto`, 4 como `escaneo_con_ocr` y 1 como `vacia`. Las 4 son, seguramente, diapositivas con una imagen grande de fondo y texto encima: cubren más del 80 % de la página y parecen un escaneo. El texto se lee bien; solo la etiqueta es imprecisa. Queda para calibrar.
+
+## Hallazgos de la primera medición
 
 ### Archivos comprimidos
 
@@ -96,9 +118,9 @@ De 20 firmas en documentos normalizados, se leyeron 13: 11 íntegras y 2 no ínt
 
 | Caso | Cuántas | Causa | Lectura |
 | --- | --- | --- | --- |
-| `adbe.pkcs7.sha1` | 4 | Formato antiguo que pyHanko no valida (riesgo ya conocido) | Correcta: no leída |
+| `adbe.pkcs7.sha1` | 4 (3 en la muestra 1, las de Cámara de Comercio y RUP; 1 en OF-007) | Formato antiguo que pyHanko no valida (riesgo ya conocido) | Correcta: no leída |
 | `adbe.pkcs7.detached` con el algoritmo mal declarado | 2 (OF-007) | El programa que firmó puso el algoritmo de firma donde va el de hash; pyHanko lo rechaza | No leída; Adobe probablemente la acepta |
-| Sello de tiempo `ETSI.RFC3161` | 1 (OF-006) | No es una firma de persona: no tiene firmante | Hoy cuenta como firma no leída |
+| Sello de tiempo `ETSI.RFC3161` | 1 (OF-006) | No es una firma de persona: no tiene firmante. El mismo PDF trae una firma CAdES, así que sigue contando como PDF firmado | Ya no cuenta como firma (T14) |
 | CAdES no íntegra, OF-005 | 1 | El archivo se reescribió después de firmarse | Correcta: no íntegra |
 | CAdES no íntegra, OF-006 | 1 | La parte firmada está intacta, pero cambios posteriores tocan la estructura interna del PDF | Posible falsa alarma |
 
@@ -106,29 +128,22 @@ De 20 firmas en documentos normalizados, se leyeron 13: 11 íntegras y 2 no ínt
 
 En OF-007, un Excel de una sola página y menos de 1 MB tardó 85 s en convertirse. El límite es 120 s, así que no falló, pero un archivo un poco más pesado sí fallaría. Cada conversión arranca LibreOffice desde cero.
 
-## Decisiones pendientes
+## Decisiones tomadas
 
-Cada decisión trae primero la opción recomendada.
+Revisadas una por una con el usuario el 2026-11-05:
 
-| Tema | Recomendación | Alternativa |
-| --- | --- | --- |
-| ZIP y RAR | Pedir al módulo 1 (pregunta A-1) que confirme que en producción todo llega descomprimido. Para la medición, descomprimir a mano lo que falta y repetir solo esos oferentes | Que el normalizador descomprima ZIP y RAR |
-| PPTX | Convertirlos con LibreOffice, igual que los Word. Cambio pequeño | Dejarlos como `NO_SOPORTADO` y pedir subsanación en PDF |
-| Excel de 85 s | Convertir solo ese archivo una vez, midiendo el tiempo, para ver qué lo frena (por ejemplo, vínculos externos) | Subir el límite de 120 s |
-| Sello de tiempo `ETSI.RFC3161` | No contarlo como firma digital, porque no tiene firmante. Cambio pequeño del contrato 0.x | Dejarlo como firma no leída |
-| Firmas con el algoritmo mal declarado | Dejarlas como no leídas y anotarlo. Si se repiten en otros oferentes, agregar la tolerancia | Tolerarlas desde ya |
-| CAdES posiblemente falsa alarma (OF-006) | Dejarla como no íntegra: es lo prudente y el revisor la abre en Adobe | Aceptar cambios de estructura posteriores a la firma |
+| Tema | Decisión |
+| --- | --- |
+| ZIP y RAR | No se toca el código: fueron un error al armar la carpeta de prueba, y en la versión final no llegan comprimidos |
+| PowerPoint | Se convierte con LibreOffice (T15). El contrato sube a `modulo3-normalizacion/0.2` |
+| Excel lento | Se diagnosticó (201 vínculos a otros libros) y se quitan antes de convertir (T16) |
+| Sello de tiempo `ETSI.RFC3161` | No se cuenta como firma (T14) |
+| Firmas con el algoritmo mal declarado | Quedan como no leídas; se agrega la tolerancia si se repiten en más oferentes |
+| CAdES de OF-006 | Queda no íntegra; el revisor la abre en Adobe |
 
-Siguen sin confirmar tres decisiones de la implementación: T10 (anclas de firma), T11 (manifiesto tras un bug) y T08 (firma sin firmante o fecha).
+## Datos personales
 
-## Datos personales y siguientes pasos
+Las mediciones usaron documentos reales antes de tener las respuestas de cumplimiento (HD-1 a HD-4 y HD-14 del checklist de habeas data). Todo se hizo en un portátil de trabajo, sin nube, y la salida del normalizador no trae nombres. Durante el diagnóstico de firmas, una herramienta auxiliar mostró en consola el nombre de un firmante; el normalizador no lo hace. La segunda medición no guardó salidas: fueron a una carpeta temporal que se borró sola.
 
-La medición usó documentos reales antes de tener las respuestas de cumplimiento (HD-1 a HD-4 y HD-14 del checklist de habeas data). Todo se hizo en un portátil de trabajo, sin nube, y la salida del normalizador no trae nombres. Durante el diagnóstico de firmas, una herramienta auxiliar mostró en consola el nombre de un firmante; el normalizador no lo hace.
-
-- [ ] Borrar las carpetas de salida con datos personales (`salida` y `salida1`)
-- [ ] Pasar el checklist de habeas data a cumplimiento
-- [ ] Preguntar al módulo 1 por los archivos comprimidos (A-1)
-- [ ] Decidir los seis puntos de la tabla anterior
-- [ ] Repetir la medición de OF-001, OF-002 y OF-007 con los comprimidos abiertos
-
-Con eso se cierra la entrega 1. Después se elige entre la extracción (entrega 2), el orquestador (iniciativa 005) o las reglas e informe (módulo 4).
+- [ ] Borrar las carpetas de salida de la primera medición (`salida` y `salida1`)
+- [ ] Pasar el checklist de habeas data a cumplimiento, contando lo de arriba

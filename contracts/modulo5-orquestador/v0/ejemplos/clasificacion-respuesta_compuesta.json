@@ -1,0 +1,35 @@
+{
+  "contrato": "modulo5-orquestador/0.1",
+  "id_documento": "OF-002-723c293af12b",
+  "version_ontologia": "1",
+  "segmentos": [
+    {
+      "pagina_inicio": 1,
+      "pagina_fin": 6,
+      "tipo_documental": "TD-03",
+      "subtipo": null,
+      "confianza": 0.97
+    },
+    {
+      "pagina_inicio": 7,
+      "pagina_fin": 11,
+      "tipo_documental": "TD-07",
+      "subtipo": null,
+      "confianza": 0.95
+    },
+    {
+      "pagina_inicio": 12,
+      "pagina_fin": 12,
+      "tipo_documental": "TD-14",
+      "subtipo": null,
+      "confianza": 0.93
+    },
+    {
+      "pagina_inicio": 13,
+      "pagina_fin": 16,
+      "tipo_documental": "TD-13",
+      "subtipo": null,
+      "confianza": 0.94
+    }
+  ]
+}

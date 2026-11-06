@@ -1,0 +1,28 @@
+{
+  "contrato": "modulo5-orquestador/0.1",
+  "id_proceso": "SR0000000001",
+  "ruta": "procesos/SR0000000001",
+  "fecha": "2026-11-06T09:00:00-05:00",
+  "archivos": [
+    {
+      "ruta": "PROCESO/CPC_SR0000000001.pdf",
+      "id_oferente": null
+    },
+    {
+      "ruta": "PROCESO/Adenda_1.pdf",
+      "id_oferente": null
+    },
+    {
+      "ruta": "OF-001/carta_presentacion.pdf",
+      "id_oferente": "OF-001"
+    },
+    {
+      "ruta": "OF-001/parafiscales/formulario3.pdf",
+      "id_oferente": "OF-001"
+    },
+    {
+      "ruta": "OF-002/oferta_economica.xlsx",
+      "id_oferente": "OF-002"
+    }
+  ]
+}

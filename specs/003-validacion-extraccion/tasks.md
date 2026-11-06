@@ -2,7 +2,7 @@
 
 Sale de `plan.md`. Cada tarea termina con sus pruebas en verde y un commit propio.
 
-**Estado al 2026-11-05: T01 a T13 hechas** y fusionadas en `main` (387 pruebas). Primera medición con la muestra real en `resultados-muestra.md`. De ella salen tres tareas nuevas, **T14 a T16**, con las decisiones del usuario en "Decisiones tras la medición", al final de este archivo.
+**Estado al 2026-11-05: entrega cerrada.** T01 a T16 hechas y fusionadas en `main` (413 pruebas). Medida con la muestra real en dos rondas, antes y después de T14 a T16: `resultados-muestra.md`.
 
 ## Para quien implemente
 

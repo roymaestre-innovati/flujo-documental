@@ -1,0 +1,14 @@
+{
+  "contrato": "modulo5-orquestador/0.1",
+  "id_proceso": "SR0000000001",
+  "id_oferente": "OF-002",
+  "id_documento": "OF-002-723c293af12b",
+  "pdf": {
+    "uri": "https://cuenta.blob.core.windows.net/flujo/SR0000000001/OF-002/pdf/OF-002-723c293af12b.pdf",
+    "sha256": "c434aac28568422189e6cfcca41f43c41c47639cb9fed198e5669f05255d793d"
+  },
+  "paginas": 16,
+  "ruta_origen": "carta_presentacion.pdf",
+  "lectura": "https://cuenta.blob.core.windows.net/flujo/SR0000000001/OF-002/lectura/OF-002-723c293af12b.json",
+  "version_ontologia": "1"
+}

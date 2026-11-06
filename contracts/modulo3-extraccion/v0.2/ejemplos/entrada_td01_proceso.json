@@ -1,0 +1,21 @@
+{
+  "contrato": "modulo3-extraccion/0.2",
+  "id_proceso": "SR0000000001",
+  "id_oferente": null,
+  "id_segmento": "PROCESO-6e2b9d04a17c-p1-48",
+  "id_documento": "PROCESO-6e2b9d04a17c",
+  "archivo": {
+    "uri": "https://cuenta.blob.core.windows.net/flujo/SR0000000001/PROCESO/pdf/PROCESO-6e2b9d04a17c.pdf",
+    "sha256": "0d4f7a2c9e1b6d3a8f5c2e9b7a4d1f6c3e0b8a5d2f9c6e3b1a7d4f0c8e5b2a96"
+  },
+  "paginas": {
+    "desde": 1,
+    "hasta": 48
+  },
+  "tipo_documental": "TD-01",
+  "lectura": "https://cuenta.blob.core.windows.net/flujo/SR0000000001/PROCESO/lectura/PROCESO-6e2b9d04a17c.json",
+  "anexos": [],
+  "clasificacion_dudosa": false,
+  "version_modelo": 21,
+  "confianza_clasificacion": 0.98
+}
