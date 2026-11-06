@@ -1,6 +1,6 @@
 # Handoff: implementación del flujo documental (opción A)
 
-Estado al 2026-11-05, al cerrar la entrega 1 (normalización y lectura). Lo siguiente es el **orquestador (iniciativa 005)**, en un **repositorio nuevo** y una **sesión nueva**.
+Estado al 2026-11-05, al cerrar la entrega 1 (normalización y lectura), con las decisiones de entrada del 2026-11-06 (paso 0 del diseño, decisiones 32 a 35). Lo siguiente es el **orquestador (iniciativa 005)**, en un **repositorio nuevo** y una **sesión nueva**.
 
 Las rutas relativas son de este repositorio (`~/GEB/flujo-documental-repo`, en GitHub `roymaestre-innovati/flujo-documental`); lo que está en otros repos va con ruta completa. `contexto/flujo-documental-opcion-a.md` sigue siendo la fuente de verdad del diseño. Este archivo no repite el diseño: dice qué existe, qué falta, qué está abierto y cómo trabaja el usuario.
 
@@ -26,7 +26,7 @@ Las rutas relativas son de este repositorio (`~/GEB/flujo-documental-repo`, en G
 
 1. Este archivo.
 2. `contexto/constitucion.md`: los siete principios.
-3. `contexto/flujo-documental-opcion-a.md`, **paso 4 (Orquestación)**: estado que guarda (cinco entidades: proceso, oferente, archivo, segmento y tarea humana), tecnología (Service Bus + workers en Container Apps + estado en Cosmos), manejo de errores por clases, versión del modelo por proceso, subsanación y reprocesamiento, apertura del proceso, cola y volumen. También las decisiones 15 y 16 y las preguntas abiertas A-1 a A-11.
+3. `contexto/flujo-documental-opcion-a.md`, **paso 0 (Entrada)**: cómo llegan los procesos (OneLake de Fabric, cola `procesos-listos`, un aviso por proceso completo) y las decisiones 32 a 35. Después el **paso 4 (Orquestación)**: estado que guarda (cinco entidades: proceso, oferente, archivo, segmento y tarea humana), tecnología (Service Bus + workers en Container Apps + estado en Cosmos), manejo de errores por clases, versión del modelo por proceso, subsanación y reprocesamiento, apertura del proceso, cola y volumen. También las decisiones 15 y 16 y las preguntas abiertas A-1 a A-11.
 4. `contexto/refinamiento-grill-me-2.md` (D1 a D24): de ahí salen D7 (versión del modelo), D22 (reintentos) y otras que usa el paso 4.
 5. `contracts/modulo3-normalizacion/v0/`: lo que produce la normalización, que el orquestador consume.
 6. `contracts/modulo3-extraccion/v0/`: la frontera con la extracción (versión 0.1; los ocho cambios para la 0.2, del paso 5 del diseño, no se han aplicado).
@@ -42,10 +42,12 @@ Preguntar al usuario, con recomendación:
 
 ### Lo que el orquestador necesita saber de la normalización
 
+- **Cómo llega el trabajo (paso 0, decisiones 32 a 35):** el módulo 1 deja el proceso completo (CPC, adendas y todos los oferentes) en su datalake de Fabric (OneLake) y publica **un mensaje por proceso** en la cola de Service Bus `procesos-listos`, con `id_proceso`, `ruta` y, opcional, la lista de archivos (forma por confirmar, A-1). Por ahora no llegan documentos tardíos. Si no pueden publicar en Service Bus, el plan B es un endpoint mínimo que deja el mensaje en esa misma cola.
+- **Los originales no se copian:** el normalizador los lee de OneLake con `azure-storage-file-datalake` y la identidad administrada del job, los baja a disco temporal, normaliza y lee, y escribe solo lo que produce en nuestro almacenamiento. Ningún otro paso vuelve a tocar Fabric. Hoy `normalizar_entrega` recibe una carpeta local: falta la pieza que lista y baja los archivos de la `ruta` del mensaje y los reparte entre el proceso y cada oferente.
 - **Entrada:** la carpeta de una entrega (un oferente, o el proceso: condiciones, adendas, anexos), `id_proceso` y `id_oferente` (sin oferente es una entrega del proceso).
 - **Como función:** `normalizacion.entrega.normalizar_entrega(carpeta, id_proceso, id_oferente, almacen, forzar=False)` devuelve un `Resultado` con el `manifiesto` (un dict según el contrato). **Por línea de comandos:** `normalizar <carpeta> --proceso SR… --oferente OF-… --salida <carpeta>`.
 - **Salida:** en el almacén, bajo `<proceso>/<oferente o PROCESO>/`: `manifiesto.json`, `pdf/`, `anexos/`, `lectura/` y `palabras/`.
-- **Almacén:** interfaz `Almacen` (`uri`, `leer`, `escribir`, `existe`, `listar`) en `almacen.py`. Solo existe `AlmacenLocal`. **Falta una implementación en Blob Storage**, que depende de A-1 (dónde deja los archivos el módulo 1).
+- **Almacén:** interfaz `Almacen` (`uri`, `leer`, `escribir`, `existe`, `listar`) en `almacen.py`. Solo existe `AlmacenLocal`. **Falta una implementación en Blob Storage** para lo que producimos. Ya no depende de A-1: los originales se quedan en OneLake y el almacén es nuestro.
 - **Errores:** un documento que no se puede procesar es un resultado, no una falla: queda `error_entrada` con su código en el manifiesto, y el comando sale con 0. Un bug (clase 4) en algún documento lanza `ErrorEntrega` al final, con los `id_documento` afectados; los demás documentos ya quedaron escritos, pero el manifiesto no. Por línea de comandos sale con 1.
 - **Idempotencia:** volver a correr la misma entrega reusa lo que no cambió, comparando con el manifiesto anterior. `forzar=True` procesa todo de nuevo. Después de una corrida con bug, como no hay manifiesto, el reintento procesa todo.
 - **Determinismo:** misma entrada, misma versión del normalizador y de parámetros, mismos bytes de salida.
@@ -78,7 +80,8 @@ No existe código de orquestación, extracción como servicio, reglas, tareas ni
 
 ### Preguntas de otros equipos que afectan al orquestador
 
-- **A-1, módulo 1:** dónde dejan los archivos y qué identificadores usan. Define el almacén en Blob y cómo se dispara la normalización. Confirmar también que los archivos llegan descomprimidos (en la muestra hubo ZIP y RAR, pero fueron un error al armar la carpeta de prueba).
+- **A-1, módulo 1 (respondida en parte, ver paso 0):** falta saber si pueden publicar en Service Bus, la forma del mensaje, cómo organizan las carpetas y distinguen los documentos del proceso de los de cada oferente, si los identificadores son los de Ariba, si los archivos quedan quietos después del aviso, y que den permiso de lectura en el workspace, habiliten en el tenant las APIs de Fabric para service principals y digan el workspace y el lakehouse. Confirmar también que los archivos llegan descomprimidos (en la muestra hubo ZIP y RAR, pero fueron un error al armar la carpeta de prueba).
+- **A-10, módulo 1:** en pausa. Por ahora no llegan documentos tardíos; si hay errores en la evaluación, un oferente podría volver a subir todo. No se diseña hasta confirmarlo.
 - **A-5, clasificación:** si clasifican sobre nuestro PDF normalizado y usan nuestra lectura.
 - **A-6, arquitectura:** licencias. Se evitó AGPL (PyMuPDF); img2pdf es LGPL-3.0 y queda anotado.
 - **Cumplimiento:** HD-1 a HD-14 del checklist; incluye S1 (conservación) y S2 (enviar datos a eastus).
@@ -103,13 +106,16 @@ Si se cambia un parámetro, sube `version_parametros`: ya hubo corridas reales.
 
 ### No hecho en la entrega 1
 
-- Almacén en Blob Storage (espera A-1).
+- Almacén en Blob Storage para lo que producimos.
+- Lectura de los originales desde OneLake. Antes de construirla, **prueba de acceso** (decisión 35): que el job lea una carpeta de prueba de OneLake con su identidad administrada. La configuración del tenant y los roles del paso 0 se escribieron sin verificar en la documentación de Microsoft; la prueba los confirma.
 - Análisis de vulnerabilidades de la imagen y publicación en un registro de Azure.
 - Experimento de OCR propio (decisión 9).
 
 ### Otros pendientes
 
 - **Datos personales:** borrar `~/GEB/pruebas-normalizacion/salida` y `salida1` (salidas de la primera medición).
+- **Diagramas:** `contexto/diagramas/` todavía muestra "Avisa entrega lista" por oferente y Blob Storage con los originales. Con el paso 0 el aviso es por proceso (cola `procesos-listos`) y los originales se leen de OneLake. Falta actualizarlos.
+- **Iniciativa 003:** `spec.md` y `plan.md` todavía dicen que A-1 está abierta y que, si fuera SharePoint, se usaría Graph API. Ya no aplica; se actualiza cuando se toque esa iniciativa.
 - Pendientes del diseño que siguen abiertos: medir la ficha inyectada (decisión 26), imágenes solo donde hacen falta (decisión 8), TD-98 (decisión 14).
 - El usuario preguntó por qué, en el diagrama de secuencia, el mensaje "archivo listo" pasa por Orquestación antes del clasificador. Se propuso partir el participante "Orquestación" en "Worker de clasificación" y "Worker de resultados y reglas", y no respondió. Es relevante para el orquestador. Si el usuario retocó el `.drawio` a mano, se edita ese archivo directamente: no se regenera con el script.
 
@@ -123,7 +129,7 @@ Si se cambia un parámetro, sube `version_parametros`: ya hubo corridas reales.
 - **Service Bus entrega mensajes dos veces a veces:** la normalización ya es idempotente; los demás workers también deben serlo.
 - **gpt-5.4 es obligatorio en la extracción:** gpt-5.4-mini no respeta las reglas de evidencia (prueba con TD-17).
 - **429:** la concurrencia de extracción hoy es 3. Un proceso de 10 oferentes son unos 160 segmentos, unos 20 minutos.
-- **LibreOffice:** la imagen de pruebas pesa unos 940 MB. Cada conversión arranca LibreOffice desde cero; el tiempo máximo es 120 s con un reintento. Si A-1 resulta en SharePoint, se puede evaluar la conversión de Graph API.
+- **LibreOffice:** la imagen de pruebas pesa unos 940 MB. Cada conversión arranca LibreOffice desde cero; el tiempo máximo es 120 s con un reintento.
 - **Firma digital:** las `adbe.pkcs7.sha1` (Cámara de Comercio, RUP) quedan como "firma que no se pudo leer". Leerlas necesita otra herramienta.
 - **Fuentes:** sin fuentes con las medidas de Office (Carlito, Caladea, Liberation), los Word, Excel y PowerPoint cambian de paginación al convertirse. La imagen las trae.
 - **Docker local:** en la máquina del usuario `docker` es podman. Para construir: ruta absoluta en `-f` y `--build-arg BASE_IMAGE=docker.io/library/ubuntu:24.04`.

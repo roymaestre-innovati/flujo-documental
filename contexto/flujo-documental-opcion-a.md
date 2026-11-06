@@ -28,7 +28,7 @@ Parte de las decisiones D1-D24 (`refinamiento-grill-me-2.md`) y del contrato v0 
 
 | Paso | Dueño | Estado |
 |---|---|---|
-| 0. Entrada de documentos | Módulo 1 (otro equipo) | Fuera de alcance |
+| 0. Entrada de documentos | Módulo 1 (otro equipo) | Fuera de alcance; la frontera está revisada |
 | 1. Normalización | Nosotros | Revisado |
 | 2. Lectura | Nosotros | Revisado |
 | 3. Clasificación | Equipo de clasificación (el clasificador); nosotros, lo que lo rodea | Revisado |
@@ -49,7 +49,7 @@ Consecuencias:
 
 | Frontera | Con quién | Qué hay que acordar |
 |---|---|---|
-| Entrada → flujo | Módulo 1 | Dónde dejan los archivos de cada oferente (blob o SharePoint), cómo avisan que un oferente terminó de entregar, y los identificadores de proceso, oferente y archivo |
+| Entrada → flujo | Módulo 1 | Acordado en lo grueso (paso 0): datalake de Fabric y aviso por cola. Falta la forma del mensaje, las carpetas y los identificadores (A-1) |
 | Flujo ↔ clasificador | Clasificación | Cómo lo llamamos, sobre qué PDF clasifica (el normalizado), qué devuelve por segmento (C1-C3) y qué hacemos con `no_corresponde` (C4) |
 | Flujo → Power App | Equipo de la Power App | Dónde escribimos las tareas de revisión (p. ej. tablas de Dataverse), con qué forma, y cómo leemos las correcciones de vuelta (P1-P3) |
 
@@ -64,6 +64,54 @@ Muestra: proceso SR5658940621, 6 oferentes.
 - 9 archivos están duplicados exactos.
 - La oferta económica y la experiencia llegan a veces solo en Excel.
 - Extraer un documento hoy toma ~22.000 tokens de entrada y ~1.500 de salida con gpt-5.4 (mediana de 346 corridas), entre 13 y 44 segundos.
+
+---
+
+## Paso 0 — Entrada · Revisado
+
+**Dueño:** el módulo 1 (otro equipo). Aquí solo se acuerda la frontera.
+
+**Lo que respondió el módulo 1 (2026-11-06):**
+
+- Los archivos quedan en un datalake de Microsoft Fabric (OneLake).
+- Nos avisan cuándo empezar con un endpoint o un mensaje a una cola; la elección es nuestra.
+- El proceso llega completo: CPC, adendas y la documentación de todos los oferentes, de una vez.
+- Por ahora no llegan documentos tardíos.
+
+**Cómo lo tomamos:**
+
+1. **Leemos los archivos donde están.** OneLake acepta la API de Azure Data Lake, así que el normalizador lee directo de Fabric con una identidad administrada a la que el módulo 1 le da permiso de lectura en su workspace. Los originales no se copian: siguen siendo del módulo 1 y no hay una segunda copia de documentos con datos personales (principio 6). Lo que producimos (PDF normalizados, lectura, informes) va a nuestro almacenamiento.
+2. **El aviso llega a una cola de Service Bus, `procesos-listos`.** Es una cola más del mismo Service Bus del paso 4. Si el normalizador está caído, el mensaje espera, y no tenemos que publicar ni proteger una API. Si la herramienta del módulo 1 no puede publicar en Service Bus, el plan B es un endpoint mínimo que solo deja el mensaje en esa misma cola; el resto del flujo no cambia.
+3. **Un aviso por proceso, no por oferente.** Como el proceso llega completo, la apertura arma la ficha con la CPC y las adendas a la mano, y todos los oferentes arrancan juntos.
+
+**Mensaje propuesto** (por confirmar con el módulo 1):
+
+| Campo | Contenido |
+|---|---|
+| `id_proceso` | Identificador del proceso (por ejemplo, el de Ariba) |
+| `ruta` | Carpeta del proceso en OneLake |
+| `archivos` | Opcional: lista de archivos con su oferente, o la marca de documento del proceso |
+
+### Cómo leemos los archivos de Fabric
+
+**Los lee el normalizador (paso 1)**, con el SDK de Azure; no hay un servicio aparte. OneLake responde con la misma API que Azure Data Lake Storage Gen2, en `https://onelake.dfs.fabric.microsoft.com/<workspace>/<lakehouse>.Lakehouse/Files/<ruta>`, y se lee con la librería `azure-storage-file-datalake` y la identidad administrada del job, sin contraseñas.
+
+1. Recibe el mensaje de `procesos-listos` con `id_proceso` y `ruta`.
+2. Lista los archivos de esa carpeta en OneLake.
+3. Descarga cada archivo a disco temporal, lo normaliza y lo lee (pasos 1 y 2).
+4. Escribe el PDF normalizado y la lectura en nuestro almacenamiento. El original no se guarda.
+
+Ningún otro paso vuelve a tocar Fabric: desde ahí todo trabaja con el PDF normalizado.
+
+**Lo que necesitamos del equipo de Fabric:**
+
+- Permiso de lectura para la identidad administrada del job en su workspace (rol Viewer, o un rol de acceso solo a la carpeta de archivos).
+- Que un administrador de Fabric habilite en el tenant el uso de las APIs de Fabric por service principals. Suele venir apagado y es lo que más bloquea.
+- El nombre del workspace y del lakehouse, y cómo arman la `ruta` del mensaje.
+
+Las lecturas consumen capacidad de Fabric del módulo 1. Son pocas (unos 19 archivos por oferente), pero hay que avisarles.
+
+**Pendiente: prueba de acceso.** Antes de construir el normalizador hay que probar que el job lee una carpeta de prueba en OneLake con su identidad administrada. Va más adelante. La configuración del tenant y los roles se tomaron de memoria, sin verificar en la documentación de Microsoft: la prueba los confirma.
 
 ---
 
@@ -106,7 +154,7 @@ Muestra: proceso SR5658940621, 6 oferentes.
 | `firma_digital` | Lista de `{firmante, fecha, integro}`, o vacía |
 | `error` | `null`, o el motivo por el que no se pudo normalizar |
 
-**Tecnología propuesta:** un Container Apps Job (Python, LibreOffice, qpdf, PyMuPDF, pyHanko) que se dispara desde la cola cuando el oferente termina de entregar, y que escala a cero. Un oferente tarda del orden de un minuto, y el volumen anual cabe en la cuota gratis del plan de consumo. Si el módulo 1 guarda los archivos en SharePoint, Graph API puede convertir DOCX y XLSX a PDF sin LibreOffice. Power Automate no encaja bien con el hash ni con el análisis por página.
+**Tecnología propuesta:** un Container Apps Job (Python, LibreOffice, qpdf, PyMuPDF, pyHanko) que se dispara con el mensaje de la cola `procesos-listos` (paso 0), lee los originales de OneLake y escala a cero. Un oferente tarda del orden de un minuto, y el volumen anual cabe en la cuota gratis del plan de consumo. Power Automate no encaja bien con el hash ni con el análisis por página.
 
 ### Firma digital: qué se puede decir y qué no
 
@@ -135,7 +183,7 @@ En ninguno se pudo decir si el certificado es confiable: para eso hace falta car
 
 ### Cuándo corre
 
-Probablemente los oferentes no llegan todos juntos. **No afecta la normalización ni la extracción:** cada archivo y cada segmento se procesan solos, y los cruces entre documentos son del módulo 4. Solo cambia el volumen de golpe, y eso lo absorbe la cola (paso 4). Lo que sí exige que lleguen en momentos distintos es fijar la versión del proceso (paso 4).
+**El proceso llega completo** (paso 0): todos los oferentes y los documentos del proceso con un solo aviso. Cada archivo y cada segmento se procesan solos, y los cruces entre documentos son del módulo 4. El volumen de golpe lo absorbe la cola (paso 4).
 
 ---
 
@@ -308,7 +356,7 @@ Lo que los delata como desempate es el contexto: la carpeta ("EMPRENDIMIENTO MUJ
 Cada paso es un worker que lee de una cola, trabaja, actualiza el estado en Cosmos y publica en la cola siguiente.
 
 ```
-entrega lista ─► [cola normalizar] ─► worker normaliza + lee (pasos 1 y 2)
+proceso listo ─► [cola procesos-listos] ─► worker normaliza + lee (pasos 1 y 2)
    ─► [cola clasificar] (un mensaje por archivo)
    ─► worker llama al clasificador, valida segmentos, aplica umbrales (paso 3)
    ─► [cola extraer] (un mensaje por segmento)
@@ -424,12 +472,12 @@ El mismo registro guarda la versión de la ontología del clasificador y la de l
 
 **Cómo se abre un proceso:**
 
-1. **Los documentos del proceso entran por el módulo 1,** igual que las ofertas, pero marcados como del proceso y sin oferente: CPC, adendas, datos esenciales, anexos.
+1. **Los documentos del proceso llegan en la misma entrega que las ofertas** (paso 0), marcados como del proceso y sin oferente: CPC, adendas, datos esenciales, anexos.
 2. **Se extraen con la misma unidad de extracción:** TD-01 (campos TD01-01 a TD01-27) y TD-02 (TD02-01 a TD02-09), como cualquier otro TD.
 3. **Ficha del proceso:** los valores de la CPC con las adendas aplicadas en orden de número; en cada parámetro gana la adenda más reciente. Cada valor guarda de qué documento y qué página salió (principio 3). Incluye, entre otros, documentos exigidos (TD01-22), plazo de subsanación (TD01-18), indicadores financieros (TD01-24), experiencia mínima (TD01-25), reglas económicas (TD01-26) y causales de rechazo (TD01-27).
 4. **Un humano confirma la ficha completa, una vez por proceso** (principio 4). Un error ahí afecta a todos los oferentes y son solo unos 400 procesos al año. Es un tipo de tarea humana propio: "confirmar ficha del proceso".
 5. **La ficha bloquea solo las reglas.** Las ofertas se extraen mientras tanto, porque la extracción no usa parámetros del proceso (D8). Las reglas del paso 6 esperan a que la ficha esté confirmada.
-6. **Las versiones se fijan en la apertura** (modelo de extracción, ontología, reglas), como decía D7. La grabación condicional con el primer segmento queda como respaldo si llega una oferta antes que la CPC.
+6. **Las versiones se fijan en la apertura** (modelo de extracción, ontología, reglas), como decía D7. Como el proceso llega completo, no hace falta el respaldo de fijarlas con el primer segmento.
 7. **La lista de documentos exigidos se usa dos veces:** se le pasa al clasificador (paso 3) y sirve para detectar los documentos que le faltan a cada oferente.
 
 **Adenda después de confirmar la ficha:** se arma una ficha nueva, el humano la confirma de nuevo y se corren otra vez las reglas de todos los oferentes, que son baratas. No se vuelve a extraer nada, salvo que la adenda cambie un formulario.
@@ -599,6 +647,10 @@ Precios de referencia de agregadores, sin confirmar en Azure: gpt-5.4 a $2,50 / 
 29. Las reglas corren de forma provisional y se recalculan con cada corrección; el resultado queda definitivo cuando el oferente no tiene tareas abiertas.
 30. Tareas de revisión: una por oferente y por área, con los campos a revisar y los "no cumple" a confirmar.
 31. Informe en Excel con el formato de las plantillas de evaluación de GEB, firmado por el coordinador.
+32. Entrada: los archivos se leen directo del datalake de Fabric (OneLake), sin copiar los originales. Solo guardamos lo que producimos.
+33. El módulo 1 avisa con un mensaje en la cola de Service Bus `procesos-listos`. Plan B, si no pueden publicar en Service Bus: un endpoint mínimo que deja el mensaje en esa cola.
+34. El proceso llega completo, con un aviso por proceso: documentos del proceso y de todos los oferentes juntos.
+35. El normalizador lee los archivos de OneLake con el SDK de Azure Data Lake y su identidad administrada. Antes de construirlo se hace una prueba de acceso, más adelante.
 
 ## Cambios a decisiones anteriores
 
@@ -606,12 +658,13 @@ Precios de referencia de agregadores, sin confirmar en Azure: gpt-5.4 a $2,50 / 
 - **D13:** se agrega el motivo de revisión `CLASIFICACION_DUDOSA`, activado por el campo `clasificacion_dudosa` de la entrada.
 - **O1:** el transporte es cola de Service Bus.
 - **D7 y contrato v0:** las versiones se fijan en la apertura del proceso. Sin `version_modelo` en la entrada, se usa la versión registrada del proceso, no la vigente.
+- **Decisión 5:** los oferentes ya no llegan en momentos distintos (decisión 34). Las versiones se fijan en la apertura, sin el respaldo del primer segmento.
 
 ## Preguntas nuevas
 
 | # | Para | Pregunta |
 |---|---|---|
-| A-1 | Módulo 1 | ¿Dónde dejan los archivos (blob o SharePoint)? ¿Cómo avisan que un oferente terminó de entregar? ¿Qué identificadores de proceso, oferente y archivo usan? ¿Nos pasan también los documentos del proceso (CPC, adendas, anexos), marcados como tales? |
+| A-1 | Módulo 1 | Respondida en parte (paso 0). Falta: ¿pueden publicar en Service Bus? ¿Qué trae el mensaje (proponemos `id_proceso`, `ruta` y la lista de archivos)? ¿Cómo se organizan las carpetas y cómo se distinguen los documentos del proceso de los de cada oferente? ¿Los identificadores son los de Ariba? ¿Los archivos quedan quietos después del aviso? ¿Qué proporción llega escaneada, con contraseña o firmada (M2)? ¿Nos dan permiso de lectura en el workspace, habilitan las APIs de Fabric para service principals en el tenant, y cuáles son el workspace y el lakehouse? |
 | A-2 | Power App | ¿Dónde escribimos las tareas de revisión y con qué forma? Proponemos una tarea por oferente y área, con puntos que se confirman, corrigen o marcan no cumple. ¿Cómo leemos las correcciones? |
 | A-3 | Negocio | ¿Un PDF modificado después de firmarse digitalmente debe alertar al evaluador? |
 | A-4 | Negocio (N-A) | ¿Una firma digital del oferente cuenta como "Firmado"? ¿Hay que validar la confianza del certificado? |
@@ -620,5 +673,5 @@ Precios de referencia de agregadores, sin confirmar en Azure: gpt-5.4 a $2,50 / 
 | A-8 | Negocio | ¿Qué tan seguido hay empates? ¿Qué procesos desempatan con documentos y cuáles por orden de presentación? |
 | A-9 | Negocio | ¿TD-14 debe cubrir también las cédulas de contador y revisor fiscal? |
 | A-11 | Negocio | ¿El informe de evaluación se entrega en Excel con el formato de las plantillas actuales (Jurídica, Financiera, Técnica, Económica y consolidado)? |
-| A-10 | Módulo 1 | ¿Cómo llegan los adjuntos de una subsanación, que vienen por la mensajería de Ariba? ¿Se pueden distinguir de la entrega original? |
+| A-10 | Módulo 1 | En parte: por ahora no llegan documentos tardíos. En pausa, sin confirmar: si hay errores en la evaluación, un oferente podría volver a subir todos sus documentos. No se diseña hasta confirmarlo |
 | A-6 | Arquitectura | ¿Se acepta una librería AGPL (PyMuPDF) en el servicio, o hay que usar alternativas permisivas? |
