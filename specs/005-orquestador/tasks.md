@@ -2,7 +2,7 @@
 
 Sale de `plan.md`. Cada tarea termina con sus pruebas en verde y un commit propio.
 
-**Estado al 2026-11-06:** T01 fusionada; T02 hecha, en revisión.
+**Estado al 2026-11-06:** T01 y T02 fusionadas; T03 hecha, en revisión.
 
 ## Para quien implemente
 
@@ -17,7 +17,7 @@ Sale de `plan.md`. Cada tarea termina con sus pruebas en verde y un commit propi
 
 - [x] **T01 — Contratos.** Escribir `contracts/modulo5-orquestador/v0/` (`README.md`, `proceso-listo.schema.json`, `clasificacion-solicitud.schema.json`, `clasificacion-respuesta.schema.json` y ejemplos: un aviso con y sin lista de archivos, una solicitud, y respuestas normal, compuesta, dudosa e inválida) y `contracts/modulo3-extraccion/v0.2/` (`README.md`, `entrada.schema.json` y `salida.schema.json` con los ocho cambios del plan, y los ejemplos de TD-16 y TD-29 pasados a 0.2, más uno de un documento del proceso sin oferente). Validar los ejemplos contra los esquemas. `v0/` de extracción no se toca. **Detenerse aquí para revisión del usuario** (principio 5), incluido el cambio de `id_documento` a `id_segmento`.
 - [x] **T02 — Esqueleto.** `servicios/orquestador/` con `pyproject.toml` (uv, pytest, `normalizacion` como dependencia de ruta), `VERSION = "0.1.0"`, los datos (`versiones.json`, `umbrales.json`, `tipos_documentales.json`) y las interfaces con su versión local: `ColaEnMemoria`, `EstadoEnMemoria`, `OrigenLocal`, `ClasificadorFalso` y el reloj. Prueba que valida los ejemplos de los contratos.
-- [ ] **T03 — Estado.** Las cinco entidades, sus transiciones permitidas, el cambio condicional con historial y `consultar(id_proceso)`. Una transición no permitida es un bug (clase 4). Requisitos R24 a R26 y R28.
+- [x] **T03 — Estado.** Las cinco entidades, sus transiciones permitidas, el cambio condicional con historial y `consultar(id_proceso)`. Una transición no permitida es un bug (clase 4). Requisitos R24 a R26 y R28.
 - [ ] **T04 — Bucle y errores.** El bucle común que corre un manejador sobre un mensaje y traduce cada excepción a su clase: reintentos con demora creciente, espera pedida por el servicio sin contar intento, cola de errores, `error_proceso`, registro de alerta y `reenviar_errores`. Se prueba con manejadores de juguete. Requisitos R18 a R21 y R23.
 - [ ] **T05 — Apertura.** Manejador de `procesos-listos`: valida el aviso, abre el proceso con `crear_si_no_existe`, fija las versiones, reparte las entregas (con la lista de archivos del aviso, sin leer el origen, o listando las carpetas) y publica un `normalizar` por entrega. Requisitos R1 a R5.
 - [ ] **T06 — Normalizar.** Manejador de `normalizar`: baja los originales de `Origen` a una carpeta temporal que se borra al terminar, llama a `normalizar_entrega` con la versión fijada, registra cada documento, crea la tarea `documento_con_error` por cada `error_entrada` y publica un `clasificar` por documento normalizado. `ErrorEntrega` es clase 4. Como máximo 2 entregas a la vez (`paralelo_normalizar`), también en la versión local. Requisitos R3, R6 a R8.
@@ -60,4 +60,17 @@ Lo que se decidió al escribir y conviene revisar:
 7. **Cola en memoria:** imita lo que importa de Service Bus: mensaje bloqueado mientras se trabaja, `abandonar` para simular un trabajador caído (vuelve a entregarse y sube `entregas`), demora y cola de errores por cola. `proxima_visible()` existe solo en la versión en memoria, para que el comando local adelante el reloj en vez de esperar.
 8. **Estado en memoria:** solo `leer`, `crear_si_no_existe`, `reemplazar` condicional por versión (como el ETag de Cosmos) y `listar` por proceso. Los estados y las transiciones van en T03.
 9. **Clasificador falso:** columna `subtipo` opcional; un documento que no está en el CSV sale TD-99 con confianza 1. No valida la respuesta, para poder probar respuestas malas en T07.
+
+### T03 — Estado (2026-11-06)
+
+`estados.py`: las cinco máquinas de estado, `crear`, `cambiar` y `consultar`. 65 pruebas.
+
+1. **Solo los estados de la entrega 1.** Los de extracción, revisión, ficha y reglas se agregan en la entrega 2, cuando se sepa cómo se usan. Una prueba comprueba que cada estado es alcanzable.
+2. **El documento no tiene `pendiente`.** Se crea cuando la normalización ya lo inventarió, directo en `normalizado`, `duplicado` o `error_entrada`. Antes de eso no se sabe qué documentos hay.
+3. **La normalización que falla entera es un error de la entrega, no de los documentos.** Si `normalizar_entrega` lanza `ErrorEntrega`, no hay manifiesto y no hay documentos que marcar. Por eso el oferente (que es su entrega) tiene `error_proceso` → `procesando`. El escalamiento a 24 horas (T09) mira documentos y entregas.
+4. **Una copia exacta se queda `duplicado`** y no tiene segmentos: no se clasifica ni se extrae (R10). En la consulta aparece con su `duplicado_de`.
+5. **`esperando_clasificacion_humana` también en el segmento.** El diseño lo tenía solo en el archivo. En un archivo compuesto, un segmento puede tener confianza baja y los demás no: los buenos se extraen y solo ese espera. El documento queda en `esperando_clasificacion_humana` solo cuando la respuesta entera es inválida.
+6. **`cambiar` con mensaje repetido:** si el registro ya está en el estado pedido, no hace nada y responde `aplicado=False`. Si está en otro estado, `EstadoInesperado`, y quien llama decide qué hacer. Si otro trabajador lo cambió entre la lectura y la escritura, relee y decide de nuevo, hasta 5 veces.
+7. **Una transición que no existe es un bug** (`TransicionNoPermitida`, clase 4), igual que crear con un estado inicial que no corresponde.
+8. **`consultar`** devuelve, por entrega, el estado del oferente, los documentos y segmentos por estado, las tareas abiertas y `en_curso`: cuántos registros siguen en un estado intermedio. El "¿oferente completo?" de la decisión 15 se arma con eso en la entrega 2, cuando se sumen los estados de la extracción.
 

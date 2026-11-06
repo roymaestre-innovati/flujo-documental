@@ -106,9 +106,9 @@ Un documento por entidad, todos con `id_proceso` (será la partición en Cosmos)
 | Entidad | Identificador | Estados en esta entrega | Además guarda |
 |---|---|---|---|
 | Proceso | `id_proceso` | `abierto` | Versiones fijadas, ruta de origen, fecha del aviso |
-| Oferente | `id_proceso` + `id_oferente` (o `PROCESO`) | `recibido` → `procesando` | Conteos se calculan; no se guardan (decisión 15) |
-| Documento | `id_documento` (el de la normalización) | `pendiente` → `normalizado` → `clasificado`; `duplicado`, `error_entrada`, `esperando_clasificacion_humana`, `error_proceso` | Hash, URI del PDF y la lectura, `duplicado_de` |
-| Segmento | `id_segmento` = `<id_documento>-p<inicio>-<fin>` | `pendiente` (publicado a `extraer`); `sin_extraccion` (TD-98, TD-99) | TD, subtipo, confianza, `clasificacion_dudosa`, quién asignó el TD si fue humano |
+| Oferente (su entrega) | `id_oferente` o `PROCESO` | `recibido` → `procesando`; `error_proceso` si la normalización de la entrega falla entera | Conteos se calculan; no se guardan (decisión 15) |
+| Documento | `id_documento` (el de la normalización) | Nace `normalizado`, `duplicado` o `error_entrada`; `normalizado` → `clasificado`, `esperando_clasificacion_humana` (respuesta inválida) o `error_proceso` | Hash, URI del PDF y la lectura, `duplicado_de` |
+| Segmento | `id_segmento` = `<id_documento>-p<inicio>-<fin>` | `pendiente` (publicado a `extraer`); `sin_extraccion` (TD-98, TD-99); `esperando_clasificacion_humana` (confianza baja) → `pendiente` o `sin_extraccion` | TD, subtipo, confianza, `clasificacion_dudosa`, quién asignó el TD si fue humano |
 | Tarea humana | `<clase>-<id del documento o segmento>` | `abierta` → `resuelta` | Clase (`clasificacion`, `documento_con_error`, `falla_tecnica`), motivo, resolución |
 
 Los estados `extrayendo` en adelante, `en_revision`, `listo_para_reglas` y los de la ficha del proceso se usan en la entrega 2. El identificador de la tarea es determinista, así que crearla dos veces no la duplica (R27).
