@@ -18,7 +18,7 @@ Validación, lectura y extracción de los documentos que entregan los oferentes 
 |---|---|
 | 003, entrega 1: normalización y lectura | Cerrada: `servicios/normalizacion/` (0.2.0), contrato `contracts/modulo3-normalizacion/v0/` (0.2), medida con la muestra real |
 | 003, entrega 2: extracción | Por planear |
-| Orquestador (iniciativa 005) | Siguiente, en un repositorio aparte |
+| Orquestador (iniciativa 005) | En planeación: `specs/005-orquestador/` |
 | Reglas e informe | Por planear |
 
 ## Datos personales

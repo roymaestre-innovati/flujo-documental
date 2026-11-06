@@ -1,6 +1,6 @@
 # Handoff: implementación del flujo documental (opción A)
 
-Estado al 2026-11-05, al cerrar la entrega 1 (normalización y lectura), con las decisiones de entrada del 2026-11-06 (paso 0 del diseño, decisiones 32 a 35). Lo siguiente es el **orquestador (iniciativa 005)**, en un **repositorio nuevo** y una **sesión nueva**.
+Estado al 2026-11-05, al cerrar la entrega 1 (normalización y lectura), con las decisiones de entrada del 2026-11-06 (paso 0 del diseño, decisiones 32 a 35). Lo siguiente es el **orquestador (iniciativa 005)**, en **este mismo repositorio**: `specs/005-orquestador/` y `servicios/orquestador/`.
 
 Las rutas relativas son de este repositorio (`~/GEB/flujo-documental-repo`, en GitHub `roymaestre-innovati/flujo-documental`); lo que está en otros repos va con ruta completa. `contexto/flujo-documental-opcion-a.md` sigue siendo la fuente de verdad del diseño. Este archivo no repite el diseño: dice qué existe, qué falta, qué está abierto y cómo trabaja el usuario.
 
@@ -9,7 +9,7 @@ Las rutas relativas son de este repositorio (`~/GEB/flujo-documental-repo`, en G
 - **Iniciativa 003, entrega 1 (normalización y lectura): cerrada.** Las tareas T01 a T16 de `specs/003-validacion-extraccion/tasks.md` están hechas y fusionadas en `main`, con 413 pruebas sobre documentos inventados. Normalizador `0.2.0`, contrato `modulo3-normalizacion/0.2`, parámetros versión 1.
 - **Medida con la muestra real** (7 oferentes, 1.034 páginas, dos mediciones): `specs/003-validacion-extraccion/resultados-muestra.md`. Los criterios A3 a A5 se cumplen y los umbrales no cambian. De la primera medición salieron T14 (el sello de tiempo no cuenta como firma), T15 (PowerPoint) y T16 (vínculos a otros libros en Excel); la segunda medición los confirma.
 - **Checklist de habeas data:** borrador en `specs/003-validacion-extraccion/checklist-habeas-data.md`, sin respuestas de cumplimiento todavía. Las mediciones se hicieron antes de tenerlas: el usuario lo cuenta al pasar el checklist.
-- **Siguiente:** el orquestador, en un repositorio aparte. Ver "Para la sesión del orquestador".
+- **Siguiente:** el orquestador, en este repositorio (decidido el 2026-11-06). Su entrega 1 está planeada en `specs/005-orquestador/` (spec, plan y tareas T01 a T11, por revisar): va del aviso del proceso a la cola de extracción, todo local, e incluye el contrato de extracción 0.2. Ver también "Para la sesión del orquestador".
 
 ## Cómo trabaja el usuario
 
@@ -32,13 +32,9 @@ Las rutas relativas son de este repositorio (`~/GEB/flujo-documental-repo`, en G
 6. `contracts/modulo3-extraccion/v0/`: la frontera con la extracción (versión 0.1; los ocho cambios para la 0.2, del paso 5 del diseño, no se han aplicado).
 7. `servicios/normalizacion/README.md`: cómo se instala, corre y prueba la normalización.
 
-### Primeras decisiones del repositorio nuevo
+### Por qué en este mismo repositorio
 
-Preguntar al usuario, con recomendación:
-
-- **Qué se copia y qué se referencia.** La constitución y el diseño viven aquí. Recomendación: copiar `constitucion.md` (son las reglas del proyecto y deben estar a mano) y referenciar el diseño con su ruta en este repo, para no tener dos copias que diverjan.
-- **Cómo se llama la normalización.** El diseño dice que el orquestador la llama "como función". Hoy es un paquete Python en este repo y una imagen Docker (`servicios/normalizacion/Dockerfile`, etapa `job`). Opciones: dependencia Python desde Git, o un worker propio que corre la imagen. Recomendación a discutir.
-- **Estructura del repo:** la misma que aquí (`contexto/`, `specs/NNN-nombre/` con `spec.md`, `plan.md` y `tasks.md`, `contracts/`, `servicios/`).
+Se decidió el 2026-11-06. El repo ya está armado para varias piezas (`servicios/` una carpeta por pieza desplegable, `specs/` una por iniciativa, `contracts/` las fronteras). La constitución, el diseño y los contratos quedan en un solo lugar, sin copias que se desalineen. El orquestador importa `normalizacion` directamente, sin publicar un paquete. Cada servicio sigue con su propia imagen y se despliega por separado. Se reconsidera solo si otro equipo toma el orquestador o necesita permisos o ciclos de versión propios.
 
 ### Lo que el orquestador necesita saber de la normalización
 
