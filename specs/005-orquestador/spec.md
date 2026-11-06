@@ -1,6 +1,6 @@
 # Spec 005 — Orquestador (módulo 5)
 
-Estado al 2026-11-06. **En planeación.** Sale del paso 0 (entrada) y del paso 4 (orquestación) de `contexto/flujo-documental-opcion-a.md`, decisiones 15 a 24 y 32 a 35.
+Estado al 2026-11-06. **Entrega 1 en construcción** (T01 a T04 de `tasks.md`). Sale del paso 0 (entrada) y del paso 4 (orquestación) de `contexto/flujo-documental-opcion-a.md`, decisiones 15 a 24 y 32 a 35.
 
 El orquestador lleva cada proceso de selección desde que el módulo 1 avisa que sus documentos están listos hasta que cada oferente tiene su informe. Guarda en qué va cada proceso, oferente y documento, pasa cada documento por la normalización, el clasificador y la extracción, le hace llegar cada error a quien lo puede resolver y garantiza que todos los oferentes de un proceso se evalúen con las mismas versiones.
 

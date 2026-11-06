@@ -1,6 +1,6 @@
 # Handoff: implementación del flujo documental (opción A)
 
-Estado al 2026-11-05, al cerrar la entrega 1 (normalización y lectura), con las decisiones de entrada del 2026-11-06 (paso 0 del diseño, decisiones 32 a 35). Lo siguiente es el **orquestador (iniciativa 005)**, en **este mismo repositorio**: `specs/005-orquestador/` y `servicios/orquestador/`.
+Estado al 2026-11-06. La iniciativa 003 cerró su entrega 1 (normalización y lectura). **En curso: el orquestador (iniciativa 005), entrega 1**, en este mismo repositorio: `specs/005-orquestador/` y `servicios/orquestador/`. T01 a T04 hechas; la siguiente es T05.
 
 Las rutas relativas son de este repositorio (`~/GEB/flujo-documental-repo`, en GitHub `roymaestre-innovati/flujo-documental`); lo que está en otros repos va con ruta completa. `contexto/flujo-documental-opcion-a.md` sigue siendo la fuente de verdad del diseño. Este archivo no repite el diseño: dice qué existe, qué falta, qué está abierto y cómo trabaja el usuario.
 
@@ -9,7 +9,10 @@ Las rutas relativas son de este repositorio (`~/GEB/flujo-documental-repo`, en G
 - **Iniciativa 003, entrega 1 (normalización y lectura): cerrada.** Las tareas T01 a T16 de `specs/003-validacion-extraccion/tasks.md` están hechas y fusionadas en `main`, con 413 pruebas sobre documentos inventados. Normalizador `0.2.0`, contrato `modulo3-normalizacion/0.2`, parámetros versión 1.
 - **Medida con la muestra real** (7 oferentes, 1.034 páginas, dos mediciones): `specs/003-validacion-extraccion/resultados-muestra.md`. Los criterios A3 a A5 se cumplen y los umbrales no cambian. De la primera medición salieron T14 (el sello de tiempo no cuenta como firma), T15 (PowerPoint) y T16 (vínculos a otros libros en Excel); la segunda medición los confirma.
 - **Checklist de habeas data:** borrador en `specs/003-validacion-extraccion/checklist-habeas-data.md`, sin respuestas de cumplimiento todavía. Las mediciones se hicieron antes de tenerlas: el usuario lo cuenta al pasar el checklist.
-- **Siguiente:** el orquestador, en este repositorio (decidido el 2026-11-06). Su entrega 1 está planeada en `specs/005-orquestador/` (spec, plan y tareas T01 a T11, por revisar): va del aviso del proceso a la cola de extracción, todo local, e incluye el contrato de extracción 0.2. Ver también "Para la sesión del orquestador".
+- **Iniciativa 005, entrega 1 (orquestador): en curso.** Va del aviso del proceso a la cola de extracción, todo local, con interfaces que tienen versión en memoria (Service Bus, Cosmos y OneLake reales en la entrega 2). Spec, plan y tareas T01 a T11 en `specs/005-orquestador/`, acordados el 2026-11-06.
+  - **T01 a T03 fusionadas en `main`:** contratos (`modulo5-orquestador/0.1` y `modulo3-extraccion/0.2`), esqueleto con interfaces locales y estados de las cinco entidades.
+  - **T04 (bucle común, errores y reintentos):** hecha, en el pull request de la rama `orquestador-t04`. Si al retomar no está fusionada, preguntar al usuario antes de seguir.
+  - **Siguiente: T05, apertura** (manejador de `procesos-listos`). Las decisiones de cada tarea están en "Notas de implementación" de `tasks.md`: leerlas antes de seguir, porque varias ajustan el plan.
 
 ## Cómo trabaja el usuario
 
@@ -20,17 +23,17 @@ Las rutas relativas son de este repositorio (`~/GEB/flujo-documental-repo`, en G
 - Commits y pushes solo dentro de ese flujo, o si los pide. No publicar ni crear pull requests sin pedirlo.
 - Corre él mismo lo que toca documentos reales y pega la salida (solo conteos). Se le dan los comandos listos para copiar y se le dice cuánto tardan.
 
-## Para la sesión del orquestador
+## Para seguir con el orquestador
 
 ### Qué leer, en este orden
 
 1. Este archivo.
-2. `contexto/constitucion.md`: los siete principios.
-3. `contexto/flujo-documental-opcion-a.md`, **paso 0 (Entrada)**: cómo llegan los procesos (OneLake de Fabric, cola `procesos-listos`, un aviso por proceso completo) y las decisiones 32 a 35. Después el **paso 4 (Orquestación)**: estado que guarda (cinco entidades: proceso, oferente, archivo, segmento y tarea humana), tecnología (Service Bus + workers en Container Apps + estado en Cosmos), manejo de errores por clases, versión del modelo por proceso, subsanación y reprocesamiento, apertura del proceso, cola y volumen. También las decisiones 15 y 16 y las preguntas abiertas A-1 a A-11.
-4. `contexto/refinamiento-grill-me-2.md` (D1 a D24): de ahí salen D7 (versión del modelo), D22 (reintentos) y otras que usa el paso 4.
-5. `contracts/modulo3-normalizacion/v0/`: lo que produce la normalización, que el orquestador consume.
-6. `contracts/modulo3-extraccion/v0/`: la frontera con la extracción (versión 0.1; los ocho cambios para la 0.2, del paso 5 del diseño, no se han aplicado).
-7. `servicios/normalizacion/README.md`: cómo se instala, corre y prueba la normalización.
+2. `specs/005-orquestador/`: `spec.md`, `plan.md` y `tasks.md`, con sus notas de implementación.
+3. `contexto/constitucion.md`: los siete principios.
+4. `contexto/flujo-documental-opcion-a.md`, **paso 0 (Entrada)**: cómo llegan los procesos (OneLake de Fabric, cola `procesos-listos`, un aviso por proceso completo) y las decisiones 32 a 35. Después el **paso 4 (Orquestación)**: estado que guarda (cinco entidades: proceso, oferente, archivo, segmento y tarea humana), tecnología (Service Bus + workers en Container Apps + estado en Cosmos), manejo de errores por clases, versión del modelo por proceso, subsanación y reprocesamiento, apertura del proceso, cola y volumen. También las decisiones 15 y 16 y las preguntas abiertas A-1 a A-11.
+5. `contexto/refinamiento-grill-me-2.md` (D1 a D24): de ahí salen D7 (versión del modelo), D22 (reintentos) y otras que usa el paso 4.
+6. Los contratos: `contracts/modulo5-orquestador/v0/` (aviso del módulo 1 y clasificador), `contracts/modulo3-extraccion/v0.2/` (solicitudes de extracción) y `contracts/modulo3-normalizacion/v0/` (lo que produce la normalización).
+7. `servicios/orquestador/README.md` y `servicios/normalizacion/README.md`: cómo se instala, corre y prueba cada uno.
 
 ### Por qué en este mismo repositorio
 
@@ -59,18 +62,20 @@ El usuario es dueño de todo el flujo menos tres piezas de otros equipos: la ent
 |---|---|---|
 | **Normalización y lectura** | `servicios/normalizacion/` | Cerrada (entrega 1, T01 a T16). Versión 0.2.0. Comando `normalizar`, imagen Docker, script de la muestra |
 | **Contrato de normalización** | `contracts/modulo3-normalizacion/v0/` | Versión `modulo3-normalizacion/0.2` (0.2 sumó `ppt`, `pptx` y `odp`) |
-| Contrato de extracción | `contracts/modulo3-extraccion/v0/` | Versión 0.1. Los ocho cambios para la 0.2 (paso 5 del diseño) no se han aplicado |
+| **Orquestador** | `servicios/orquestador/` | Entrega 1 en curso (T01 a T04). Versión 0.1.0. Interfaces locales, estados, bucle de errores. Sin manejadores todavía |
+| **Contrato del orquestador** | `contracts/modulo5-orquestador/v0/` | Versión 0.1: aviso de proceso listo (módulo 1) y solicitud y respuesta del clasificador. Propuesta para A-1 y C1 a C3 |
+| Contrato de extracción | `contracts/modulo3-extraccion/v0.2/` | Versión 0.2, con los ocho cambios del paso 5 del diseño más `id_segmento`. La 0.1 queda en `v0/`, sin cambios |
 | Resultados de la muestra real | `specs/003-validacion-extraccion/resultados-muestra.md` | Dos mediciones (2026-11-05). Solo conteos |
 | Checklist de habeas data | `specs/003-validacion-extraccion/checklist-habeas-data.md` | Borrador para cumplimiento |
 | Matriz de campos por TD (TD-01 a TD-35) | Fuente: `~/GEB/Extraccion/matriz/campos.py`, que genera el Excel con `generar_matriz.py` | En uso. El Excel es generado: no se edita a mano |
 | Modelo semántico y servidor MCP | `~/GEB/modelo-semantico` (repo aparte): modelo en Cosmos DB, servidor en Container Apps | Desplegado; modelo `extraccion_documental` en v21 |
 | Agente de extracción de prueba | `~/GEB/modelo-semantico/agente_local/chat.py` y `lote.py` | Arnés de pruebas con gpt-5.4. No es el servicio de producción |
 | Gold por tipo documental | `~/GEB/Extraccion/Documentos/pruebas/TD-NN/gold_TD-NN.xlsx` (no van a git: datos reales) | TD-03, 05, 15, 16, 17, 18, 26, 27, 29, 30 y 35 |
-| Clasificación manual de la muestra | `Documentos/clasificados/manifiesto.csv` (datos reales, fuera de git) | Sirve como clasificador falso |
+| Clasificación manual de la muestra | `~/GEB/Extraccion/Documentos/clasificados/manifiesto.csv` (datos reales, fuera de git) | Sirve como clasificador falso (T11 la convierte al CSV del orquestador) |
 | Muestra real para medir | `~/GEB/pruebas-normalizacion/muestra1` (6 oferentes) y `muestra` (OF-007) | Fuera del repo. Datos reales |
 | Plantilla de evaluación | `insumos/Matriz_Extraccion_Evaluacion_Ofertas_PCA-SR5587392192.xlsx` | Formato del informe |
 
-No existe código de orquestación, extracción como servicio, reglas, tareas ni informe.
+No existe código de extracción como servicio, reglas, tareas en la Power App ni informe. El orquestador todavía no tiene manejadores (T05 a T09).
 
 ## Pendiente
 
@@ -115,9 +120,10 @@ Si se cambia un parámetro, sube `version_parametros`: ya hubo corridas reales.
 - Pendientes del diseño que siguen abiertos: medir la ficha inyectada (decisión 26), imágenes solo donde hacen falta (decisión 8), TD-98 (decisión 14).
 - El usuario preguntó por qué, en el diagrama de secuencia, el mensaje "archivo listo" pasa por Orquestación antes del clasificador. Se propuso partir el participante "Orquestación" en "Worker de clasificación" y "Worker de resultados y reglas", y no respondió. Es relevante para el orquestador. Si el usuario retocó el `.drawio` a mano, se edita ese archivo directamente: no se regenera con el script.
 
-## Lo que viene después del orquestador
+## Lo que viene después
 
-- **Entrega 2 de la iniciativa 003: extracción.** Empieza por el contrato 0.2 de extracción (decisión 25), como versión nueva, sin editar la vigente (principio 5). Depende de S2 (enviar datos a eastus).
+- **Entrega 2 del orquestador:** resultados de la extracción, ficha del proceso, menor precio, tareas en la Power App, `reprocesar` y las piezas en Azure (Service Bus, Cosmos, OneLake, Blob, alertas).
+- **Entrega 2 de la iniciativa 003: extracción.** El contrato 0.2 ya está (T01 de la 005), así que empieza por el servicio. Depende de S2 (enviar datos a eastus).
 - **Módulo 4: reglas e informe**, con la hoja Reglas de la matriz (decisión 28).
 
 ## Riesgos y datos técnicos conocidos

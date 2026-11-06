@@ -1,6 +1,6 @@
 # Plan 005 — Orquestador, entrega 1: del aviso a la cola de extracción
 
-Estado al 2026-11-06. **Propuesto, por revisar.** Implementa la entrega 1 de `spec.md`. Decisiones del usuario que lo enmarcan (2026-11-06):
+Estado al 2026-11-06. **Acordado y en construcción** (T01 a T04 de `tasks.md`). Los ajustes que salieron al implementar ya están en el texto y explicados en las notas de `tasks.md`. Implementa la entrega 1 de `spec.md`. Decisiones del usuario que lo enmarcan (2026-11-06):
 
 - La entrega 1 llega hasta publicar las solicitudes de extracción. La vuelta de los resultados va en la entrega 2.
 - Todo se prueba en la máquina del equipo, con interfaces que tienen una versión en memoria. Service Bus, Cosmos y OneLake reales van en la entrega 2.
