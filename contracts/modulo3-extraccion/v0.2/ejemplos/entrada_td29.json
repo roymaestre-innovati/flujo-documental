@@ -1,0 +1,22 @@
+{
+  "contrato": "modulo3-extraccion/0.2",
+  "id_proceso": "SR0000000001",
+  "id_oferente": "OF-002",
+  "id_segmento": "OF-002-9c13f0a8e652-p1-2",
+  "id_documento": "OF-002-9c13f0a8e652",
+  "archivo": {
+    "uri": "https://cuenta.blob.core.windows.net/flujo/SR0000000001/OF-002/pdf/OF-002-9c13f0a8e652.pdf",
+    "sha256": "a83d1e6f2c9b0a47d5e8f1c3b6a9d2e0f7c4b1a8e5d2c9f6b3a0e7d4c1b8a5f2"
+  },
+  "paginas": {
+    "desde": 1,
+    "hasta": 2
+  },
+  "tipo_documental": "TD-29",
+  "lectura": "https://cuenta.blob.core.windows.net/flujo/SR0000000001/OF-002/lectura/OF-002-9c13f0a8e652.json",
+  "anexos": [],
+  "clasificacion_dudosa": true,
+  "tipo_oferente": "PJ_NAL",
+  "version_modelo": 21,
+  "confianza_clasificacion": 0.82
+}

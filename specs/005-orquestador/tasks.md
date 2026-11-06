@@ -2,7 +2,7 @@
 
 Sale de `plan.md`. Cada tarea termina con sus pruebas en verde y un commit propio.
 
-**Estado al 2026-11-06: por empezar.** Primero se revisan `spec.md` y `plan.md`.
+**Estado al 2026-11-06:** T01 hecha, en revisión.
 
 ## Para quien implemente
 
@@ -15,7 +15,7 @@ Sale de `plan.md`. Cada tarea termina con sus pruebas en verde y un commit propi
 
 ## Tareas
 
-- [ ] **T01 — Contratos.** Escribir `contracts/modulo5-orquestador/v0/` (`README.md`, `proceso-listo.schema.json`, `clasificacion-solicitud.schema.json`, `clasificacion-respuesta.schema.json` y ejemplos: un aviso con y sin lista de archivos, una solicitud, y respuestas normal, compuesta, dudosa e inválida) y `contracts/modulo3-extraccion/v0.2/` (`README.md`, `entrada.schema.json` y `salida.schema.json` con los ocho cambios del plan, y los ejemplos de TD-16 y TD-29 pasados a 0.2, más uno de un documento del proceso sin oferente). Validar los ejemplos contra los esquemas. `v0/` de extracción no se toca. **Detenerse aquí para revisión del usuario** (principio 5), incluido el cambio de `id_documento` a `id_segmento`.
+- [x] **T01 — Contratos.** Escribir `contracts/modulo5-orquestador/v0/` (`README.md`, `proceso-listo.schema.json`, `clasificacion-solicitud.schema.json`, `clasificacion-respuesta.schema.json` y ejemplos: un aviso con y sin lista de archivos, una solicitud, y respuestas normal, compuesta, dudosa e inválida) y `contracts/modulo3-extraccion/v0.2/` (`README.md`, `entrada.schema.json` y `salida.schema.json` con los ocho cambios del plan, y los ejemplos de TD-16 y TD-29 pasados a 0.2, más uno de un documento del proceso sin oferente). Validar los ejemplos contra los esquemas. `v0/` de extracción no se toca. **Detenerse aquí para revisión del usuario** (principio 5), incluido el cambio de `id_documento` a `id_segmento`.
 - [ ] **T02 — Esqueleto.** `servicios/orquestador/` con `pyproject.toml` (uv, pytest, `normalizacion` como dependencia de ruta), `VERSION = "0.1.0"`, los datos (`versiones.json`, `umbrales.json`, `tipos_documentales.json`) y las interfaces con su versión local: `ColaEnMemoria`, `EstadoEnMemoria`, `OrigenLocal`, `ClasificadorFalso` y el reloj. Prueba que valida los ejemplos de los contratos.
 - [ ] **T03 — Estado.** Las cinco entidades, sus transiciones permitidas, el cambio condicional con historial y `consultar(id_proceso)`. Una transición no permitida es un bug (clase 4). Requisitos R24 a R26 y R28.
 - [ ] **T04 — Bucle y errores.** El bucle común que corre un manejador sobre un mensaje y traduce cada excepción a su clase: reintentos con demora creciente, espera pedida por el servicio sin contar intento, cola de errores, `error_proceso`, registro de alerta y `reenviar_errores`. Se prueba con manejadores de juguete. Requisitos R18 a R21 y R23.
@@ -30,3 +30,20 @@ Sale de `plan.md`. Cada tarea termina con sus pruebas en verde y un commit propi
 **Al cerrar la entrega:** actualizar el estado en `spec.md`, `plan.md` (sección "Lo que cambió al implementar"), el README del repo y `contexto/HANDOFF-implementacion.md`.
 
 ## Notas de implementación
+
+### T01 — Contratos (2026-11-06)
+
+Escritos `contracts/modulo5-orquestador/v0/` (0.1) y `contracts/modulo3-extraccion/v0.2/`. Todos los ejemplos validan contra sus esquemas, con chequeo de formato de URI y fechas (por eso los comandos de validación suman `rfc3987`). La `v0/` de extracción no se tocó. Los ejemplos de 0.2 de TD-16 y TD-29 se generaron desde los de 0.1, para no perder datos.
+
+Lo que se decidió al escribir y conviene revisar:
+
+1. **`id_segmento` e `id_documento` en extracción.** El segmento es `<id_documento>-p<desde>-<hasta>`; `id_documento` es el del manifiesto. Va en la entrada y en la salida.
+2. **`id_oferente` obligatorio con `null`** en extracción y en la solicitud de clasificación, en vez de opcional, como en el contrato de normalización. El plan decía "opcional"; ya está ajustado.
+3. **`confianza_clasificacion` admite `null`** en extracción, para cuando una persona asigna el TD.
+4. **Clasificación dudosa en la salida:** todos los resultados salen con `revision: true` y el motivo `CLASIFICACION_DUDOSA`, incluidos los campos no encontrados. Así lo dice el diseño ("todo el documento va a revisión"). El ejemplo de TD-29 lo muestra.
+5. **Solicitud de clasificación:** se quitó `nombre_origen`, porque `ruta_origen` ya trae el nombre, y se agregó `version_ontologia`, la fijada para el proceso (principio 7). La respuesta devuelve la que usó y el orquestador revisa que coincida.
+6. **El aviso lleva `fecha`** (cuándo quedó completo el proceso) y `contrato`. `archivos` es opcional y, si llega, cada archivo trae `id_oferente` (`null` para los del proceso).
+7. **`subtipo` obligatorio con `null`** en cada segmento, para TD-98 y TD-07.
+8. **Ejemplo de respuesta inválida:** cumple el esquema pero le falta la página 7. Muestra que la cobertura de páginas la revisa el orquestador, no el esquema.
+9. **URI de ejemplo** con `cuenta.blob.core.windows.net`: la forma `<cuenta>` no pasa el chequeo de URI.
+

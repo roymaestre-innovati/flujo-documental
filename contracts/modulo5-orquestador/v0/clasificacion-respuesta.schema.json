@@ -1,0 +1,77 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "modulo5-orquestador/v0/clasificacion-respuesta.schema.json",
+  "title": "Respuesta del clasificador para un documento",
+  "description": "Los segmentos de un documento normalizado (C1). Además de cumplir este esquema, el orquestador revisa que los segmentos cubran todas las páginas, sin huecos ni solapes, y que cada TD exista en la matriz. Si no, pide la clasificación una vez más y, si sigue mal, crea una tarea de clasificación.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contrato",
+    "id_documento",
+    "version_ontologia",
+    "segmentos"
+  ],
+  "properties": {
+    "contrato": {
+      "const": "modulo5-orquestador/0.1"
+    },
+    "id_documento": {
+      "type": "string",
+      "minLength": 1
+    },
+    "version_ontologia": {
+      "type": "string",
+      "minLength": 1,
+      "description": "La que se usó. Debe ser la de la solicitud."
+    },
+    "segmentos": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/segmento"
+      },
+      "description": "En orden de páginas."
+    }
+  },
+  "$defs": {
+    "segmento": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "pagina_inicio",
+        "pagina_fin",
+        "tipo_documental",
+        "subtipo",
+        "confianza"
+      ],
+      "properties": {
+        "pagina_inicio": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "pagina_fin": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "tipo_documental": {
+          "type": "string",
+          "pattern": "^TD-[0-9]{2}$",
+          "description": "Identificador de la matriz (C2). Lo que no es de ningún tipo va como TD-99; no se omite."
+        },
+        "subtipo": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1,
+          "description": "Solo en los TD que tienen subtipos, por ejemplo TD-98 (criterio de desempate) o TD-07. null en los demás."
+        },
+        "confianza": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        }
+      }
+    }
+  }
+}

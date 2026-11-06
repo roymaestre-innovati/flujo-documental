@@ -1,0 +1,14 @@
+{
+  "contrato": "modulo5-orquestador/0.1",
+  "id_documento": "OF-002-9c13f0a8e652",
+  "version_ontologia": "1",
+  "segmentos": [
+    {
+      "pagina_inicio": 1,
+      "pagina_fin": 2,
+      "tipo_documental": "TD-29",
+      "subtipo": null,
+      "confianza": 0.82
+    }
+  ]
+}

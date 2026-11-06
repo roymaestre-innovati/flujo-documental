@@ -56,9 +56,9 @@ Se escriben y se revisan antes del código (T01).
 | Archivo | Frontera | Contenido |
 |---|---|---|
 | `proceso-listo.schema.json` | Módulo 1 | `contrato`, `id_proceso`, `ruta`, `archivos` opcional (lista de `{ruta, id_oferente o null}`), `fecha` |
-| `clasificacion-solicitud.schema.json` | Clasificador | `id_proceso`, `id_documento`, `pdf` (URI), `hash`, `nombre_origen`, `ruta_origen`, `lectura` (URI, opcional), `paginas` |
+| `clasificacion-solicitud.schema.json` | Clasificador | `id_proceso`, `id_oferente` (o `null`), `id_documento`, `pdf` (URI y huella), `paginas`, `ruta_origen` (incluye el nombre), `lectura` (URI) y `version_ontologia` fijada del proceso |
 | `clasificacion-respuesta.schema.json` | Clasificador | `id_documento`, `segmentos`: lista de `{pagina_inicio, pagina_fin, tipo_documental, subtipo opcional, confianza}`, y `version_ontologia` |
-| `ejemplos/` | | Un aviso, una solicitud y respuestas: normal, compuesta (varios segmentos), dudosa e inválida |
+| `ejemplos/` | | Avisos con y sin lista de archivos, una solicitud y respuestas: normal, compuesta, dudosa, de desempate e inválida |
 
 Son una propuesta para llevar al módulo 1 (A-1) y a clasificación (C1 a C3). Mientras sean 0.x se pueden cambiar avisando.
 
@@ -71,7 +71,7 @@ Son una propuesta para llevar al módulo 1 (A-1) y a clasificación (C1 a C3). M
 | 3 | Excel nativo | `anexos`: lista de URI, vacía si no hay |
 | 4 | Clasificación dudosa | `clasificacion_dudosa`: booleano; en la salida, el motivo `CLASIFICACION_DUDOSA` |
 | 5 | Versión del proceso | `version_modelo` se describe como "la registrada del proceso"; sin ella, la extracción consulta el registro, no la vigente |
-| 6 | Sin oferente | `id_oferente` deja de ser obligatorio (documentos del proceso) |
+| 6 | Sin oferente | `id_oferente` admite `null` (documentos del proceso); sigue siendo obligatorio, para que la forma sea estable |
 | 7 | TD-98 no se envía | Se excluyen TD-98 y TD-99 del patrón de `tipo_documental` |
 | 8 | `forzar_reproceso` | Igual, con la descripción de que solo lo activa `reprocesar` |
 
