@@ -2,7 +2,7 @@
 
 Sale de `plan.md`. Cada tarea termina con sus pruebas en verde y un commit propio.
 
-**Estado al 2026-11-09:** T01 a T07 fusionadas; T08 hecha, en revisión.
+**Estado al 2026-11-09:** T01 a T08 fusionadas; T09 hecha, en revisión.
 
 ## Para quien implemente
 
@@ -23,7 +23,7 @@ Sale de `plan.md`. Cada tarea termina con sus pruebas en verde y un commit propi
 - [x] **T06 — Normalizar.** Manejador de `normalizar`: baja los originales de `Origen` a una carpeta temporal que se borra al terminar, llama a `normalizar_entrega` con la versión fijada, registra cada documento, crea la tarea `documento_con_error` por cada `error_entrada` y publica un `clasificar` por documento normalizado. `ErrorEntrega` es clase 4. Requisitos R3, R6 a R8. (El límite de 2 entregas a la vez pasó a T10: ver la nota de T06.)
 - [x] **T07 — Clasificar.** Manejador de `clasificar`: arma la solicitud del contrato, llama al clasificador, valida la respuesta (un reintento), aplica los umbrales fijados, crea los segmentos y las tareas de clasificación. Las copias no llegan aquí (ver la nota de T07). TD-98 y TD-99 quedan `sin_extraccion`. Requisitos R9 a R14.
 - [x] **T08 — Solicitudes de extracción.** Por cada segmento que se extrae, arma la solicitud 0.2, la valida contra el esquema y la publica en `extraer`. Incluye los documentos del proceso sin oferente. Requisitos R16 y R17.
-- [ ] **T09 — Tareas.** Resolver una tarea de clasificación (asigna TD, registra quién y publica la solicitud) y `escalar_fallas(ahora)` para las 24 horas. Requisitos R15 y R22.
+- [x] **T09 — Tareas.** Resolver una tarea de clasificación (asigna TD, registra quién y publica la solicitud) y `escalar_fallas(ahora)` para las 24 horas. Requisitos R15 y R22.
 - [ ] **T10 — Punta a punta.** Comando `orquestar`, que normaliza como máximo 2 entregas a la vez (`paralelo_normalizar`), y prueba de punta a punta con un proceso inventado (proceso y dos oferentes, con copia, contraseña, dudosa, baja confianza y TD-99). Prueba de mensajes repetidos: cada mensaje entregado dos veces da el mismo estado y las mismas solicitudes. README del servicio completo (ya existe uno parcial). Criterios A2 y A3.
 - [ ] **T11 — Corrida con la muestra.** `scripts/correr_muestra.py`: convierte `manifiesto.csv` de la clasificación manual al CSV del clasificador falso y corre `orquestar` sobre la muestra, imprimiendo solo conteos (criterio A4). Lo corre el usuario en su máquina; se le dan los comandos y cuánto tarda.
 
@@ -142,4 +142,17 @@ Lo que se decidió al escribir y conviene revisar:
 4. **`anexos`** lleva el Excel original cuando el documento lo tiene, si no va vacía. Hay dos pruebas: una arma la solicitud con un documento de ejemplo, y otra sigue un Excel inventado de punta a punta (normalizar, clasificar y pedir la extracción) y comprueba que el anexo es el original byte a byte. Esa segunda necesita LibreOffice: está marcada `libreoffice` y se salta donde no está instalado, como en la normalización.
 5. **Una solicitud que no cumple el contrato es un bug** (`SolicitudInvalida`, clase 4): el documento queda en `error_proceso` y operación lo ve. No pasa con datos bien formados; la prueba la provoca con un TD-99.
 6. **`forzar_reproceso`** no se manda: lo activa `reprocesar`, que es de la entrega 2.
+
+### T09 — Tareas (2026-11-09)
+
+`resolucion.py`: `resolver_clasificacion`. `tareas.py`: `escalar_fallas`. `Estado.procesos()`, para que el trabajo periódico recorra todos los procesos. 154 pruebas.
+
+1. **Dos clases de tarea de clasificación.**
+   - **De un segmento** (confianza baja): la persona da un TD para las páginas de ese segmento.
+   - **De un documento entero** (respuesta inválida dos veces): la persona parte el documento en segmentos, cada uno con su TD. Se revisa con la misma función que la respuesta del clasificador: todas las páginas, sin huecos ni solapes, y cada TD existe en la versión fijada.
+2. **Lo que asigna la persona** va a extracción sin confianza (`null`) y sin marca de dudosa. TD-98 y TD-99 quedan sin extracción. El segmento guarda `asignado_por`, `asignado_en` y, en la tarea de un segmento, `tipo_sugerido`, lo que había dicho el clasificador. La tarea guarda la resolución completa, con quién y cuándo (principio 3).
+3. **La tarea se marca resuelta al final.** Si algo falla a la mitad, se puede llamar otra vez sin duplicar. Con la tarea ya resuelta no hace nada, aunque traiga otro TD: para cambiar un tipo ya asignado hará falta `reprocesar` (entrega 2).
+4. **Quién llama a `resolver_clasificacion`:** en la entrega 2, la corrección que llega de la Power App (A-2). Por ahora es una función; T10 decide si el comando local la expone.
+5. **Escalar a las 24 horas** mira entregas y documentos en `error_proceso` con `error_desde` más viejo que `horas_escalamiento`. Crea una tarea `falla_tecnica` por cada uno, una sola vez, con una referencia a lo que falló. En producción corre como trabajo periódico (entrega 2).
+6. **Si lo escalado se recupera después** (operación lo reenvía y sale bien), la tarea `falla_tecnica` sigue abierta: no se cierra sola. Cerrarla automáticamente es simple, pero no está pedido; queda para decidirlo con el uso.
 
