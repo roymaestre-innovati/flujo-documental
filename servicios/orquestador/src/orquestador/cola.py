@@ -16,6 +16,8 @@ contrato (el aviso del módulo 1 no admite campos extra).
 """
 
 import copy
+import functools
+import threading
 import datetime
 import itertools
 import json
@@ -88,6 +90,20 @@ class Cola(ABC):
         """Mensajes que faltan por completar, visibles o no, sin contar errores."""
 
 
+
+def _con_candado(metodo):
+    """Una operación a la vez: el comando local normaliza varias entregas en
+    hilos, y la versión en memoria debe portarse como el servicio real, donde
+    cada operación es atómica."""
+
+    @functools.wraps(metodo)
+    def envuelto(self, *args, **kwargs):
+        with self._candado:
+            return metodo(self, *args, **kwargs)
+
+    return envuelto
+
+
 class ColaEnMemoria(Cola):
     def __init__(self, reloj: Reloj | None = None) -> None:
         self._reloj = reloj or RelojSistema()
@@ -95,12 +111,14 @@ class ColaEnMemoria(Cola):
         self._bloqueados: dict[str, Mensaje] = {}
         self._errores: dict[str, list[MensajeEnErrores]] = defaultdict(list)
         self._ids = itertools.count(1)
+        self._candado = threading.RLock()
 
     @staticmethod
     def _revisar_cola(cola: str) -> None:
         if cola not in COLAS:
             raise ErrorCola(f"Cola desconocida: {cola}")
 
+    @_con_candado
     def publicar(self, cola: str, cuerpo: dict, demora_s: float = 0, propiedades: dict | None = None) -> str:
         self._revisar_cola(cola)
         if demora_s < 0:
@@ -114,6 +132,7 @@ class ColaEnMemoria(Cola):
         self._colas[cola].append(mensaje)
         return mensaje.id
 
+    @_con_candado
     def recibir(self, cola: str) -> Mensaje | None:
         self._revisar_cola(cola)
         ahora = self._reloj.ahora()
@@ -132,32 +151,39 @@ class ColaEnMemoria(Cola):
         except KeyError:
             raise ErrorCola(f"El mensaje {mensaje.id} no está bloqueado: ya se completó o nunca se recibió") from None
 
+    @_con_candado
     def completar(self, mensaje: Mensaje) -> None:
         self._soltar(mensaje)
 
+    @_con_candado
     def abandonar(self, mensaje: Mensaje) -> None:
         original = self._soltar(mensaje)
         original.visible_desde = self._reloj.ahora()
         self._colas[original.cola].append(original)
 
+    @_con_candado
     def a_errores(self, mensaje: Mensaje, motivo: str) -> None:
         original = self._soltar(mensaje)
         self._errores[original.cola].append(MensajeEnErrores(original, motivo, self._reloj.ahora()))
 
+    @_con_candado
     def errores(self, cola: str) -> list[MensajeEnErrores]:
         self._revisar_cola(cola)
         return copy.deepcopy(self._errores[cola])
 
+    @_con_candado
     def sacar_de_errores(self, cola: str) -> list[MensajeEnErrores]:
         self._revisar_cola(cola)
         sacados, self._errores[cola] = self._errores[cola], []
         return sacados
 
+    @_con_candado
     def pendientes(self, cola: str) -> int:
         self._revisar_cola(cola)
         en_curso = sum(1 for m in self._bloqueados.values() if m.cola == cola)
         return len(self._colas[cola]) + en_curso
 
+    @_con_candado
     def proxima_visible(self) -> datetime.datetime | None:
         """Cuándo se vuelve visible el próximo mensaje con demora, en cualquier cola.
 
