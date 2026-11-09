@@ -2,7 +2,7 @@
 
 Sale de `plan.md`. Cada tarea termina con sus pruebas en verde y un commit propio.
 
-**Estado al 2026-11-09:** T01 a T04 fusionadas; T05 hecha, en revisión.
+**Estado al 2026-11-09:** T01 a T05 fusionadas; T06 hecha, en revisión.
 
 ## Para quien implemente
 
@@ -20,11 +20,11 @@ Sale de `plan.md`. Cada tarea termina con sus pruebas en verde y un commit propi
 - [x] **T03 — Estado.** Las cinco entidades, sus transiciones permitidas, el cambio condicional con historial y `consultar(id_proceso)`. Una transición no permitida es un bug (clase 4). Requisitos R24 a R26 y R28.
 - [x] **T04 — Bucle y errores.** El bucle común que corre un manejador sobre un mensaje y traduce cada excepción a su clase: reintentos con demora creciente, espera pedida por el servicio sin contar intento, cola de errores, `error_proceso`, registro de alerta y `reenviar_errores`. Se prueba con manejadores de juguete. Requisitos R18 a R21 y R23.
 - [x] **T05 — Apertura.** Manejador de `procesos-listos`: valida el aviso, abre el proceso con `crear_si_no_existe`, fija las versiones, reparte las entregas (con la lista de archivos del aviso, sin leer el origen, o listando las carpetas) y publica un `normalizar` por entrega. Requisitos R1 a R5.
-- [ ] **T06 — Normalizar.** Manejador de `normalizar`: baja los originales de `Origen` a una carpeta temporal que se borra al terminar, llama a `normalizar_entrega` con la versión fijada, registra cada documento, crea la tarea `documento_con_error` por cada `error_entrada` y publica un `clasificar` por documento normalizado. `ErrorEntrega` es clase 4. Como máximo 2 entregas a la vez (`paralelo_normalizar`), también en la versión local. Requisitos R3, R6 a R8.
+- [x] **T06 — Normalizar.** Manejador de `normalizar`: baja los originales de `Origen` a una carpeta temporal que se borra al terminar, llama a `normalizar_entrega` con la versión fijada, registra cada documento, crea la tarea `documento_con_error` por cada `error_entrada` y publica un `clasificar` por documento normalizado. `ErrorEntrega` es clase 4. Requisitos R3, R6 a R8. (El límite de 2 entregas a la vez pasó a T10: ver la nota de T06.)
 - [ ] **T07 — Clasificar.** Manejador de `clasificar`: arma la solicitud del contrato, llama al clasificador, valida la respuesta (un reintento), aplica los umbrales fijados, crea los segmentos y las tareas de clasificación. Las copias toman los segmentos del original. TD-98 y TD-99 quedan `sin_extraccion`. Requisitos R9 a R14.
 - [ ] **T08 — Solicitudes de extracción.** Por cada segmento que se extrae, arma la solicitud 0.2, la valida contra el esquema y la publica en `extraer`. Incluye los documentos del proceso sin oferente. Requisitos R16 y R17.
 - [ ] **T09 — Tareas.** Resolver una tarea de clasificación (asigna TD, registra quién y publica la solicitud) y `escalar_fallas(ahora)` para las 24 horas. Requisitos R15 y R22.
-- [ ] **T10 — Punta a punta.** Comando `orquestar` y prueba de punta a punta con un proceso inventado (proceso y dos oferentes, con copia, contraseña, dudosa, baja confianza y TD-99). Prueba de mensajes repetidos: cada mensaje entregado dos veces da el mismo estado y las mismas solicitudes. README del servicio completo (ya existe uno parcial). Criterios A2 y A3.
+- [ ] **T10 — Punta a punta.** Comando `orquestar`, que normaliza como máximo 2 entregas a la vez (`paralelo_normalizar`), y prueba de punta a punta con un proceso inventado (proceso y dos oferentes, con copia, contraseña, dudosa, baja confianza y TD-99). Prueba de mensajes repetidos: cada mensaje entregado dos veces da el mismo estado y las mismas solicitudes. README del servicio completo (ya existe uno parcial). Criterios A2 y A3.
 - [ ] **T11 — Corrida con la muestra.** `scripts/correr_muestra.py`: convierte `manifiesto.csv` de la clasificación manual al CSV del clasificador falso y corre `orquestar` sobre la muestra, imprimiendo solo conteos (criterio A4). Lo corre el usuario en su máquina; se le dan los comandos y cuánto tarda.
 
 **Al cerrar la entrega:** actualizar el estado en `spec.md`, `plan.md` (sección "Lo que cambió al implementar"), el README del repo y `contexto/HANDOFF-implementacion.md`.
@@ -105,4 +105,17 @@ Lo que se decidió al escribir y conviene revisar:
 5. **Versiones fijadas** en el proceso: las vigentes de `datos/versiones.json` más la versión del normalizador y de sus parámetros.
 6. **El proceso no tiene estado de error.** Si la apertura falla, no se abrió nada que el evaluador deba ver: el aviso queda en errores y le llega a operación por la alerta. `al_fallar` solo lo registra.
 7. **`estados.anotar`**: suma datos a un registro sin cambiar su estado, para marcas como `entregas_publicadas`.
+
+### T06 — Normalizar (2026-11-09)
+
+`normalizar.py`: el manejador de `normalizar`. 105 pruebas, con PDF inventados hechos con reportlab y pikepdf (sin LibreOffice).
+
+1. **El límite de 2 entregas a la vez pasó a T10.** Un manejador procesa un mensaje; cuántos corren en paralelo lo decide quien los corre: en producción, la configuración del job en Container Apps (entrega 2); en local, el comando `orquestar` de T10. Por eso se movió de T06 a T10.
+2. **`ruta_origen` sin la carpeta de la entrega.** `OF-001/sub/carta.pdf` se baja como `sub/carta.pdf`, que es lo que entregó el oferente y de donde sale el `id_documento`. Con la lista del aviso, si el archivo no está bajo una carpeta con el nombre de la entrega, queda con su ruta completa.
+3. **La entrega pasa a `procesando` al final**, después de registrar documentos, tareas y mensajes. Esa es la marca de "hecho": si el trabajador se cae antes, el mensaje se repite y todo se hace otra vez sin duplicar (la normalización reusa, `crear` no pisa). Los `clasificar` sí pueden salir dos veces; T07 los absorbe.
+4. **Un archivo que falta en el origen es una falla transitoria**: se reintenta y, si no aparece, la entrega queda en `error_proceso` para operación. Con OneLake puede ser un problema de red o de permisos.
+5. **Versión del normalizador distinta de la fijada:** no se normaliza; la entrega va a errores con `VersionNoCoincide`. Se resuelve con `reprocesar` (entrega 2), que deja constancia de por qué.
+6. **El documento guarda del manifiesto** su ruta de origen, huella, tipo, URI del PDF, anexo y lectura, páginas, `duplicado_de` y error. La ruta de origen hace falta para la solicitud al clasificador.
+7. **La tarea "documento con error"** lleva el código y el `detalle` que escribe la normalización, que dice qué pedirle al oferente y no trae texto del documento.
+8. **Al volver de `error_proceso`** la entrega borra su `error`. El historial conserva el paso por el error.
 
