@@ -2,7 +2,7 @@
 
 Sale de `plan.md`. Cada tarea termina con sus pruebas en verde y un commit propio.
 
-**Estado al 2026-11-09:** T01 a T09 fusionadas; T10 hecha, en revisión.
+**Estado al 2026-11-09:** T01 a T10 fusionadas; el script de T11 está hecho, en revisión. Falta que el usuario corra la muestra y, con los resultados, cerrar la entrega.
 
 ## Para quien implemente
 
@@ -167,3 +167,14 @@ Lo que se decidió al escribir y conviene revisar:
 5. **El comando imprime solo conteos** y deja en `<salida>` el estado, las solicitudes, los errores y los conteos. Se niega a escribir dentro de un repositorio git, porque la salida trae datos personales. Termina con 1 si algo quedó en errores.
 6. **El comando no resuelve tareas.** Resolver queda como función, para la Power App en la entrega 2. Para la muestra (T11) no hace falta: basta con ver cuántas tareas quedan.
 7. **Para la entrega 2:** dos trabajadores pueden normalizar la misma entrega a la vez si el `normalizar` llega repetido. En local da el mismo resultado, pero escriben los mismos archivos del almacén al mismo tiempo. Con Blob conviene revisar que la escritura sea de reemplazo completo (lo es por defecto) o tomar un lease por entrega.
+
+### T11 — Corrida con la muestra (2026-11-09)
+
+`scripts/correr_muestra.py`: convierte la clasificación manual al CSV del clasificador falso, arma la carpeta del proceso con una subcarpeta `OF-00N` por oferente (con enlaces duros, sin copiar) y corre la corrida local. Imprime solo conteos. 166 pruebas; las del script usan una muestra inventada.
+
+1. **Cómo se empareja el manifiesto con la muestra.** Los oferentes del manifiesto no se llaman como las carpetas, y `origen` trae una carpeta de más al principio. El script quita esa carpeta y empareja cada oferente del manifiesto con la carpeta donde están más de sus archivos. Las filas que no encuentran su archivo no se usan, y su documento sale TD-99 (el clasificador falso no lo conoce).
+2. **Ensayo del emparejamiento con la muestra real (solo conteos, sin correr el orquestador):** 121 filas, 101 usadas. 6 de las 7 carpetas tienen clasificación; **OF-007 (la carpeta `muestra`) no**: las 17 filas de su oferente no coinciden con sus archivos. Con eso, OF-007 sale toda TD-99 y no pide extracciones. Hay que revisarlo antes de dar por cumplido A4. Otras 3 filas de otro oferente tampoco encuentran su archivo.
+3. **"SIN CLASIFICAR" se trata como TD-99**: la persona no le encontró tipo. No se extrae.
+4. **Clasificación por páginas** (`origen` con ` (p4-33)`): los huecos se llenan con TD-99 contando las páginas del PDF, para que la respuesta cubra todo el documento. Si las páginas del PDF normalizado no coinciden con las del original, el documento queda con una tarea `RESPUESTA_INVALIDA`, y se ve en los conteos.
+5. **Confianza 1,0** en todas las filas: la clasificación es de una persona. Por eso la muestra no ejercita los umbrales; eso lo cubren las pruebas inventadas.
+6. **La salida** va por defecto a una carpeta temporal que se borra al terminar. Con `--salida` se conserva, en una carpeta vacía fuera de cualquier repositorio.
