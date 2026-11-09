@@ -101,3 +101,39 @@ def test_solicitud_que_no_cumple_el_contrato_es_un_bug(tmp_path):
     extraer = Extraer(c.ColaEnMemoria(), Almacen())
     with pytest.raises(SolicitudInvalida, match="tipo_documental: no cumple 'not'"):
         extraer.pedir(PROCESO, DOCUMENTO, malo)
+
+
+@pytest.mark.libreoffice
+def test_excel_real_de_punta_a_punta_lleva_su_anexo(tmp_path):
+    """Un Excel entregado por el oferente se normaliza (PDF + original como anexo),
+    se clasifica y su solicitud de extracción lleva el Excel original."""
+    import io
+
+    import openpyxl
+
+    libro = openpyxl.Workbook()
+    hoja = libro.active
+    hoja.append(["Ítem", "Descripción", "Valor"])
+    for n in range(1, 6):
+        hoja.append([n, f"Servicio inventado {n}", n * 1000])
+    contenido = io.BytesIO()
+    libro.save(contenido)
+    escribir(tmp_path, "OF-001/oferta_economica.xlsx", contenido.getvalue())
+    (tmp_path / "c.csv").write_text(
+        "id_oferente,ruta_origen,pagina_inicio,pagina_fin,tipo_documental,confianza\n"
+        "OF-001,oferta_economica.xlsx,,,TD-35,0.97\n", encoding="utf-8")
+
+    mundo = Mundo(tmp_path)
+    mundo.abrir()
+    assert {r.desenlace for r in mundo.correr(mundo.normalizar)} == {"ok"}
+    extraer = Extraer(mundo.cola, mundo.almacen)
+    clasificar = Clasificar(mundo.estado, mundo.almacen, ClasificadorFalso(tmp_path / "c.csv"), extraer, mundo.reloj)
+    assert {r.desenlace for r in mundo.correr(clasificar)} == {"ok"}
+
+    [s] = mundo.sacar(c.EXTRAER)
+    contratos.validar(contratos.EXTRACCION_ENTRADA, s)
+    assert s["tipo_documental"] == "TD-35"
+    [anexo] = s["anexos"]
+    assert anexo.endswith(".xlsx")
+    assert mundo.almacen.leer(anexo) == contenido.getvalue(), "el anexo es el Excel original, byte a byte"
+    assert s["archivo"]["uri"].endswith(".pdf")

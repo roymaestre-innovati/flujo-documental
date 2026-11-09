@@ -13,7 +13,7 @@ uv sync
 uv run pytest
 ```
 
-La normalización (`../normalizacion`) se instala como dependencia de ruta, editable: un cambio allá se ve aquí sin reinstalar. Las pruebas del orquestador no necesitan LibreOffice.
+La normalización (`../normalizacion`) se instala como dependencia de ruta, editable: un cambio allá se ve aquí sin reinstalar. Las pruebas del orquestador no necesitan LibreOffice, salvo una marcada `libreoffice` (un Excel de punta a punta), que se salta si `soffice` no está instalado.
 
 ## Qué hay
 

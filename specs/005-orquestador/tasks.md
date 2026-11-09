@@ -134,12 +134,12 @@ Lo que se decidió al escribir y conviene revisar:
 
 ### T08 — Solicitudes de extracción (2026-11-09)
 
-`extraer.py`: `solicitud` arma el mensaje 0.2 y `Extraer` lo valida y lo publica en `extraer`. Es la implementación de `Solicitudes` que usa T07. 139 pruebas.
+`extraer.py`: `solicitud` arma el mensaje 0.2 y `Extraer` lo valida y lo publica en `extraer`. Es la implementación de `Solicitudes` que usa T07. 140 pruebas, una de ellas con LibreOffice.
 
 1. **Huella del PDF:** se lee `hash_pdf` de la lectura, como en la solicitud de clasificación. Leer la lectura otra vez cuesta poco y evita guardar la huella en dos lugares.
 2. **`tipo_oferente` no se manda.** Es opcional en el contrato y todavía no se sabe de dónde sale (O3). Sin él, la extracción deja sin evaluar los campos condicionales.
 3. **`confianza_clasificacion` va en `null`** cuando el tipo lo asignó una persona (T09).
-4. **`anexos`** lleva el Excel original cuando el documento lo tiene, si no va vacía. No hay prueba con un Excel real porque convertirlo necesita LibreOffice: se prueba armando la solicitud con un documento de ejemplo.
+4. **`anexos`** lleva el Excel original cuando el documento lo tiene, si no va vacía. Hay dos pruebas: una arma la solicitud con un documento de ejemplo, y otra sigue un Excel inventado de punta a punta (normalizar, clasificar y pedir la extracción) y comprueba que el anexo es el original byte a byte. Esa segunda necesita LibreOffice: está marcada `libreoffice` y se salta donde no está instalado, como en la normalización.
 5. **Una solicitud que no cumple el contrato es un bug** (`SolicitudInvalida`, clase 4): el documento queda en `error_proceso` y operación lo ve. No pasa con datos bien formados; la prueba la provoca con un TD-99.
 6. **`forzar_reproceso`** no se manda: lo activa `reprocesar`, que es de la entrega 2.
 
