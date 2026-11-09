@@ -13,6 +13,8 @@ from pathlib import Path
 from jsonschema import Draft202012Validator
 from jsonschema.exceptions import ValidationError
 
+from .errores import MensajeRechazado
+
 PROCESO_LISTO = "modulo5-orquestador/v0/proceso-listo"
 CLASIFICACION_SOLICITUD = "modulo5-orquestador/v0/clasificacion-solicitud"
 CLASIFICACION_RESPUESTA = "modulo5-orquestador/v0/clasificacion-respuesta"
@@ -27,8 +29,8 @@ def carpeta_contratos() -> Path:
     return Path(__file__).resolve().parents[4] / "contracts"
 
 
-class MensajeInvalido(Exception):
-    """El mensaje no cumple su contrato."""
+class MensajeInvalido(MensajeRechazado):
+    """El mensaje no cumple su contrato. Su texto lleva solo campos y reglas, sin valores."""
 
     def __init__(self, esquema: str, errores: list[str]) -> None:
         self.esquema = esquema

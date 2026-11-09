@@ -209,6 +209,27 @@ def cambiar(
     raise Conflicto(f"{tipo} {id}: siguió cambiando después de {intentos} intentos")
 
 
+def anotar(
+    estado: Estado, id_proceso: str, tipo: str, id: str, datos: dict, intentos: int = 5,
+) -> Registro:
+    """Suma `datos` al registro sin cambiar su estado ni su historial.
+
+    Para marcas de trabajo hecho, como "ya se publicaron las entregas". Si otro
+    trabajador lo cambió entre la lectura y la escritura, lo vuelve a intentar.
+    """
+    if reservados := [k for k in RESERVADOS if k in datos]:
+        raise TransicionNoPermitida(f"Campos reservados en los datos: {', '.join(reservados)}")
+    for _ in range(intentos):
+        registro = estado.leer(id_proceso, tipo, id)
+        if registro is None:
+            raise NoExiste(f"No existe {tipo} {id} en {id_proceso}")
+        try:
+            return estado.reemplazar(registro, {**registro.datos, **datos})
+        except Conflicto:
+            continue
+    raise Conflicto(f"{tipo} {id}: siguió cambiando después de {intentos} intentos")
+
+
 def consultar(estado: Estado, id_proceso: str) -> dict | None:
     """En qué va un proceso (R25): por entrega, cuántos documentos y segmentos
     hay en cada estado, cuántos registros siguen en un estado intermedio

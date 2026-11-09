@@ -2,7 +2,7 @@
 
 Sale de `plan.md`. Cada tarea termina con sus pruebas en verde y un commit propio.
 
-**Estado al 2026-11-06:** T01 a T03 fusionadas; T04 hecha, en revisión.
+**Estado al 2026-11-09:** T01 a T04 fusionadas; T05 hecha, en revisión.
 
 ## Para quien implemente
 
@@ -19,7 +19,7 @@ Sale de `plan.md`. Cada tarea termina con sus pruebas en verde y un commit propi
 - [x] **T02 — Esqueleto.** `servicios/orquestador/` con `pyproject.toml` (uv, pytest, `normalizacion` como dependencia de ruta), `VERSION = "0.1.0"`, los datos (`versiones.json`, `umbrales.json`, `tipos_documentales.json`) y las interfaces con su versión local: `ColaEnMemoria`, `EstadoEnMemoria`, `OrigenLocal`, `ClasificadorFalso` y el reloj. Prueba que valida los ejemplos de los contratos.
 - [x] **T03 — Estado.** Las cinco entidades, sus transiciones permitidas, el cambio condicional con historial y `consultar(id_proceso)`. Una transición no permitida es un bug (clase 4). Requisitos R24 a R26 y R28.
 - [x] **T04 — Bucle y errores.** El bucle común que corre un manejador sobre un mensaje y traduce cada excepción a su clase: reintentos con demora creciente, espera pedida por el servicio sin contar intento, cola de errores, `error_proceso`, registro de alerta y `reenviar_errores`. Se prueba con manejadores de juguete. Requisitos R18 a R21 y R23.
-- [ ] **T05 — Apertura.** Manejador de `procesos-listos`: valida el aviso, abre el proceso con `crear_si_no_existe`, fija las versiones, reparte las entregas (con la lista de archivos del aviso, sin leer el origen, o listando las carpetas) y publica un `normalizar` por entrega. Requisitos R1 a R5.
+- [x] **T05 — Apertura.** Manejador de `procesos-listos`: valida el aviso, abre el proceso con `crear_si_no_existe`, fija las versiones, reparte las entregas (con la lista de archivos del aviso, sin leer el origen, o listando las carpetas) y publica un `normalizar` por entrega. Requisitos R1 a R5.
 - [ ] **T06 — Normalizar.** Manejador de `normalizar`: baja los originales de `Origen` a una carpeta temporal que se borra al terminar, llama a `normalizar_entrega` con la versión fijada, registra cada documento, crea la tarea `documento_con_error` por cada `error_entrada` y publica un `clasificar` por documento normalizado. `ErrorEntrega` es clase 4. Como máximo 2 entregas a la vez (`paralelo_normalizar`), también en la versión local. Requisitos R3, R6 a R8.
 - [ ] **T07 — Clasificar.** Manejador de `clasificar`: arma la solicitud del contrato, llama al clasificador, valida la respuesta (un reintento), aplica los umbrales fijados, crea los segmentos y las tareas de clasificación. Las copias toman los segmentos del original. TD-98 y TD-99 quedan `sin_extraccion`. Requisitos R9 a R14.
 - [ ] **T08 — Solicitudes de extracción.** Por cada segmento que se extrae, arma la solicitud 0.2, la valida contra el esquema y la publica en `extraer`. Incluye los documentos del proceso sin oferente. Requisitos R16 y R17.
@@ -86,4 +86,23 @@ Lo que se decidió al escribir y conviene revisar:
 6. **Motivos sin datos personales:** solo el tipo de la excepción y el lugar del código (`KeyError en clasificar.py:42`), nunca su mensaje, con la misma función que la normalización. La alerta va al registro `orquestador.alertas` con nivel ERROR y los identificadores del mensaje.
 7. **Renovar el bloqueo** de Service Bus queda para el bucle de la entrega 2: en memoria no vence.
 8. **`reenviar_errores`** publica de nuevo desde el primer intento y conserva las demás propiedades.
+
+### T05 — Apertura (2026-11-09)
+
+`apertura.py`: el manejador de `procesos-listos` y `repartir`, la función que reparte los archivos entre entregas. 94 pruebas.
+
+1. **Aviso que no se puede procesar: clase nueva `MensajeRechazado`.** Va a errores sin reintento y con alerta, igual que un bug, pero con el motivo `Rechazado: …` en vez de `Bug: …`, para que operación sepa que hay que hablar con el módulo 1 y no arreglar código. `MensajeInvalido` (no cumple el contrato) es un caso de esta clase. El motivo lleva solo campos, conteos y códigos, nunca rutas.
+2. **Se rechaza el aviso entero si:**
+   - no cumple el contrato;
+   - la carpeta no existe;
+   - hay archivos sueltos en la raíz;
+   - no trae archivos o no trae ningún oferente;
+   - un oferente se llama `PROCESO`.
+   
+   No se procesa a medias: un archivo suelto podría ser de un oferente. Un proceso sin entrega `PROCESO` sí se acepta, con los oferentes solos: la ficha, que necesita la CPC, es de la entrega 2.
+3. **El aviso repetido** se reconoce por la marca `entregas_publicadas` del proceso. Con la marca, no hace nada; si trae otra ruta o fecha, se registra un aviso y se ignora: gana el primero (A-10 sigue en pausa). Sin la marca, el trabajador anterior se cayó a la mitad: se publican otra vez todas las entregas y alguna sale repetida, cosa que absorbe T06.
+4. **El mensaje `normalizar` lleva solo `id_proceso` y `entrega`.** La lista de archivos de cada entrega queda en su registro de estado, así los mensajes no llevan rutas con nombres. El plan ponía también la ruta; ya está ajustado.
+5. **Versiones fijadas** en el proceso: las vigentes de `datos/versiones.json` más la versión del normalizador y de sus parámetros.
+6. **El proceso no tiene estado de error.** Si la apertura falla, no se abrió nada que el evaluador deba ver: el aviso queda en errores y le llega a operación por la alerta. `al_fallar` solo lo registra.
+7. **`estados.anotar`**: suma datos a un registro sin cambiar su estado, para marcas como `entregas_publicadas`.
 

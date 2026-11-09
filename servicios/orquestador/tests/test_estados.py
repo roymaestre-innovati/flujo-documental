@@ -212,3 +212,14 @@ def test_consultar(estado, reloj):
     assert resumen["entregas"]["OF-002"]["en_curso"] == 1  # recibido, sin normalizar
     assert resumen["tareas_abiertas"] == [{"id": "documento_con_error-OF-001-c", "entrega": "OF-001",
                                            "clase": "documento_con_error", "motivo": "CONTRASENA"}]
+
+
+def test_anotar_suma_datos_sin_cambiar_estado_ni_historial(estado, reloj):
+    _documento(estado, reloj)
+    registro = e.anotar(estado, P, e.DOCUMENTO, "OF-001-aaa", {"marca": True})
+    assert (registro.datos["estado"], registro.datos["marca"], len(registro.datos["historial"])) == (
+        e.NORMALIZADO, True, 1)
+    with pytest.raises(e.TransicionNoPermitida):
+        e.anotar(estado, P, e.DOCUMENTO, "OF-001-aaa", {"estado": "otro"})
+    with pytest.raises(e.NoExiste):
+        e.anotar(estado, P, e.DOCUMENTO, "no-hay", {})
