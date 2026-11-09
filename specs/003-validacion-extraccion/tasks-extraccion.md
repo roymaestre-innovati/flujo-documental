@@ -2,7 +2,7 @@
 
 Sale de `plan-extraccion.md`. Cada tarea termina con sus pruebas en verde y un commit propio.
 
-**Estado al 2026-11-09:** spec, plan y tareas aprobados. T01 fusionada. T02 hecha, en revisión.
+**Estado al 2026-11-09:** spec, plan y tareas aprobados. T01 y T02 fusionadas. T03 hecha, en revisión.
 
 ## Para quien implemente
 
@@ -19,7 +19,7 @@ Sale de `plan-extraccion.md`. Cada tarea termina con sus pruebas en verde y un c
 
 - [x] **T01 — Esqueleto y dobles.** `servicios/extraccion/` con `pyproject.toml` (uv, pytest, `normalizacion` como dependencia de ruta), `VERSION = "0.1.0"`, `datos/parametros.json`, `datos/respuesta.schema.json`, `contratos.py`, las interfaces `FuenteModelo` (con `FuenteModeloArchivo`), `ClienteLLM` (con `LLMFalso`) y `Resultados` (con `ResultadosEnCarpeta`), y el reloj. Fichas de prueba de TD-16, TD-29 y TD-01 con la forma de `obtener_seccion`, y respuestas falsas que dan los ejemplos del contrato. Pruebas: los ejemplos del contrato y las respuestas falsas validan contra sus esquemas.
 - [x] **T02 — Entrada.** Mover `en_el_almacen` a `normalizacion.almacen` (el visor la importa de ahí). `entrada.py`: valida la solicitud, resuelve las URI, comprueba las huellas, lee la lectura y revisa el rango, con los errores de la tabla del plan. Requisitos R26 a R30.
-- [ ] **T03 — Preprocesamiento.** `preproceso.py`: qué va de cada página según su tipo, imagen con pypdfium2, firma ampliada a 300 dpi desde las anclas, valores del anexo con openpyxl y tope con `ANEXO_RECORTADO`, y `lectura` de la salida. Pruebas con PDF y xlsx inventados pasados por `normalizar_entrega`. Requisitos R31 a R34 y R36.
+- [x] **T03 — Preprocesamiento.** `preproceso.py`: qué va de cada página según su tipo, imagen con pypdfium2, firma ampliada a 300 dpi desde las anclas, valores del anexo con openpyxl y tope con `ANEXO_RECORTADO`, y `lectura` de la salida. Pruebas con PDF y xlsx inventados pasados por `normalizar_entrega`. Requisitos R31 a R34 y R36.
 - [ ] **T04 — Mensaje y prompt.** `datos/prompt.md` (los cambios del plan sobre el `prompt.md` del modelo semántico) y `mensaje.py` (sistema: prompt + guía; usuario: ficha + contenido). Pruebas: el mensaje solo lleva las páginas del segmento, numeradas sobre el documento completo, y la ficha de la versión pedida. **Alto para que el usuario revise el prompt.** Requisito R35.
 - [ ] **T05 — Posvalidación.** `posvalidacion.py` y `validadores.py`: forma, `no_corresponde`, alineación con la ficha, citas fuera del segmento, validadores, motivos, `datos_personales` y sobre validado contra el contrato. Con el `LLMFalso`, las solicitudes de ejemplo dan las salidas de ejemplo (criterio A7). Requisitos R37 a R48, R55 y R56.
 - [ ] **T06 — Llamada.** `llm_azure.py` (chat completions con `json_object`, traducción de 429, tiempo agotado y 5xx a las excepciones de `llm.py`, y rechazo de un deployment `mini`) y `llamada.py` (reintentos de la tabla del plan y semáforo global). Las pruebas no tocan la red: un cliente HTTP falso para `llm_azure` y el `LLMFalso` con fallas programadas para `llamada`. Requisitos R49 a R52 y R54.
@@ -71,3 +71,15 @@ Lo que se decidió al escribir y conviene revisar:
 3. **Huella:** se compara el SHA-256 del PDF con `archivo.sha256` (si viene) y siempre con `hash_pdf` de la lectura. Si no coincide, `ARCHIVO_DISTINTO`.
 4. **Orden de las revisiones:** primero el contrato y la versión, después la lectura, el PDF y su huella, y al final el rango. Un documento que cambió se informa como falla técnica antes que como rango fuera.
 5. **El mensaje del rango** dice "de la N a la M", algo distinto del ejemplo `salida_error.json` ("hasta la 9"). El ejemplo es solo una muestra; el contrato no fija el texto.
+
+### T03 — Preprocesamiento (2026-11-09)
+
+`preproceso.py` con `preparar_contenido(entrada) → Contenido`: por página, el texto (marcado si es del escáner), la imagen y las firmas ampliadas, más los anexos y las alertas, y `Contenido.lectura()` para el campo `lectura` de la salida. Dependencias nuevas: `pypdfium2` (Apache-2.0 / BSD-3), `pillow` y `openpyxl`. La fábrica suma un PDF de seis páginas, una de cada caso (texto, texto con firma, escaneo, escaneo con capa de texto y firma, en blanco y girada), y una hoja de cálculo. 49 pruebas.
+
+Lo que se decidió al escribir y conviene revisar:
+
+1. **Zona de la firma:** la caja del ancla (que ya trae la línea y su rótulo) más 3 renglones de 14 puntos hacia arriba, 1 hacia abajo y media pulgada a cada lado, a 300 dpi. El plan decía "a todo el ancho de la columna"; se dejó un margen fijo porque la lectura no dice dónde están las columnas. Una línea de firma típica da una imagen de unos 1.100 × 340 píxeles.
+2. **Páginas giradas:** la imagen de la página sale como se ve en un visor (pdfium aplica la rotación). El recorte se dibuja sobre la página sin girar, porque las cajas de la lectura son de la página sin girar, y después se gira la imagen.
+3. **Firmas en páginas `escaneo_con_ocr`:** también se amplían cuando la capa del escáner trajo el rótulo y la normalización encontró el ancla.
+4. **Anexos:** se leen con openpyxl solo los xlsx y xlsm, con los valores que guardó Excel (no calcula fórmulas). Un xls, un ods o un archivo dañado no frena la extracción: queda la alerta `ANEXO_NO_LEIDO` y se usa solo el PDF. El tope es de 60.000 caracteres por anexo, con la alerta `ANEXO_RECORTADO`.
+5. **Las alertas del preprocesamiento** no traen datos del documento, solo el número del anexo. Van a la salida junto con las del LLM (T05).
