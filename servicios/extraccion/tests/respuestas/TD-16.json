@@ -1,0 +1,179 @@
+{
+ "corresponde": true,
+ "motivo_no_corresponde": null,
+ "resultados": [
+  {
+   "id_tecnico": "td16.subtipo",
+   "evidencia": [
+    {
+     "pagina": 1,
+     "cita": "en mi condición de Revisor Fiscal de OFERENTE EJEMPLO LTDA identificada con NIT 900.123.456-8",
+     "visual": null
+    }
+   ],
+   "valor": "PJ",
+   "confianza": 0.98,
+   "cumple": null,
+   "reglas_pendientes": [],
+   "motivos": [],
+   "observacion": null
+  },
+  {
+   "id_tecnico": "td16.sociedad",
+   "evidencia": [
+    {
+     "pagina": 1,
+     "cita": "Revisor Fiscal de OFERENTE EJEMPLO LTDA identificada con NIT 900.123.456-8",
+     "visual": null
+    }
+   ],
+   "valor": {
+    "razon_social": "OFERENTE EJEMPLO LTDA",
+    "nit": "900123456-8"
+   },
+   "confianza": 0.98,
+   "cumple": "SI",
+   "reglas_pendientes": [
+    {
+     "texto": "= oferente o integrante de EP",
+     "requiere": [
+      "datos del oferente"
+     ]
+    }
+   ],
+   "motivos": [],
+   "observacion": "DV del NIT verificado (validador nit_dv)."
+  },
+  {
+   "id_tecnico": "td16.firmante",
+   "evidencia": [
+    {
+     "pagina": 1,
+     "cita": "Yo, Ana María Pérez Gómez, identificado con cédula de ciudadanía No. 1000000001, y con Tarjeta Profesional No. 000001-T de la Junta Central de Contadores, en mi condición de Revisor Fiscal",
+     "visual": null
+    },
+    {
+     "pagina": 1,
+     "cita": "______________________ REVISORA FISCAL CC. 1.000.000.001 T.P: 000001-T",
+     "visual": "ampliación de la zona de firma: línea vacía, sin trazo ni sello sobre ella"
+    }
+   ],
+   "valor": [
+    {
+     "rol": "RF",
+     "nombre": "Ana María Pérez Gómez",
+     "documento": "1000000001",
+     "cargo": "Revisora Fiscal",
+     "tarjeta_profesional": "000001-T",
+     "firma": "NO"
+    }
+   ],
+   "confianza": 0.97,
+   "cumple": "NO",
+   "reglas_pendientes": [
+    {
+     "texto": "RF si la sociedad está obligada (ver td07.junta_directiva_y_revisor); RL si no",
+     "requiere": [
+      "TD-07"
+     ]
+    },
+    {
+     "texto": "Si firma RF: exigir TD-26 y TD-27 de esa persona",
+     "requiere": [
+      "TD-26",
+      "TD-27"
+     ]
+    }
+   ],
+   "motivos": [],
+   "observacion": "Regla td16.firmante.r1 'Firmado por al menos un firmante (firma = SI)': la única línea de firma está vacía en la ampliación."
+  },
+  {
+   "id_tecnico": "td16.paz_y_salvo",
+   "evidencia": [
+    {
+     "pagina": 1,
+     "cita": "certifico que la empresa se encuentra a paz y salvo con el pago de los aportes de sus empleados a los sistemas de salud, riesgos laborales, pensiones y parafiscales al momento de presentar la Oferta (si aplica).",
+     "visual": null
+    }
+   ],
+   "valor": {
+    "salud": "SI",
+    "riesgos_laborales": "SI",
+    "pensiones": "SI",
+    "parafiscales": "SI",
+    "periodo": "al momento de presentar la Oferta (si aplica)"
+   },
+   "confianza": 0.98,
+   "cumple": "SI",
+   "reglas_pendientes": [
+    {
+     "texto": "Periodo exigido por la CPC (art. 50 Ley 789/2002)",
+     "requiere": [
+      "TD-01"
+     ]
+    }
+   ],
+   "motivos": [],
+   "observacion": null
+  },
+  {
+   "id_tecnico": "td16.fecha_certificacion",
+   "evidencia": [
+    {
+     "pagina": 1,
+     "cita": "Dada en Bogotá D.C, a los 30 días del mes de julio de 2026.",
+     "visual": null
+    }
+   ],
+   "valor": "2026-07-30",
+   "confianza": 0.98,
+   "cumple": null,
+   "reglas_pendientes": [
+    {
+     "texto": "≤ cierre",
+     "requiere": [
+      "PRO-16"
+     ]
+    }
+   ],
+   "motivos": [],
+   "observacion": null
+  },
+  {
+   "id_tecnico": "td16.version_formato",
+   "evidencia": [
+    {
+     "pagina": 1,
+     "cita": "ABA-PRO-049-F-009",
+     "visual": null
+    },
+    {
+     "pagina": 1,
+     "cita": "Versión: 001",
+     "visual": null
+    }
+   ],
+   "valor": "ABA-PRO-049-F-009, Versión 001",
+   "confianza": 0.99,
+   "cumple": null,
+   "reglas_pendientes": [
+    {
+     "texto": "Es el formato del proceso",
+     "requiere": [
+      "TD-01"
+     ]
+    }
+   ],
+   "motivos": [],
+   "observacion": null
+  }
+ ],
+ "alertas": [
+  {
+   "codigo": "FIRMA_AUSENTE",
+   "mensaje": "El certificado de aportes no está firmado por la revisora fiscal.",
+   "id_tecnico": "td16.firmante"
+  }
+ ]
+}

@@ -1,0 +1,76 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "extraccion/respuesta.schema.json",
+  "title": "Respuesta del LLM a una extracción",
+  "description": "Forma que el servicio le pide al LLM. Es interna: no es un contrato entre módulos. La posvalidación la convierte en un resultado del contrato modulo3-extraccion/0.2. No trae revision (la decide el código, R43) ni id_regla (lo asigna el código, R1 provisional).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["corresponde", "motivo_no_corresponde", "resultados", "alertas"],
+  "properties": {
+    "corresponde": {
+      "type": "boolean",
+      "description": "false si el contenido no es del tipo documental indicado (R41)."
+    },
+    "motivo_no_corresponde": {
+      "type": ["string", "null"]
+    },
+    "resultados": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/resultado"}
+    },
+    "alertas": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/alerta"}
+    }
+  },
+  "$defs": {
+    "cita": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["pagina", "cita", "visual"],
+      "properties": {
+        "pagina": {"type": "integer", "minimum": 1},
+        "cita": {"type": ["string", "null"]},
+        "visual": {"type": ["string", "null"]}
+      }
+    },
+    "regla_pendiente": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["texto", "requiere"],
+      "properties": {
+        "texto": {"type": "string"},
+        "requiere": {"type": "array", "items": {"type": "string"}}
+      }
+    },
+    "resultado": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id_tecnico", "evidencia", "valor", "confianza", "cumple", "reglas_pendientes", "motivos", "observacion"],
+      "properties": {
+        "id_tecnico": {"type": "string"},
+        "evidencia": {"type": "array", "items": {"$ref": "#/$defs/cita"}},
+        "valor": {},
+        "confianza": {"type": ["number", "null"], "minimum": 0, "maximum": 1},
+        "cumple": {"enum": ["SI", "NO", "PENDIENTE", null]},
+        "reglas_pendientes": {"type": "array", "items": {"$ref": "#/$defs/regla_pendiente"}},
+        "motivos": {
+          "type": "array",
+          "description": "Solo los motivos que se reconocen leyendo el documento (R44). Los demás los pone el código.",
+          "items": {"enum": ["REQUIERE_IMAGEN", "PLANTILLA_SIN_LLENAR", "NOTA_ELEMENTO", "CONTRADICCION"]}
+        },
+        "observacion": {"type": ["string", "null"]}
+      }
+    },
+    "alerta": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["codigo", "mensaje", "id_tecnico"],
+      "properties": {
+        "codigo": {"type": "string", "pattern": "^[A-Z][A-Z0-9_]*$"},
+        "mensaje": {"type": "string"},
+        "id_tecnico": {"type": ["string", "null"]}
+      }
+    }
+  }
+}

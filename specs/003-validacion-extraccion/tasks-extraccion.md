@@ -2,7 +2,7 @@
 
 Sale de `plan-extraccion.md`. Cada tarea termina con sus pruebas en verde y un commit propio.
 
-**Estado al 2026-11-09:** spec, plan y tareas en revisión. Ninguna tarea empezada.
+**Estado al 2026-11-09:** spec, plan y tareas aprobados. T01 hecha, en revisión.
 
 ## Para quien implemente
 
@@ -17,7 +17,7 @@ Sale de `plan-extraccion.md`. Cada tarea termina con sus pruebas en verde y un c
 
 ## Tareas
 
-- [ ] **T01 — Esqueleto y dobles.** `servicios/extraccion/` con `pyproject.toml` (uv, pytest, `normalizacion` como dependencia de ruta), `VERSION = "0.1.0"`, `datos/parametros.json`, `datos/respuesta.schema.json`, `contratos.py`, las interfaces `FuenteModelo` (con `FuenteModeloArchivo`), `ClienteLLM` (con `LLMFalso`) y `Resultados` (con `ResultadosEnCarpeta`), y el reloj. Fichas de prueba de TD-16, TD-29 y TD-01 con la forma de `obtener_seccion`, y respuestas falsas que dan los ejemplos del contrato. Pruebas: los ejemplos del contrato y las respuestas falsas validan contra sus esquemas.
+- [x] **T01 — Esqueleto y dobles.** `servicios/extraccion/` con `pyproject.toml` (uv, pytest, `normalizacion` como dependencia de ruta), `VERSION = "0.1.0"`, `datos/parametros.json`, `datos/respuesta.schema.json`, `contratos.py`, las interfaces `FuenteModelo` (con `FuenteModeloArchivo`), `ClienteLLM` (con `LLMFalso`) y `Resultados` (con `ResultadosEnCarpeta`), y el reloj. Fichas de prueba de TD-16, TD-29 y TD-01 con la forma de `obtener_seccion`, y respuestas falsas que dan los ejemplos del contrato. Pruebas: los ejemplos del contrato y las respuestas falsas validan contra sus esquemas.
 - [ ] **T02 — Entrada.** Mover `en_el_almacen` a `normalizacion.almacen` (el visor la importa de ahí). `entrada.py`: valida la solicitud, resuelve las URI, comprueba las huellas, lee la lectura y revisa el rango, con los errores de la tabla del plan. Requisitos R26 a R30.
 - [ ] **T03 — Preprocesamiento.** `preproceso.py`: qué va de cada página según su tipo, imagen con pypdfium2, firma ampliada a 300 dpi desde las anclas, valores del anexo con openpyxl y tope con `ANEXO_RECORTADO`, y `lectura` de la salida. Pruebas con PDF y xlsx inventados pasados por `normalizar_entrega`. Requisitos R31 a R34 y R36.
 - [ ] **T04 — Mensaje y prompt.** `datos/prompt.md` (los cambios del plan sobre el `prompt.md` del modelo semántico) y `mensaje.py` (sistema: prompt + guía; usuario: ficha + contenido). Pruebas: el mensaje solo lleva las páginas del segmento, numeradas sobre el documento completo, y la ficha de la versión pedida. **Alto para que el usuario revise el prompt.** Requisito R35.
@@ -44,3 +44,16 @@ Para revisar con el usuario:
 4. **Las páginas escaneadas siempre llevan imagen**, también en documentos de más de 20 páginas: si no, no queda nada que leer. Aceptado por el usuario el 2026-11-09 por ahora; queda para estudio posterior (tope de imágenes por documento u OCR, decisión 9) si el costo de los escaneos largos pesa.
 5. **Falla técnica sin guardar:** un `error_proceso` no queda en el almacén de resultados, para que el reintento del orquestador vuelva a extraer.
 6. **La cifra del criterio de adopción** (70 % de campos aceptados sin cambios) es una propuesta. Hay que confirmarla con negocio.
+
+### T01 — Esqueleto y dobles (2026-11-09)
+
+`servicios/extraccion/` con `pyproject.toml`, `VERSION = "0.1.0"`, `parametros.json` (versión 1), `respuesta.schema.json`, `contratos.py`, `ficha.py` (`FuenteModelo`, `FuenteModeloArchivo`, `Ficha`), `llm.py` (`ClienteLLM`, `LLMFalso`, `LimiteDeUso`, `FallaPasajera`), `resultados.py` (`Clave`, `ResultadosEnCarpeta`) y `reloj.py`. 24 pruebas.
+
+Lo que se decidió al escribir y conviene revisar:
+
+1. **La ficha de prueba es una copia de v21**, de las secciones TD-01, TD-16 y TD-29, tomada de `tipos_documentales.json` del modelo semántico y pasada por `elemento_para_agente`, la misma función del MCP. Son metadatos del modelo, sin datos de documentos. La genera `tests/generar_dobles.py`, que se corre a mano. No se comprobó que el archivo local sea idéntico a la v21 de Cosmos; eso se verá en T08, contra el MCP.
+2. **Lo que la ficha de prueba agrega a v21**, solo para reproducir los ejemplos del contrato: `td_probado: true` en las secciones TD-16 y TD-29 (en `secciones`, como la daría `describir_modelo`) y `atributos.validador` en `td16.sociedad` (`nit_dv`), `td29.contratos` (`fecha_orden`) y `td29.totales_declarados` (dos `suma_igual`). Esa es la forma propuesta para declarar validadores en la matriz (D16): una lista de `{tipo, …parámetros}`. Se puede ajustar en T05.
+3. **Respuesta del LLM:** las alertas exigen `id_tecnico` (puede ser `null`) y un código en mayúsculas, para que el LLM no las omita a medias.
+4. **El LLM falso reconoce el TD** por la línea `Tipo documental: TD-NN` del mensaje del usuario. T04 tiene que armar el mensaje con esa línea.
+5. **Reproceso:** el resultado reemplazado queda como `<nombre>.anterior-<id de ejecución>.json`, al lado del vigente.
+6. **El reloj** de la extracción tiene `dormir` y `monotono`, además de `ahora`, para probar las esperas y medir la duración. Es una copia pequeña del del orquestador, porque la extracción no depende del orquestador.
