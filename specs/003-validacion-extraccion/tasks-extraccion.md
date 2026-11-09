@@ -78,7 +78,7 @@ Lo que se decidió al escribir y conviene revisar:
 
 Lo que se decidió al escribir y conviene revisar:
 
-1. **Zona de la firma:** la caja del ancla (que ya trae la línea y su rótulo) más 3 renglones de 14 puntos hacia arriba, 1 hacia abajo y media pulgada a cada lado, a 300 dpi. El plan decía "a todo el ancho de la columna"; se dejó un margen fijo porque la lectura no dice dónde están las columnas. Una línea de firma típica da una imagen de unos 1.100 × 340 puntos de imagen.
+1. **Zona de la firma:** la caja del ancla (que ya trae la línea y su rótulo) más 3 renglones de 14 puntos hacia arriba, 1 hacia abajo y media pulgada a cada lado, a 300 dpi. El plan decía "a todo el ancho de la columna"; se dejó un margen fijo porque la lectura no dice dónde están las columnas. Una línea de firma típica da una imagen de unos 1.100 × 340 píxeles.
 2. **Páginas giradas:** la imagen de la página sale como se ve en un visor (pdfium aplica la rotación). El recorte se dibuja sobre la página sin girar, porque las cajas de la lectura son de la página sin girar, y después se gira la imagen.
 3. **Firmas en páginas `escaneo_con_ocr`:** también se amplían cuando la capa del escáner trajo el rótulo y la normalización encontró el ancla.
 4. **Anexos:** se leen con openpyxl solo los xlsx y xlsm, con los valores que guardó Excel (no calcula fórmulas). Un xls, un ods o un archivo dañado no frena la extracción: queda la alerta `ANEXO_NO_LEIDO` y se usa solo el PDF. El tope es de 60.000 caracteres por anexo, con la alerta `ANEXO_RECORTADO`.
