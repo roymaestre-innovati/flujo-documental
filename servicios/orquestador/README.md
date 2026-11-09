@@ -2,7 +2,7 @@
 
 Lleva cada proceso de selección desde el aviso del módulo 1 hasta las solicitudes de extracción (iniciativa 005, entrega 1). La spec, el plan y las tareas están en `specs/005-orquestador/`; los contratos, en `contracts/modulo5-orquestador/v0/` y `contracts/modulo3-extraccion/v0.2/`.
 
-**Estado:** entrega 1 completa en local (T01 a T10). Falta la corrida con la muestra (T11). Azure (Service Bus, Cosmos, OneLake, Container Apps) va en la entrega 2.
+**Estado:** entrega 1 cerrada (T01 a T11), en local. El resultado con la muestra real está en la nota de T11 de `tasks.md`. Azure (Service Bus, Cosmos, OneLake, Container Apps) va en la entrega 2.
 
 ## Cómo funciona
 
@@ -52,6 +52,18 @@ uv run orquestar --origen <carpeta del proceso> --proceso SR0000000001 \
 Por pantalla salen **solo conteos**: entregas, documentos y segmentos por estado, solicitudes por tipo documental, tareas abiertas por clase y motivo, registros atascados (en un estado intermedio sin tarea; debe ser 0), mensajes en errores y tiempo. En `<salida>` quedan el almacén (PDF normalizados y lecturas), `estado.json`, `solicitudes-extraccion.jsonl`, `errores.json` y `conteos.json`. **Todo eso trae datos personales**: el comando se niega a escribir dentro de un repositorio git. Termina con 0 si nada quedó en errores, 1 si algo quedó y 2 si los argumentos están mal.
 
 Las demoras de los reintentos no se esperan: el comando adelanta el reloj. Si algo queda en errores, se ve en `errores.json` con su motivo.
+
+## Correr la muestra real
+
+Solo en la máquina del equipo (principio 6). Imprime solo conteos:
+
+```bash
+uv run python scripts/correr_muestra.py \
+    --manifiesto ~/GEB/Extraccion/Documentos/clasificados/manifiesto.csv \
+    --muestra ~/GEB/pruebas-normalizacion/muestra1 --muestra ~/GEB/pruebas-normalizacion/muestra
+```
+
+Convierte la clasificación manual al CSV del clasificador falso (`SIN CLASIFICAR` como TD-99, los huecos de una clasificación por páginas como TD-99), nombra los oferentes OF-001, OF-002… en el orden de las carpetas y corre todo. Con `--salida <carpeta vacía fuera del repo>` conserva el estado y las solicitudes para revisarlos a mano.
 
 ## Qué hay
 
