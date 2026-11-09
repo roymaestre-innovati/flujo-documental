@@ -87,8 +87,14 @@ def _huella(datos: bytes) -> str:
 
 
 def validar(solicitud) -> None:
-    """Lanza `SolicitudInvalida` si la solicitud no cumple el contrato de entrada (R26)."""
+    """Lanza `SolicitudInvalida` si la solicitud no cumple el contrato de entrada (R26) o no trae la versión."""
     problemas = contratos.errores(contratos.ENTRADA, solicitud)
+    if isinstance(solicitud, dict) and "version_modelo" not in solicitud:
+        # El contrato la deja opcional, con la versión registrada del proceso como
+        # respaldo, pero la extracción no guarda las versiones de los procesos: las
+        # fija el orquestador, que la manda siempre. Nunca se usa la vigente (R30).
+        # Tampoco se puede contestar con un error: la salida exige version_modelo.
+        problemas.append("version_modelo: falta (la extracción no conoce la versión registrada del proceso)")
     if problemas:
         raise SolicitudInvalida(problemas)
 
@@ -96,11 +102,6 @@ def validar(solicitud) -> None:
 def preparar(solicitud: dict, almacen: Almacen) -> Entrada:
     """Valida la solicitud, lee la lectura, el PDF y los anexos, y revisa huellas y rango."""
     validar(solicitud)
-    if "version_modelo" not in solicitud:
-        # El contrato la deja opcional, con la versión registrada del proceso como
-        # respaldo, pero la extracción no guarda las versiones de los procesos: las
-        # fija el orquestador, que la manda siempre. Nunca se usa la vigente (R30).
-        raise _proceso("VERSION_NO_INDICADA", "La solicitud no trae la versión del modelo.", reintentable=False)
 
     try:
         lectura = json.loads(_leer(almacen, solicitud["lectura"], "la lectura del documento"))

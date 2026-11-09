@@ -39,9 +39,9 @@ def test_solicitud_que_no_cumple_el_contrato_es_un_bug(corrida, documento):
 def test_sin_version_no_se_usa_la_vigente(corrida, documento):
     solicitud = corrida.solicitud(documento, 1, 1)
     del solicitud["version_modelo"]
-    with pytest.raises(ErrorDeSolicitud) as error:
+    with pytest.raises(SolicitudInvalida) as error:
         preparar(solicitud, corrida.almacen)
-    assert (error.value.estado, error.value.codigo, error.value.reintentable) == ("error_proceso", "VERSION_NO_INDICADA", False)
+    assert error.value.errores == ["version_modelo: falta (la extracción no conoce la versión registrada del proceso)"]
 
 
 @pytest.mark.parametrize("desde,hasta", [(1, 4), (3, 2)])
