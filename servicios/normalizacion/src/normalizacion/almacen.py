@@ -12,6 +12,44 @@ from pathlib import Path, PurePosixPath
 from urllib.parse import unquote, urlparse
 
 
+CARPETA_ALMACEN = "almacen"
+"""Nombre de la carpeta del almacén dentro de una corrida local."""
+
+
+def ruta_en_el_almacen(uri: str | None) -> PurePosixPath | None:
+    """La ruta relativa al almacén de una URI `file://`, o None.
+
+    Se toma lo que va después de la última carpeta `almacen/`, para que una
+    corrida se pueda mover de carpeta y sus URI absolutas sigan sirviendo. Lo usan
+    el visor del orquestador y la extracción.
+    """
+    if not uri:
+        return None
+    partes_uri = urlparse(uri)
+    if partes_uri.scheme != "file":
+        return None
+    partes = PurePosixPath(unquote(partes_uri.path)).parts
+    if CARPETA_ALMACEN not in partes:
+        return None
+    resto = partes[len(partes) - partes[::-1].index(CARPETA_ALMACEN):]
+    if not resto or ".." in resto:
+        return None
+    return PurePosixPath(*resto)
+
+
+def en_el_almacen(carpeta: Path, uri: str | None) -> Path | None:
+    """El archivo de una URI dentro del almacén de la corrida `carpeta`, o None.
+
+    No deja salir del almacén y devuelve None si el archivo no existe.
+    """
+    relativa = ruta_en_el_almacen(uri)
+    if relativa is None:
+        return None
+    base = (carpeta / CARPETA_ALMACEN).resolve()
+    ruta = base.joinpath(*relativa.parts).resolve()
+    return ruta if ruta.is_file() and ruta.is_relative_to(base) else None
+
+
 class ErrorAlmacen(Exception):
     """URI inválida, fuera del almacén o inexistente."""
 

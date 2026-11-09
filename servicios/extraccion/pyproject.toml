@@ -16,6 +16,7 @@ normalizacion = { path = "../normalizacion", editable = true }
 [dependency-groups]
 dev = [
     "pytest>=8",
+    "reportlab>=5.1.0",
 ]
 
 [build-system]
