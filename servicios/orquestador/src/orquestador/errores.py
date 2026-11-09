@@ -11,6 +11,8 @@ lanza una de estas excepciones y el bucle decide qué hacer:
 | ErrorTransitorio       | 2     | Reintenta 3 veces, a los 2, 4 y 8 minutos. Si el servicio   |
 |                        |       | dijo cuánto esperar, espera eso sin contar el intento      |
 | RespuestaInvalida      | 3     | Reintenta 2 veces enseguida                                |
+| MensajeRechazado       | 4     | El mensaje mismo está mal (por ejemplo, un aviso que no    |
+|                        |       | cumple su contrato): sin reintento, a operación            |
 | cualquier otra         | 4     | Un bug: sin reintento                                      |
 
 Cuando se agotan los reintentos, o con un bug, el bucle llama a `al_fallar` del
@@ -49,6 +51,15 @@ class ErrorTransitorio(Exception):
 
 class RespuestaInvalida(Exception):
     """Clase 3: un servicio respondió algo que no cumple la forma esperada."""
+
+
+class MensajeRechazado(Exception):
+    """Clase 4: el mensaje no se puede procesar tal como llegó, y repetirlo no
+    cambia nada. Va a errores para que operación lo revise con quien lo mandó.
+
+    El texto de la excepción va al motivo y a los registros, así que no debe
+    llevar rutas ni valores del mensaje: solo campos, conteos y códigos.
+    """
 
 
 class Manejador(Protocol):
@@ -117,6 +128,8 @@ def procesar_uno(cola: Cola, manejador: Manejador, parametros: Parametros = PARA
                 registro.warning("Respuesta inválida, intento %s; se reintenta: %s", intento, motivo)
                 return Resultado(mensaje.id, "reintento", motivo)
             return _fallar(cola, manejador, mensaje, f"Respuesta inválida tras {intento} intentos: {motivo}")
+        except MensajeRechazado as error:
+            return _fallar(cola, manejador, mensaje, f"Rechazado: {error}")
         except Exception as error:  # noqa: BLE001 - clase 4: cualquier otra cosa es un bug
             return _fallar(cola, manejador, mensaje, f"Bug: {lugar_de_la_excepcion(error)}")
     cola.completar(mensaje)

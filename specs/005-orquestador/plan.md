@@ -83,7 +83,7 @@ No son frontera entre módulos, así que no van a `contracts/`. Se validan con `
 
 | Cola | Mensaje | Clave de idempotencia |
 |---|---|---|
-| `normalizar` | `id_proceso`, `entrega` (`PROCESO` o `id_oferente`), `ruta` | `id_proceso` + `entrega` + versión del normalizador |
+| `normalizar` | `id_proceso` y `entrega` (`PROCESO` o `id_oferente`). Los archivos de la entrega quedan en su registro de estado, no en el mensaje | `id_proceso` + `entrega` + versión del normalizador |
 | `clasificar` | `id_proceso`, `entrega`, `id_documento` | `id_documento` + `hash` + versión de la ontología |
 | `extraer` | Solicitud del contrato 0.2 | `id_segmento` + TD + versión del modelo (D22) |
 
@@ -119,7 +119,7 @@ Los estados `extrayendo` en adelante, `en_revision`, `listo_para_reglas` y los d
 
 ### Entregas del proceso (supuesto de A-1)
 
-Si el aviso trae `archivos`, manda esa lista. Si no, la carpeta `ruta` trae una subcarpeta por entrega: `PROCESO/` para los documentos del proceso y una por oferente, con su identificador como nombre. Cualquier otra cosa en la raíz se registra como error del aviso, a operación. Es lo único que cambia cuando el módulo 1 responda A-1, y queda en una sola función.
+Si el aviso trae `archivos`, manda esa lista. Si no, la carpeta `ruta` trae una subcarpeta por entrega: `PROCESO/` para los documentos del proceso y una por oferente, con su identificador como nombre. Un archivo suelto en la raíz rechaza el aviso entero y va a operación: podría ser de un oferente, y no se evalúa a nadie con documentos de menos. También se rechaza un aviso sin archivos o sin ningún oferente. Es lo único que cambia cuando el módulo 1 responda A-1, y queda en una sola función (`apertura.repartir`).
 
 ### Versiones fijadas (R5)
 
