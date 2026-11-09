@@ -31,6 +31,7 @@ from normalizacion.inventario import ENTREGA_DEL_PROCESO
 from normalizacion.parametros import PARAMETROS as PARAMETROS_NORMALIZACION
 
 from . import estados
+from .tareas import DOCUMENTO_CON_ERROR, crear_tarea
 from .cola import CLASIFICAR, NORMALIZAR, Cola
 from .errores import ErrorTransitorio
 from .estado import Estado
@@ -39,7 +40,6 @@ from .reloj import Reloj
 
 registro = logging.getLogger("orquestador.normalizar")
 
-DOCUMENTO_CON_ERROR = "documento_con_error"
 CAMPOS_DEL_MANIFIESTO = ("ruta_origen", "hash", "tipo_origen", "pdf", "anexo_nativo", "lectura", "paginas",
                          "duplicado_de", "error")
 
@@ -61,10 +61,6 @@ def ruta_en_la_entrega(archivo: str, entrega: str) -> str:
     if len(partes) > 1 and partes[0] == entrega:
         return PurePosixPath(*partes[1:]).as_posix()
     return archivo
-
-
-def id_tarea(clase: str, id_referencia: str) -> str:
-    return f"{clase}-{id_referencia}"
 
 
 class Normalizar:
@@ -142,13 +138,8 @@ class Normalizar:
         )
         if archivo["estado"] == estados.ERROR_ENTRADA:
             error = archivo["error"]
-            estados.crear(
-                self._estado, self._reloj, id_proceso, estados.TAREA, id_tarea(DOCUMENTO_CON_ERROR, id_documento),
-                estados.ABIERTA, "documento con error de entrada",
-                {"clase": DOCUMENTO_CON_ERROR, "motivo": error["codigo"], "detalle": error["detalle"],
-                 "id_documento": id_documento},
-                entrega=entrega,
-            )
+            crear_tarea(self._estado, self._reloj, id_proceso, entrega, DOCUMENTO_CON_ERROR, id_documento,
+                        error["codigo"], {"detalle": error["detalle"], "id_documento": id_documento})
 
     def al_fallar(self, cuerpo: dict, motivo: str) -> None:
         try:

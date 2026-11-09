@@ -131,7 +131,7 @@ Un archivo de datos, `versiones.json`, con las vigentes: `modelo_extraccion`, `o
 
 ### Validación de la respuesta del clasificador (R11)
 
-Las páginas de todos los segmentos cubren de 1 a `paginas` sin huecos ni solapes, cada TD está en la lista de TD de la matriz (más TD-98 y TD-99) y la confianza está entre 0 y 1. Si falla: se publica de nuevo con `intento + 1` una sola vez; la segunda falla crea la tarea de clasificación y deja el documento en `esperando_clasificacion_humana`.
+Las páginas de todos los segmentos cubren de 1 a `paginas` sin huecos ni solapes, cada TD está en la lista de TD de la matriz (más TD-98 y TD-99) y la confianza está entre 0 y 1. Si falla, el manejador la pide otra vez enseguida, dentro del mismo mensaje; la segunda falla crea la tarea de clasificación y deja el documento en `esperando_clasificacion_humana`. También se revisa que `id_documento` y `version_ontologia` coincidan con la solicitud.
 
 ### Clasificador falso
 
