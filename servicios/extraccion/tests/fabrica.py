@@ -10,6 +10,10 @@ from pathlib import Path
 
 from normalizacion.almacen import CARPETA_ALMACEN, AlmacenLocal
 from normalizacion.entrega import normalizar_entrega
+import pikepdf
+from PIL import Image, ImageDraw
+from reportlab.lib.pagesizes import letter
+from reportlab.lib.utils import ImageReader
 from reportlab.pdfgen import canvas
 
 PROCESO = "SR0000000001"
@@ -22,6 +26,93 @@ def pdf(paginas: int, texto: str = "Documento inventado") -> bytes:
         lienzo.drawString(72, 720, f"{texto}, página {n + 1}. Documento inventado para pruebas.")
         lienzo.showPage()
     lienzo.save()
+    return salida.getvalue()
+
+
+ANCHO, ALTO = letter
+PARRAFO = (
+    "El suscrito representante legal certifica que la sociedad OFERENTE INVENTADO S.A.S. "
+    "se encuentra al día en el pago de aportes al sistema de seguridad social."
+)
+
+
+def _escaneo() -> Image.Image:
+    """Una "hoja escaneada": fondo de papel con renglones dibujados, sin texto."""
+    imagen = Image.new("RGB", (850, 1100), "#f2efe6")
+    dibujo = ImageDraw.Draw(imagen)
+    for y in range(150, 950, 40):
+        dibujo.line((100, y, 750 - (y * 7) % 200, y), fill="#555555", width=6)
+    return imagen
+
+
+def _parrafo(lienzo: canvas.Canvas, y: float = 700, render: int = 0) -> None:
+    texto = lienzo.beginText(72, y)
+    texto.setFont("Helvetica", 11)
+    texto.setTextRenderMode(render)
+    texto.textLine(PARRAFO[:90])
+    texto.textLine(PARRAFO[90:])
+    lienzo.drawText(texto)
+
+
+def _firma(lienzo: canvas.Canvas) -> None:
+    lienzo.drawString(72, 200, "________________________________")
+    lienzo.drawString(72, 186, "Firma del representante legal")
+
+
+def pdf_mixto() -> bytes:
+    """Seis páginas, una de cada caso:
+
+    1. texto sin anclas; 2. texto con línea de firma; 3. escaneo sin texto;
+    4. escaneo con la capa de texto del escáner y una línea de firma;
+    5. en blanco; 6. texto con línea de firma, girada 90 grados.
+    """
+    salida = io.BytesIO()
+    lienzo = canvas.Canvas(salida, pagesize=letter, invariant=1)
+    _parrafo(lienzo)
+    lienzo.showPage()
+    _parrafo(lienzo)
+    _firma(lienzo)
+    lienzo.showPage()
+    lienzo.drawImage(ImageReader(_escaneo()), 0, 0, width=ANCHO, height=ALTO)
+    lienzo.showPage()
+    lienzo.drawImage(ImageReader(_escaneo()), 0, 0, width=ANCHO, height=ALTO)
+    _parrafo(lienzo, render=3)
+    texto = lienzo.beginText(72, 200)
+    texto.setTextRenderMode(3)
+    texto.textLine("________________________________")
+    lienzo.drawText(texto)
+    texto = lienzo.beginText(72, 186)
+    texto.setTextRenderMode(3)
+    texto.textLine("Firma del representante legal")
+    lienzo.drawText(texto)
+    lienzo.showPage()
+    lienzo.showPage()
+    _parrafo(lienzo)
+    _firma(lienzo)
+    lienzo.showPage()
+    lienzo.save()
+    girado = io.BytesIO()
+    with pikepdf.open(io.BytesIO(salida.getvalue())) as documento:
+        documento.pages[5].obj.Rotate = 90
+        documento.save(girado, deterministic_id=True)
+    return girado.getvalue()
+
+
+def xlsx(filas: int = 3, texto: str = "Contrato") -> bytes:
+    from openpyxl import Workbook
+
+    libro = Workbook()
+    hoja = libro.active
+    hoja.title = "Experiencia"
+    hoja.append(["Consecutivo", "Contratante", "Valor", None])
+    for n in range(1, filas + 1):
+        hoja.append([n, f"{texto} {n}", n * 1000.0, None])
+    hoja.append([None, None, None])
+    otra = libro.create_sheet("Totales")
+    otra["A1"] = "Total"
+    otra["B1"] = "=SUM(Experiencia!C2:C4)"
+    salida = io.BytesIO()
+    libro.save(salida)
     return salida.getvalue()
 
 
