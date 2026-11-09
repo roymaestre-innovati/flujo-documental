@@ -1,6 +1,6 @@
 # Plan 005 — Orquestador, entrega 1: del aviso a la cola de extracción
 
-Estado al 2026-11-06. **Acordado y en construcción** (T01 a T04 de `tasks.md`). Los ajustes que salieron al implementar ya están en el texto y explicados en las notas de `tasks.md`. Implementa la entrega 1 de `spec.md`. Decisiones del usuario que lo enmarcan (2026-11-06):
+Estado al 2026-11-09. **Entrega 1 cerrada** (T01 a T11 de `tasks.md`); ver "Lo que cambió al implementar", al final. Los ajustes que salieron al implementar ya están en el texto y explicados en las notas de `tasks.md`. Implementa la entrega 1 de `spec.md`. Decisiones del usuario que lo enmarcan (2026-11-06):
 
 - La entrega 1 llega hasta publicar las solicitudes de extracción. La vuelta de los resultados va en la entrega 2.
 - Todo se prueba en la máquina del equipo, con interfaces que tienen una versión en memoria. Service Bus, Cosmos y OneLake reales van en la entrega 2.
@@ -236,3 +236,18 @@ Todo con documentos inventados: unos pocos PDF hechos con `reportlab` (no hace f
 - **El clasificador real puede no parecerse al falso** (C1 a C3). Solo cambia `clasificador.py`; la validación y los umbrales siguen.
 - **Las carpetas del módulo 1 pueden no seguir el supuesto** (A-1). Solo cambia la función que reparte entregas.
 - **Dos entregas en paralelo puede quedarse corto** con varios cierres el mismo día: 10 oferentes de 40 s son unos 3 a 4 minutos por proceso. Es un parámetro; se sube después de medir.
+
+## Lo que cambió al implementar
+
+El detalle y el porqué de cada punto están en las notas de `tasks.md`.
+
+- **Las copias exactas no se clasifican ni tienen segmentos** (T07). "Toma el resultado del original" se cumple con `duplicado_de`; si tuvieran segmentos, se extraería dos veces lo mismo.
+- **El reintento de una respuesta inválida del clasificador es inmediato, dentro del mismo mensaje** (T07). La segunda falla crea una tarea de clasificación y no va a la cola de errores, que es para fallas técnicas.
+- **`esperando_clasificacion_humana` existe también por segmento** (T07). En un archivo compuesto solo espera el segmento dudoso; los demás siguen a extracción.
+- **Cada manejador deja su marca de "hecho" al final** (T05 a T09): `entregas_publicadas` en el proceso, la entrega en `procesando`, el documento en `clasificado` y la tarea en `resuelta`. Una caída a la mitad repite el mensaje sin duplicar nada.
+- **El límite de 2 entregas a la vez lo pone quien corre los manejadores** (T06, T10), no el manejador: en local, el comando `orquestar`; en producción, la configuración del job.
+- **Una tarea ya resuelta no se resuelve otra vez** (T09). Cambiar un tipo ya asignado será `reprocesar` (entrega 2). La tarea `falla_tecnica` no se cierra sola si lo escalado se recupera.
+- **Los conteos de una corrida suman "atascados"** (T10): lo que quedó en un estado intermedio sin una tarea que lo explique. A4 pide que sea 0.
+- **La cola y el estado en memoria tienen un candado** (T10), porque la corrida local normaliza en hilos. Con la muestra real, los hilos casi no aceleran (T11); en producción cada entrega corre en su propio contenedor.
+- **Para la entrega 2:** dos trabajadores pueden normalizar la misma entrega a la vez si el `normalizar` llega repetido. En local da el mismo resultado; con Blob hay que confirmar que escribir lo mismo a la vez sea seguro, o tomar un lease por entrega (T10). Las pruebas de mensajes repetidos y de cambio condicional se repiten contra Cosmos.
+

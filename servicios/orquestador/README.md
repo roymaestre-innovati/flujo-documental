@@ -2,7 +2,7 @@
 
 Lleva cada proceso de selección desde el aviso del módulo 1 hasta las solicitudes de extracción (iniciativa 005, entrega 1). La spec, el plan y las tareas están en `specs/005-orquestador/`; los contratos, en `contracts/modulo5-orquestador/v0/` y `contracts/modulo3-extraccion/v0.2/`.
 
-**Estado:** entrega 1 completa en local (T01 a T11). Falta correr la muestra real y anotar los resultados. Azure (Service Bus, Cosmos, OneLake, Container Apps) va en la entrega 2.
+**Estado:** entrega 1 cerrada (T01 a T11), en local. El resultado con la muestra real está en la nota de T11 de `tasks.md`. Azure (Service Bus, Cosmos, OneLake, Container Apps) va en la entrega 2.
 
 ## Cómo funciona
 

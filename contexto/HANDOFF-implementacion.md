@@ -1,6 +1,6 @@
 # Handoff: implementación del flujo documental (opción A)
 
-Estado al 2026-11-06. La iniciativa 003 cerró su entrega 1 (normalización y lectura). **En curso: el orquestador (iniciativa 005), entrega 1**, en este mismo repositorio: `specs/005-orquestador/` y `servicios/orquestador/`. T01 a T04 hechas; la siguiente es T05.
+Estado al 2026-11-09. Cerradas la entrega 1 de la iniciativa 003 (normalización y lectura) y la entrega 1 de la 005 (orquestador, del aviso a la cola de extracción), las dos en local. **No hay nada en curso:** lo siguiente se elige con el usuario (ver "Lo que viene después").
 
 Las rutas relativas son de este repositorio (`~/GEB/flujo-documental-repo`, en GitHub `roymaestre-innovati/flujo-documental`); lo que está en otros repos va con ruta completa. `contexto/flujo-documental-opcion-a.md` sigue siendo la fuente de verdad del diseño. Este archivo no repite el diseño: dice qué existe, qué falta, qué está abierto y cómo trabaja el usuario.
 
@@ -9,10 +9,8 @@ Las rutas relativas son de este repositorio (`~/GEB/flujo-documental-repo`, en G
 - **Iniciativa 003, entrega 1 (normalización y lectura): cerrada.** Las tareas T01 a T16 de `specs/003-validacion-extraccion/tasks.md` están hechas y fusionadas en `main`, con 413 pruebas sobre documentos inventados. Normalizador `0.2.0`, contrato `modulo3-normalizacion/0.2`, parámetros versión 1.
 - **Medida con la muestra real** (7 oferentes, 1.034 páginas, dos mediciones): `specs/003-validacion-extraccion/resultados-muestra.md`. Los criterios A3 a A5 se cumplen y los umbrales no cambian. De la primera medición salieron T14 (el sello de tiempo no cuenta como firma), T15 (PowerPoint) y T16 (vínculos a otros libros en Excel); la segunda medición los confirma.
 - **Checklist de habeas data:** borrador en `specs/003-validacion-extraccion/checklist-habeas-data.md`, sin respuestas de cumplimiento todavía. Las mediciones se hicieron antes de tenerlas: el usuario lo cuenta al pasar el checklist.
-- **Iniciativa 005, entrega 1 (orquestador): en curso.** Va del aviso del proceso a la cola de extracción, todo local, con interfaces que tienen versión en memoria (Service Bus, Cosmos y OneLake reales en la entrega 2). Spec, plan y tareas T01 a T11 en `specs/005-orquestador/`, acordados el 2026-11-06.
-  - **T01 a T03 fusionadas en `main`:** contratos (`modulo5-orquestador/0.1` y `modulo3-extraccion/0.2`), esqueleto con interfaces locales y estados de las cinco entidades.
-  - **T04 (bucle común, errores y reintentos):** hecha, en el pull request de la rama `orquestador-t04`. Si al retomar no está fusionada, preguntar al usuario antes de seguir.
-  - **Siguiente: T05, apertura** (manejador de `procesos-listos`). Las decisiones de cada tarea están en "Notas de implementación" de `tasks.md`: leerlas antes de seguir, porque varias ajustan el plan.
+- **Iniciativa 005, entrega 1 (orquestador): cerrada** el 2026-11-09. T01 a T11 de `specs/005-orquestador/tasks.md`, con 166 pruebas sobre documentos inventados. Va del aviso del proceso a las solicitudes de extracción, todo local, con interfaces que tienen versión en memoria (Service Bus, Cosmos y OneLake reales en la entrega 2). Comando `orquestar` y `scripts/correr_muestra.py`. Lo que cambió respecto del plan está al final de `plan.md`, en "Lo que cambió al implementar".
+- **Corrida con la muestra real (A4, 2026-11-09):** las 7 entregas llegan a las solicitudes o a una tarea; nada atascado ni en errores; 75 solicitudes de extracción, 13 tareas `NO_SOPORTADO` (los ZIP y RAR ya conocidos), 270 s. OF-007 no tiene clasificación manual que coincida con sus archivos y sale todo TD-99. Detalle en la nota de T11.
 
 ## Cómo trabaja el usuario
 
@@ -62,7 +60,7 @@ El usuario es dueño de todo el flujo menos tres piezas de otros equipos: la ent
 |---|---|---|
 | **Normalización y lectura** | `servicios/normalizacion/` | Cerrada (entrega 1, T01 a T16). Versión 0.2.0. Comando `normalizar`, imagen Docker, script de la muestra |
 | **Contrato de normalización** | `contracts/modulo3-normalizacion/v0/` | Versión `modulo3-normalizacion/0.2` (0.2 sumó `ppt`, `pptx` y `odp`) |
-| **Orquestador** | `servicios/orquestador/` | Entrega 1 en curso (T01 a T04). Versión 0.1.0. Interfaces locales, estados, bucle de errores. Sin manejadores todavía |
+| **Orquestador** | `servicios/orquestador/` | Entrega 1 cerrada (T01 a T11). Versión 0.1.0. Manejadores de `procesos-listos`, `normalizar` y `clasificar`, solicitudes de extracción 0.2, tareas, escalamiento, comando `orquestar` y script de la muestra |
 | **Contrato del orquestador** | `contracts/modulo5-orquestador/v0/` | Versión 0.1: aviso de proceso listo (módulo 1) y solicitud y respuesta del clasificador. Propuesta para A-1 y C1 a C3 |
 | Contrato de extracción | `contracts/modulo3-extraccion/v0.2/` | Versión 0.2, con los ocho cambios del paso 5 del diseño más `id_segmento`. La 0.1 queda en `v0/`, sin cambios |
 | Resultados de la muestra real | `specs/003-validacion-extraccion/resultados-muestra.md` | Dos mediciones (2026-11-05). Solo conteos |
@@ -71,11 +69,11 @@ El usuario es dueño de todo el flujo menos tres piezas de otros equipos: la ent
 | Modelo semántico y servidor MCP | `~/GEB/modelo-semantico` (repo aparte): modelo en Cosmos DB, servidor en Container Apps | Desplegado; modelo `extraccion_documental` en v21 |
 | Agente de extracción de prueba | `~/GEB/modelo-semantico/agente_local/chat.py` y `lote.py` | Arnés de pruebas con gpt-5.4. No es el servicio de producción |
 | Gold por tipo documental | `~/GEB/Extraccion/Documentos/pruebas/TD-NN/gold_TD-NN.xlsx` (no van a git: datos reales) | TD-03, 05, 15, 16, 17, 18, 26, 27, 29, 30 y 35 |
-| Clasificación manual de la muestra | `~/GEB/Extraccion/Documentos/clasificados/manifiesto.csv` (datos reales, fuera de git) | Sirve como clasificador falso (T11 la convierte al CSV del orquestador) |
+| Clasificación manual de la muestra | `~/GEB/Extraccion/Documentos/clasificados/manifiesto.csv` (datos reales, fuera de git) | Clasificador falso de `correr_muestra.py`. Las 17 filas del oferente de OF-007 no coinciden con sus archivos |
 | Muestra real para medir | `~/GEB/pruebas-normalizacion/muestra1` (6 oferentes) y `muestra` (OF-007) | Fuera del repo. Datos reales |
 | Plantilla de evaluación | `insumos/Matriz_Extraccion_Evaluacion_Ofertas_PCA-SR5587392192.xlsx` | Formato del informe |
 
-No existe código de extracción como servicio, reglas, tareas en la Power App ni informe. El orquestador todavía no tiene manejadores (T05 a T09).
+No existe código de extracción como servicio, reglas, tareas en la Power App ni informe. El orquestador no recibe resultados de extracción todavía (entrega 2).
 
 ## Pendiente
 
@@ -92,6 +90,13 @@ No existe código de extracción como servicio, reglas, tareas en la Power App n
 - **T10, anclas:** "una palabra que empieza por firma" se tomó como una frase cuya *primera* palabra empieza por "firma".
 - **T11, entrega:** ante un bug, los demás documentos se escriben pero el manifiesto no (ver "Errores", arriba).
 - **T08, firma:** una firma que se lee pero no trae firmante o fecha queda `leida: false`, porque el contrato exige los dos.
+
+### Decisiones del orquestador para confirmar con el uso
+
+- La tarea `falla_tecnica` no se cierra sola si lo escalado se recupera (T09).
+- Una tarea de clasificación ya resuelta no se vuelve a resolver; cambiar un tipo será `reprocesar` (T09).
+- "SIN CLASIFICAR" de la clasificación manual se trata como TD-99 (T11).
+- Revisar la clasificación manual de OF-007 y volver a correr `correr_muestra.py` (T11).
 
 ### Para calibrar la normalización más adelante
 
@@ -122,13 +127,14 @@ Si se cambia un parámetro, sube `version_parametros`: ya hubo corridas reales.
 
 ## Lo que viene después
 
-- **Entrega 2 del orquestador:** resultados de la extracción, ficha del proceso, menor precio, tareas en la Power App, `reprocesar` y las piezas en Azure (Service Bus, Cosmos, OneLake, Blob, alertas).
+- **Entrega 2 del orquestador:** resultados de la extracción, ficha del proceso, menor precio, tareas en la Power App, `reprocesar` y las piezas en Azure (Service Bus, Cosmos, OneLake, Blob, alertas). Antes de OneLake, la prueba de acceso (decisión 35).
 - **Entrega 2 de la iniciativa 003: extracción.** El contrato 0.2 ya está (T01 de la 005), así que empieza por el servicio. Depende de S2 (enviar datos a eastus).
 - **Módulo 4: reglas e informe**, con la hoja Reglas de la matriz (decisión 28).
 
 ## Riesgos y datos técnicos conocidos
 
-- **Service Bus entrega mensajes dos veces a veces:** la normalización ya es idempotente; los demás workers también deben serlo.
+- **Service Bus entrega mensajes dos veces a veces:** la normalización y los manejadores del orquestador son idempotentes (probado en local, A3). Con Cosmos hay que repetir esas pruebas. Si el `normalizar` llega repetido, dos trabajadores pueden normalizar la misma entrega a la vez: confirmar con Blob o tomar un lease por entrega.
+- **Paralelo en local:** la corrida local normaliza en hilos y casi no acelera (Python no reparte el trabajo entre hilos). En producción cada entrega va en su contenedor.
 - **gpt-5.4 es obligatorio en la extracción:** gpt-5.4-mini no respeta las reglas de evidencia (prueba con TD-17).
 - **429:** la concurrencia de extracción hoy es 3. Un proceso de 10 oferentes son unos 160 segmentos, unos 20 minutos.
 - **LibreOffice:** la imagen de pruebas pesa unos 940 MB. Cada conversión arranca LibreOffice desde cero; el tiempo máximo es 120 s con un reintento.

@@ -2,7 +2,7 @@
 
 Sale de `plan.md`. Cada tarea termina con sus pruebas en verde y un commit propio.
 
-**Estado al 2026-11-09:** T01 a T10 fusionadas; el script de T11 está hecho, en revisión. Falta que el usuario corra la muestra y, con los resultados, cerrar la entrega.
+**Estado al 2026-11-09:** entrega 1 cerrada. T01 a T10 fusionadas; T11 hecha y corrida con la muestra real, en revisión.
 
 ## Para quien implemente
 
@@ -25,7 +25,7 @@ Sale de `plan.md`. Cada tarea termina con sus pruebas en verde y un commit propi
 - [x] **T08 — Solicitudes de extracción.** Por cada segmento que se extrae, arma la solicitud 0.2, la valida contra el esquema y la publica en `extraer`. Incluye los documentos del proceso sin oferente. Requisitos R16 y R17.
 - [x] **T09 — Tareas.** Resolver una tarea de clasificación (asigna TD, registra quién y publica la solicitud) y `escalar_fallas(ahora)` para las 24 horas. Requisitos R15 y R22.
 - [x] **T10 — Punta a punta.** Comando `orquestar`, que normaliza como máximo 2 entregas a la vez (`paralelo_normalizar`), y prueba de punta a punta con un proceso inventado (proceso y dos oferentes, con copia, contraseña, dudosa, baja confianza y TD-99). Prueba de mensajes repetidos: cada mensaje entregado dos veces da el mismo estado y las mismas solicitudes. README del servicio completo (ya existe uno parcial). Criterios A2 y A3.
-- [ ] **T11 — Corrida con la muestra.** `scripts/correr_muestra.py`: convierte `manifiesto.csv` de la clasificación manual al CSV del clasificador falso y corre `orquestar` sobre la muestra, imprimiendo solo conteos (criterio A4). Lo corre el usuario en su máquina; se le dan los comandos y cuánto tarda.
+- [x] **T11 — Corrida con la muestra.** `scripts/correr_muestra.py`: convierte `manifiesto.csv` de la clasificación manual al CSV del clasificador falso y corre `orquestar` sobre la muestra, imprimiendo solo conteos (criterio A4). Lo corre el usuario en su máquina; se le dan los comandos y cuánto tarda.
 
 **Al cerrar la entrega:** actualizar el estado en `spec.md`, `plan.md` (sección "Lo que cambió al implementar"), el README del repo y `contexto/HANDOFF-implementacion.md`.
 
@@ -178,3 +178,25 @@ Lo que se decidió al escribir y conviene revisar:
 4. **Clasificación por páginas** (`origen` con ` (p4-33)`): los huecos se llenan con TD-99 contando las páginas del PDF, para que la respuesta cubra todo el documento. Si las páginas del PDF normalizado no coinciden con las del original, el documento queda con una tarea `RESPUESTA_INVALIDA`, y se ve en los conteos.
 5. **Confianza 1,0** en todas las filas: la clasificación es de una persona. Por eso la muestra no ejercita los umbrales; eso lo cubren las pruebas inventadas.
 6. **La salida** va por defecto a una carpeta temporal que se borra al terminar. Con `--salida` se conserva, en una carpeta vacía fuera de cualquier repositorio.
+
+#### Resultado con la muestra real (2026-11-09, corrida por el usuario)
+
+Solo conteos. 7 oferentes, 269,7 s.
+
+| | |
+|---|---|
+| Entregas | 7 en `procesando` |
+| Documentos | 163 clasificados, 9 copias exactas, 13 con error de entrada |
+| Segmentos | 75 pendientes de extracción, 88 sin extracción |
+| Solicitudes de extracción | 75, de 16 tipos documentales (TD-30: 12, TD-29: 8, TD-03, TD-05, TD-16, TD-17 y TD-35: 6 cada uno; el resto, de 1 a 5) |
+| Tareas abiertas | 13 `documento_con_error`, todas `NO_SOPORTADO` |
+| Atascados, en errores, pendientes | 0, 0, 0 |
+| Emparejamiento | 101 de 121 filas usadas; 1 carpeta sin clasificación (OF-007); 32 "SIN CLASIFICAR" como TD-99 |
+
+**A4 se cumple:** las 7 entregas llegan a las solicitudes de extracción o a una tarea, y nada queda en un estado intermedio ni en errores. Con dos salvedades:
+
+1. **OF-007 no tiene clasificación manual** que coincida con sus archivos: todo sale TD-99 y no pide extracciones. Recorre el flujo completo, pero la cifra de solicitudes es de 6 oferentes. Si se ajusta el manifiesto, basta con volver a correr el script.
+2. **Los 13 `NO_SOPORTADO` son los 8 ZIP y 5 RAR** de la muestra, ya conocidos en la medición de la normalización: fueron un error al armar la carpeta de prueba y en producción no llegan (A-1 lo confirma). Las 9 copias coinciden con las 9 del diseño.
+
+**Tiempo:** 269,7 s, casi lo mismo que la suma de las dos mediciones de la normalización sin paralelo (117 s y 149 s). La normalización en dos hilos casi no acelera: el trabajo de Python (leer PDF, OCR, rasterizar) no corre en paralelo dentro de un proceso, y solo LibreOffice va aparte. En producción cada entrega corre en su propio contenedor, así que no aplica. Si hiciera falta en local, el cambio es usar procesos en vez de hilos; no se hace porque la corrida local solo sirve para probar.
+
