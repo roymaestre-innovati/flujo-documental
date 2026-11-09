@@ -43,7 +43,7 @@ from normalizacion.almacen import AlmacenLocal
 
 from orquestador.cli import dentro_de_un_repositorio
 from orquestador.clasificador import COLUMNAS, ClasificadorFalso
-from orquestador.local import Corrida, aviso, conteos
+from orquestador.local import Corrida, aviso, conteos, guardar_salida
 from orquestador.origen import OrigenLocal
 from orquestador.parametros import PARAMETROS
 from orquestador.registros import configurar
@@ -224,10 +224,7 @@ def correr(manifiesto: Path, muestras: list[Path], salida: Path, proceso: str, p
         **conteos(corrida, proceso),
         "tiempo_s": round(time.perf_counter() - inicio, 1),
     }
-    corrida.estado.guardar(salida / "estado.json")
-    with open(salida / "solicitudes-extraccion.jsonl", "w", encoding="utf-8") as f:
-        for solicitud in corrida.solicitudes:
-            f.write(json.dumps(solicitud, ensure_ascii=False) + "\n")
+    guardar_salida(corrida, salida, resumen)
     return resumen
 
 

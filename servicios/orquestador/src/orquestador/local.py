@@ -13,10 +13,12 @@ vaciarlas. Sirve para la prueba de punta a punta (A2), la de mensajes repetidos
 """
 
 import datetime
+import json
 import logging
 from collections import Counter
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
+from pathlib import Path
 
 from normalizacion.almacen import Almacen
 
@@ -139,3 +141,22 @@ def conteos(corrida: Corrida, id_proceso: str) -> dict:
         "mensajes_en_errores": {c: n for c in COLAS if (n := len(corrida.cola.errores(c)))},
         "mensajes_pendientes": {c: n for c in (NORMALIZAR, CLASIFICAR) if (n := corrida.cola.pendientes(c))},
     }
+
+
+def guardar_salida(corrida: Corrida, salida: Path, resumen: dict) -> None:
+    """Lo que queda de una corrida en `<salida>`, junto al almacén. Lo lee el visor.
+
+    - `estado.json`: todos los registros, con su historial.
+    - `solicitudes-extraccion.jsonl`: una solicitud por línea, en orden.
+    - `errores.json`: lo que quedó en las colas de errores, con su motivo.
+    - `conteos.json`: el resumen que se imprimió.
+    """
+    corrida.estado.guardar(salida / "estado.json")
+    with open(salida / "solicitudes-extraccion.jsonl", "w", encoding="utf-8") as f:
+        for solicitud in corrida.solicitudes:
+            f.write(json.dumps(solicitud, ensure_ascii=False) + "\n")
+    errores = [{"cola": c, "motivo": e.motivo, "cuando": e.cuando.isoformat(), "cuerpo": e.mensaje.cuerpo}
+               for c in COLAS for e in corrida.cola.errores(c)]
+    (salida / "errores.json").write_text(json.dumps(errores, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    (salida / "conteos.json").write_text(json.dumps(resumen, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
