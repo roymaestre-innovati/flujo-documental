@@ -65,6 +65,21 @@ uv run python scripts/correr_muestra.py \
 
 Convierte la clasificación manual al CSV del clasificador falso (`SIN CLASIFICAR` como TD-99, los huecos de una clasificación por páginas como TD-99), nombra los oferentes OF-001, OF-002… en el orden de las carpetas y corre todo. Con `--salida <carpeta vacía fuera del repo>` conserva el estado y las solicitudes para revisarlos a mano.
 
+## Ver las corridas en el navegador
+
+```bash
+uv run visor --corridas <carpeta>
+```
+
+Abre `http://127.0.0.1:8766` con lo que dejó una corrida guardada con `--salida` (de `orquestar` o de `correr_muestra.py`). `<carpeta>` puede ser la salida de una corrida o una carpeta con varias, una por subcarpeta; se elige en la lista de arriba. Hay cuatro vistas:
+
+- **Resumen:** conteos, una fila por entrega (clic para ver sus documentos), solicitudes por tipo documental, tareas por motivo y versiones fijadas.
+- **Documentos:** la lista por entrega, con filtros (texto, entrega, estado, con tarea, dudosa). El detalle muestra los segmentos con su confianza frente al umbral y el piso, las tareas, la lectura página por página, el historial y la solicitud de extracción de cada segmento. "Ver PDF" abre el PDF normalizado al lado; un clic en una página lo lleva a esa página.
+- **Tareas:** todas, abiertas primero; un clic abre el documento.
+- **Errores:** mensajes en las colas de errores y entregas con error.
+
+Las corridas traen datos personales: el servidor solo escucha en 127.0.0.1 y solo sirve archivos del almacén de la corrida. Se puede mover la carpeta de una corrida: los PDF se buscan en su `almacen/`. La página se recarga para ver una corrida nueva.
+
 ## Qué hay
 
 | Archivo | Qué hace |
@@ -87,6 +102,7 @@ Convierte la clasificación manual al CSV del clasificador falso (`SIN CLASIFICA
 | `resolucion.py` | Resolver una tarea de clasificación |
 | `local.py` | Una corrida completa sobre las versiones en memoria, con la normalización en paralelo |
 | `cli.py` | El comando `orquestar` |
+| `visor/` | El comando `visor`: servidor local y página para revisar corridas |
 
 ## Datos personales
 

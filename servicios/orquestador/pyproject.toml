@@ -12,6 +12,7 @@ dependencies = [
 
 [project.scripts]
 orquestar = "orquestador.cli:main"
+visor = "orquestador.visor.servidor:main"
 
 [tool.uv.sources]
 normalizacion = { path = "../normalizacion", editable = true }

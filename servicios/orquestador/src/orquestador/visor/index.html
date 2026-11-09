@@ -1,0 +1,466 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Visor del orquestador</title>
+<style>
+  :root {
+    --fondo: #f6f7f9; --panel: #ffffff; --borde: #e3e6eb; --texto: #1d2330; --suave: #6b7383;
+    --acento: #2457c5; --acento-suave: #e8eefb; --ok: #1f7a4d; --ok-suave: #e3f4ea;
+    --alerta: #a35a00; --alerta-suave: #fdf0dc; --mal: #b42323; --mal-suave: #fbe6e6; --nulo: #9aa1ae;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --fondo: #14171c; --panel: #1c2027; --borde: #2c323c; --texto: #e6e9ee; --suave: #9aa3b2;
+      --acento: #7ea2ff; --acento-suave: #1f2a44; --ok: #5fd39a; --ok-suave: #173327;
+      --alerta: #f0b25c; --alerta-suave: #3a2c16; --mal: #ff8a8a; --mal-suave: #3d1c1c; --nulo: #6d7480;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 14px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; background: var(--fondo); color: var(--texto); height: 100vh; display: flex; flex-direction: column; }
+  header { display: flex; align-items: center; gap: 12px; padding: 10px 16px; background: var(--panel); border-bottom: 1px solid var(--borde); flex-wrap: wrap; }
+  header h1 { font-size: 16px; margin: 0; font-weight: 600; }
+  select, button, input { font: inherit; color: var(--texto); background: var(--panel); border: 1px solid var(--borde); border-radius: 6px; padding: 5px 9px; }
+  button { cursor: pointer; }
+  button.activo { background: var(--acento-suave); border-color: var(--acento); color: var(--acento); }
+  .pestanas { display: flex; gap: 4px; }
+  .meta { color: var(--suave); font-size: 13px; }
+  .cuerpo { flex: 1; display: flex; min-height: 0; }
+  nav { width: 300px; flex-shrink: 0; overflow-y: auto; background: var(--panel); border-right: 1px solid var(--borde); display: none; }
+  nav.visible { display: block; }
+  .filtro { position: sticky; top: 0; padding: 8px 10px; background: var(--panel); border-bottom: 1px solid var(--borde); display: grid; gap: 6px; grid-template-columns: 1fr 1fr; z-index: 1; }
+  .filtro input { grid-column: 1 / -1; background: var(--fondo); }
+  .filtro select { width: 100%; min-width: 0; }
+  .grupo { padding: 6px 14px; font-size: 12px; font-weight: 600; color: var(--suave); background: var(--fondo); border-bottom: 1px solid var(--borde); position: sticky; top: 77px; }
+  nav .doc { padding: 8px 14px; border-bottom: 1px solid var(--borde); cursor: pointer; }
+  nav .doc:hover { background: var(--fondo); }
+  nav .doc.sel { background: var(--acento-suave); box-shadow: inset 3px 0 0 var(--acento); }
+  nav .nombre { font-weight: 500; word-break: break-word; }
+  .chips { margin-top: 4px; display: flex; gap: 4px; flex-wrap: wrap; align-items: center; }
+  main { flex: 1; overflow-y: auto; padding: 16px 20px; min-width: 0; }
+  aside { width: 45%; flex-shrink: 0; border-left: 1px solid var(--borde); display: none; background: var(--panel); }
+  aside.visible { display: block; }
+  aside iframe { width: 100%; height: 100%; border: 0; }
+  .chip { display: inline-block; font-size: 12px; padding: 1px 7px; border-radius: 10px; background: var(--fondo); color: var(--suave); border: 1px solid var(--borde); white-space: nowrap; }
+  .chip.ok { background: var(--ok-suave); color: var(--ok); border-color: transparent; }
+  .chip.alerta { background: var(--alerta-suave); color: var(--alerta); border-color: transparent; }
+  .chip.mal { background: var(--mal-suave); color: var(--mal); border-color: transparent; }
+  .chip.acento { background: var(--acento-suave); color: var(--acento); border-color: transparent; }
+  h2 { font-size: 17px; margin: 0; font-weight: 600; word-break: break-word; }
+  h3 { font-size: 14px; margin: 22px 0 8px; font-weight: 600; }
+  .titulo-doc { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 6px; }
+  .barra { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin: 10px 0 14px; }
+  .error { background: var(--mal-suave); color: var(--mal); border-radius: 8px; padding: 10px 12px; margin-bottom: 14px; white-space: pre-wrap; }
+  .aviso { background: var(--alerta-suave); border-radius: 8px; padding: 10px 12px; margin-bottom: 14px; }
+  table { width: 100%; border-collapse: collapse; background: var(--panel); border: 1px solid var(--borde); border-radius: 8px; overflow: hidden; }
+  th { text-align: left; font-size: 12px; font-weight: 600; color: var(--suave); background: var(--fondo); padding: 8px 10px; border-bottom: 1px solid var(--borde); }
+  td { padding: 8px 10px; border-bottom: 1px solid var(--borde); vertical-align: top; }
+  tr:last-child td { border-bottom: 0; }
+  tr.clic { cursor: pointer; }
+  tr.clic:hover td { background: var(--fondo); }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .id { color: var(--suave); font-size: 12px; font-family: ui-monospace, monospace; word-break: break-all; }
+  .nulo { color: var(--nulo); font-style: italic; }
+  .conf { font-variant-numeric: tabular-nums; font-weight: 600; }
+  .conf.bajo { color: var(--mal); } .conf.dudosa { color: var(--alerta); }
+  .medidor { position: relative; height: 5px; background: var(--fondo); border-radius: 3px; margin-top: 5px; width: 90px; }
+  .medidor > i { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 3px; background: var(--ok); }
+  .medidor.dudosa > i { background: var(--alerta); } .medidor.bajo > i { background: var(--mal); }
+  .medidor > b { position: absolute; top: -3px; bottom: -3px; width: 2px; background: var(--texto); opacity: .55; }
+  .medidor > s { position: absolute; top: -3px; bottom: -3px; width: 2px; background: var(--mal); opacity: .55; }
+  .umbral { font-size: 11px; color: var(--suave); }
+  .tarjetas { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; margin: 6px 0 4px; }
+  .tarjeta { background: var(--panel); border: 1px solid var(--borde); border-radius: 8px; padding: 10px 12px; }
+  .tarjeta .valor { font-size: 22px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .tarjeta .rotulo { font-size: 12px; color: var(--suave); }
+  .tarjeta.mal .valor { color: var(--mal); } .tarjeta.alerta .valor { color: var(--alerta); }
+  .columnas { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 0 24px; }
+  .barras { display: grid; grid-template-columns: max-content 1fr max-content; gap: 6px 10px; align-items: center; }
+  .barras .fila { display: contents; }
+  .barras .fila .pista { height: 14px; background: var(--fondo); border-radius: 3px; position: relative; }
+  .barras .fila .pista i { position: absolute; left: 0; top: 0; bottom: 0; background: var(--acento); border-radius: 3px; opacity: .8; }
+  .barras .fila .n { text-align: right; font-variant-numeric: tabular-nums; }
+  .paginas { display: flex; gap: 3px; flex-wrap: wrap; }
+  .pag { width: 26px; height: 30px; border-radius: 3px; font-size: 11px; display: flex; align-items: center; justify-content: center; cursor: pointer; border: 1px solid var(--borde); background: var(--panel); }
+  .pag.texto { background: var(--ok-suave); color: var(--ok); border-color: transparent; }
+  .pag.escaneo_con_ocr { background: var(--alerta-suave); color: var(--alerta); border-color: transparent; }
+  .pag.imagen { background: var(--mal-suave); color: var(--mal); border-color: transparent; }
+  .pag.vacia { color: var(--nulo); }
+  .linea { display: grid; grid-template-columns: 80px 170px 1fr; gap: 10px; padding: 4px 0; border-bottom: 1px dashed var(--borde); font-size: 13px; }
+  .linea .hora { color: var(--suave); font-variant-numeric: tabular-nums; }
+  pre { font-size: 12px; background: var(--fondo); border-radius: 6px; padding: 8px 10px; overflow-x: auto; margin: 6px 0; }
+  details summary { cursor: pointer; color: var(--suave); font-size: 13px; }
+  .vacio { color: var(--suave); padding: 40px; text-align: center; }
+  a { color: var(--acento); cursor: pointer; }
+  .kv { display: grid; grid-template-columns: max-content 1fr; gap: 3px 12px; font-size: 13px; }
+  .kv .k { color: var(--suave); }
+  @media (max-width: 900px) { nav { width: 210px; } aside.visible { position: fixed; inset: 50px 0 0 0; width: 100%; z-index: 5; } }
+</style>
+</head>
+<body>
+<header>
+  <h1>Visor del orquestador</h1>
+  <select id="corrida" aria-label="Corrida"></select>
+  <div class="pestanas" role="tablist">
+    <button data-vista="resumen">Resumen</button>
+    <button data-vista="documentos">Documentos</button>
+    <button data-vista="tareas">Tareas</button>
+    <button data-vista="errores">Errores</button>
+  </div>
+  <span class="meta" id="meta"></span>
+</header>
+<div class="cuerpo">
+  <nav id="lateral">
+    <div class="filtro">
+      <input id="texto" type="search" placeholder="Filtrar por nombre o id…" aria-label="Filtrar documentos">
+      <select id="f-entrega" aria-label="Entrega"></select>
+      <select id="f-estado" aria-label="Estado"></select>
+    </div>
+    <div id="docs"></div>
+  </nav>
+  <main id="principal"><div class="vacio">Cargando…</div></main>
+  <aside id="panel-pdf"><iframe id="pdf" title="PDF normalizado"></iframe></aside>
+</div>
+<script>
+const $ = (s) => document.querySelector(s);
+const esc = (t) => String(t ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const nulo = (t = "vacío") => `<span class="nulo">${t}</span>`;
+
+const COLOR = {
+  // documentos
+  clasificado: "ok", duplicado: "", error_entrada: "mal", error_proceso: "mal", normalizado: "alerta",
+  esperando_clasificacion_humana: "alerta",
+  // segmentos
+  pendiente: "ok", sin_extraccion: "",
+  // entregas y tareas
+  procesando: "ok", recibido: "alerta", abierta: "alerta", resuelta: "ok",
+};
+const NOMBRE_ESTADO = {
+  clasificado: "clasificado", duplicado: "copia exacta", error_entrada: "error de entrada", error_proceso: "error de proceso",
+  normalizado: "normalizado", esperando_clasificacion_humana: "espera a una persona", pendiente: "a extracción",
+  sin_extraccion: "sin extracción", procesando: "procesando", recibido: "recibido", abierta: "abierta", resuelta: "resuelta",
+};
+const chipEstado = (e) => `<span class="chip ${COLOR[e] ?? ""}">${esc(NOMBRE_ESTADO[e] ?? e)}</span>`;
+
+let corridas = [];
+let c = null;            // la corrida cargada, con índices
+const estado = { corrida: null, vista: "resumen", documento: null, pdf: false, pagina: 1, texto: "", entrega: "", filtroEstado: "" };
+
+async function api(ruta) {
+  const r = await fetch(ruta);
+  if (!r.ok) throw new Error(`${r.status} en ${ruta}`);
+  return r.json();
+}
+const q = (params) => new URLSearchParams(params).toString();
+
+// --- Carga ---
+
+function indexar(d) {
+  d.docPorId = new Map(d.documentos.map((x) => [x.id, x]));
+  d.segPorDoc = new Map();
+  for (const s of d.segmentos) {
+    if (!d.segPorDoc.has(s.id_documento)) d.segPorDoc.set(s.id_documento, []);
+    d.segPorDoc.get(s.id_documento).push(s);
+  }
+  for (const l of d.segPorDoc.values()) l.sort((a, b) => a.pagina_inicio - b.pagina_inicio);
+  d.tareasPorDoc = new Map();
+  for (const t of d.tareas) {
+    const id = t.id_documento || t.referencia?.id;
+    if (!d.tareasPorDoc.has(id)) d.tareasPorDoc.set(id, []);
+    d.tareasPorDoc.get(id).push(t);
+  }
+  d.solPorSeg = new Map(d.solicitudes.map((s) => [s.id_segmento, s]));
+  d.entregas = [...new Set([...d.oferentes.map((o) => o.id), ...d.documentos.map((x) => x.entrega)])].sort();
+  return d;
+}
+
+async function cargarCorridas() {
+  corridas = await api("/api/corridas");
+  if (!corridas.length) { $("#principal").innerHTML = '<div class="vacio">No hay corridas.</div>'; return; }
+  const guardada = sessionStorage.getItem("corrida");
+  estado.corrida = corridas.some((x) => x.id === guardada) ? guardada : corridas[0].id;
+  $("#corrida").innerHTML = corridas.map((x) => {
+    const fecha = x.fecha ? new Date(x.fecha).toLocaleString("es-CO", { dateStyle: "short", timeStyle: "short" }) : "";
+    return `<option value="${esc(x.id)}">${esc([x.procesos.join(", "), fecha, x.id === "." ? "" : x.id].filter(Boolean).join(" · "))}</option>`;
+  }).join("");
+  $("#corrida").value = estado.corrida;
+  await cargarCorrida();
+}
+
+async function cargarCorrida() {
+  try { sessionStorage.setItem("corrida", estado.corrida); } catch (_) {}
+  $("#principal").innerHTML = '<div class="vacio">Cargando…</div>';
+  c = indexar(await api("/api/corrida?" + q({ corrida: estado.corrida })));
+  estado.documento = null; estado.pdf = false; estado.entrega = ""; estado.filtroEstado = "";
+  const h = new URLSearchParams(location.hash.slice(1));
+  if (h.get("vista")) estado.vista = h.get("vista");
+  if (h.get("doc") && c.docPorId.has(h.get("doc"))) estado.documento = h.get("doc");
+  const v = c.proceso.versiones || {};
+  const tiempo = c.conteos?.tiempo_s != null ? `${c.conteos.tiempo_s} s` : null;
+  $("#meta").textContent = [c.proceso.id, `normalizador ${v.normalizador ?? "?"}`, `umbrales v${v.umbrales ?? "?"}`,
+    `modelo v${v.modelo_extraccion ?? "?"}`, tiempo].filter(Boolean).join(" · ");
+  pintarFiltros();
+  pintar();
+}
+
+// --- Vistas ---
+
+// La vista y el documento van en la dirección (#vista=documentos&doc=…), para
+// poder volver o compartir el enlace dentro de la misma máquina.
+function guardarDireccion() {
+  const h = new URLSearchParams({ vista: estado.vista });
+  if (estado.vista === "documentos" && estado.documento) h.set("doc", estado.documento);
+  history.replaceState(null, "", "#" + h.toString());
+}
+
+function pintar() {
+  guardarDireccion();
+  document.querySelectorAll("[data-vista]").forEach((b) => b.classList.toggle("activo", b.dataset.vista === estado.vista));
+  $("#lateral").classList.toggle("visible", estado.vista === "documentos");
+  $("#panel-pdf").classList.toggle("visible", estado.vista === "documentos" && estado.pdf && !!estado.documento);
+  if (estado.vista === "resumen") pintarResumen();
+  if (estado.vista === "documentos") { pintarDocs(); pintarDocumento(); }
+  if (estado.vista === "tareas") pintarTareas();
+  if (estado.vista === "errores") pintarErrores();
+}
+
+function contar(lista, clave) {
+  const m = {};
+  for (const x of lista) m[clave(x)] = (m[clave(x)] || 0) + 1;
+  return m;
+}
+
+function barras(cuentas, etiqueta = (k) => k, titulo = () => "") {
+  const filas = Object.entries(cuentas).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+  if (!filas.length) return nulo("ninguna");
+  const max = Math.max(...filas.map(([, n]) => n));
+  return `<div class="barras">${filas.map(([k, n]) => `<div class="fila" title="${esc(titulo(k))}">
+    <span>${esc(etiqueta(k))}</span><span class="pista"><i style="width:${(n / max) * 100}%"></i></span><span class="n">${n}</span></div>`).join("")}</div>`;
+}
+
+function pintarResumen() {
+  const abiertas = c.tareas.filter((t) => t.estado === "abierta");
+  const atascados = c.conteos?.atascados;
+  const tarjeta = (valor, rotulo, clase = "") => `<div class="tarjeta ${clase}"><div class="valor">${valor}</div><div class="rotulo">${rotulo}</div></div>`;
+  const porEntrega = c.entregas.map((e) => {
+    const of = c.oferentes.find((o) => o.id === e);
+    const docs = c.documentos.filter((x) => x.entrega === e);
+    const segs = c.segmentos.filter((x) => x.entrega === e);
+    const de = (lista, est) => lista.filter((x) => x.estado === est).length;
+    return `<tr class="clic" data-entrega="${esc(e)}">
+      <td><b>${esc(e)}</b></td><td>${of ? chipEstado(of.estado) : nulo()}${of?.error ? ' <span class="chip mal">con error</span>' : ""}</td>
+      <td class="num">${docs.length}</td><td class="num">${de(docs, "clasificado")}</td><td class="num">${de(docs, "duplicado")}</td>
+      <td class="num">${de(docs, "error_entrada") + de(docs, "error_proceso")}</td>
+      <td class="num">${de(segs, "pendiente")}</td><td class="num">${de(segs, "sin_extraccion")}</td>
+      <td class="num">${de(segs, "esperando_clasificacion_humana")}</td>
+      <td class="num">${c.solicitudes.filter((s) => (s.id_oferente ?? "PROCESO") === e).length}</td>
+      <td class="num">${abiertas.filter((t) => t.entrega === e).length}</td></tr>`;
+  }).join("");
+  const emp = c.conteos?.emparejamiento;
+  $("#principal").innerHTML = `
+    <div class="tarjetas">
+      ${tarjeta(c.entregas.length, "entregas")}
+      ${tarjeta(c.documentos.length, "documentos")}
+      ${tarjeta(c.segmentos.length, "segmentos")}
+      ${tarjeta(c.solicitudes.length, "solicitudes de extracción")}
+      ${tarjeta(abiertas.length, "tareas abiertas", abiertas.length ? "alerta" : "")}
+      ${tarjeta(atascados ?? "—", "atascados", atascados ? "mal" : "")}
+      ${tarjeta(c.errores.length, "mensajes en errores", c.errores.length ? "mal" : "")}
+    </div>
+    <h3>Por entrega</h3>
+    <table><thead><tr><th>Entrega</th><th>Estado</th><th class="num">Documentos</th><th class="num">Clasificados</th>
+      <th class="num">Copias</th><th class="num">Con error</th><th class="num">Seg. a extracción</th><th class="num">Seg. sin extracción</th>
+      <th class="num">Seg. esperando</th><th class="num">Solicitudes</th><th class="num">Tareas</th></tr></thead>
+      <tbody>${porEntrega}</tbody></table>
+    <div class="columnas">
+      <div><h3>Solicitudes por tipo documental</h3>${barras(contar(c.solicitudes, (s) => s.tipo_documental), (k) => k, (k) => c.datos.tipos[k] || "")}</div>
+      <div><h3>Segmentos sin extracción por tipo</h3>${barras(contar(c.segmentos.filter((s) => s.estado === "sin_extraccion"), (s) => s.tipo_documental), (k) => k, (k) => c.datos.tipos[k] || "")}
+        <h3>Tareas abiertas por motivo</h3>${barras(contar(abiertas, (t) => t.motivo), (k) => k)}
+        <h3>Documentos por tipo de origen</h3>${barras(contar(c.documentos, (d) => d.tipo_origen || "?"))}</div>
+    </div>
+    <h3>Versiones fijadas en el proceso</h3>
+    <div class="chips">${Object.entries(c.proceso.versiones || {}).map(([k, v]) => `<span class="chip">${esc(k)}: ${esc(v ?? "—")}</span>`).join("")}</div>
+    ${emp ? `<h3>Emparejamiento con la clasificación manual</h3><div class="kv">${Object.entries(emp).map(([k, v]) => `<span class="k">${esc(k.replaceAll("_", " "))}</span><span>${esc(v)}</span>`).join("")}</div>` : ""}`;
+  document.querySelectorAll("tr[data-entrega]").forEach((tr) => tr.onclick = () => {
+    estado.vista = "documentos"; estado.entrega = tr.dataset.entrega; $("#f-entrega").value = estado.entrega; pintar();
+  });
+}
+
+function pintarFiltros() {
+  $("#f-entrega").innerHTML = '<option value="">Todas las entregas</option>' + c.entregas.map((e) => `<option>${esc(e)}</option>`).join("");
+  const estados = [...new Set(c.documentos.map((d) => d.estado))].sort();
+  $("#f-estado").innerHTML = '<option value="">Todos los estados</option>' +
+    '<option value="_tarea">Con tarea abierta</option><option value="_dudosa">Con segmento dudoso</option>' +
+    estados.map((e) => `<option value="${esc(e)}">${esc(NOMBRE_ESTADO[e] ?? e)}</option>`).join("");
+  $("#f-entrega").value = estado.entrega; $("#f-estado").value = estado.filtroEstado;
+}
+
+function nombreDoc(d) { return d.ruta_origen || d.id; }
+
+function docsFiltrados() {
+  const f = estado.texto.toLowerCase();
+  return c.documentos.filter((d) => {
+    if (estado.entrega && d.entrega !== estado.entrega) return false;
+    if (f && !(nombreDoc(d).toLowerCase().includes(f) || d.id.toLowerCase().includes(f))) return false;
+    const segs = c.segPorDoc.get(d.id) || [];
+    if (estado.filtroEstado === "_tarea") return (c.tareasPorDoc.get(d.id) || []).some((t) => t.estado === "abierta");
+    if (estado.filtroEstado === "_dudosa") return segs.some((s) => s.clasificacion_dudosa);
+    if (estado.filtroEstado && d.estado !== estado.filtroEstado) return false;
+    return true;
+  }).sort((a, b) => a.entrega.localeCompare(b.entrega) || nombreDoc(a).localeCompare(nombreDoc(b)));
+}
+
+function pintarDocs() {
+  const lista = docsFiltrados();
+  if (!lista.length) { $("#docs").innerHTML = '<div class="vacio">Ningún documento coincide.</div>'; return; }
+  let html = "", grupo = null;
+  for (const d of lista) {
+    if (d.entrega !== grupo) { grupo = d.entrega; html += `<div class="grupo">${esc(grupo)}</div>`; }
+    const segs = c.segPorDoc.get(d.id) || [];
+    const tds = [...new Set(segs.map((s) => s.tipo_documental))];
+    const abiertas = (c.tareasPorDoc.get(d.id) || []).filter((t) => t.estado === "abierta").length;
+    html += `<div class="doc ${d.id === estado.documento ? "sel" : ""}" data-doc="${esc(d.id)}">
+      <div class="nombre">${esc(nombreDoc(d))}</div>
+      <div class="chips">${chipEstado(d.estado)}${tds.map((t) => `<span class="chip acento">${esc(t)}</span>`).join("")}
+        ${segs.some((s) => s.clasificacion_dudosa) ? '<span class="chip alerta">dudosa</span>' : ""}
+        ${abiertas ? `<span class="chip alerta">${abiertas} tarea${abiertas > 1 ? "s" : ""}</span>` : ""}</div></div>`;
+  }
+  $("#docs").innerHTML = html;
+  document.querySelectorAll("nav .doc").forEach((el) => el.onclick = () => abrirDocumento(el.dataset.doc));
+}
+
+function abrirDocumento(id, pagina = 1) {
+  estado.vista = "documentos"; estado.documento = id; estado.pagina = pagina;
+  pintar();
+  document.querySelector("nav .doc.sel")?.scrollIntoView({ block: "nearest" });
+}
+
+function confianzaHTML(s) {
+  if (typeof s.confianza !== "number") return s.asignado_por && s.asignado_por !== "clasificador" ? '<span class="chip">asignado</span>' : nulo("—");
+  const u = c.datos.umbrales;
+  const umbral = u?.por_td?.[s.tipo_documental];
+  const piso = u?.piso;
+  const clase = typeof piso === "number" && s.confianza < piso ? "bajo" : (typeof umbral === "number" && s.confianza < umbral ? "dudosa" : "");
+  return `<div class="conf ${clase}">${s.confianza.toFixed(2)}</div>
+    <div class="medidor ${clase}"><i style="width:${Math.min(s.confianza, 1) * 100}%"></i>
+      ${typeof umbral === "number" ? `<b style="left:${umbral * 100}%"></b>` : ""}${typeof piso === "number" ? `<s style="left:${piso * 100}%"></s>` : ""}</div>
+    <div class="umbral">${typeof umbral === "number" ? `umbral ${umbral.toFixed(2)}` : ""}${typeof piso === "number" ? ` · piso ${piso.toFixed(2)}` : ""}</div>`;
+}
+
+function verPagina(n) {
+  estado.pagina = n; estado.pdf = true;
+  $("#panel-pdf").classList.add("visible");
+  $("#ver-pdf")?.classList.add("activo");
+  if ($("#ver-pdf")) $("#ver-pdf").textContent = "Ocultar PDF";
+  $("#pdf").src = "/pdf?" + q({ corrida: estado.corrida, documento: estado.documento, p: n }) + "#page=" + n;
+}
+
+async function pintarDocumento() {
+  const d = c.docPorId.get(estado.documento);
+  if (!d) { $("#principal").innerHTML = '<div class="vacio">Elige un documento a la izquierda.</div>'; $("#panel-pdf").classList.remove("visible"); return; }
+  const segs = c.segPorDoc.get(d.id) || [];
+  const tareas = c.tareasPorDoc.get(d.id) || [];
+  const original = d.duplicado_de ? c.docPorId.get(d.duplicado_de) : null;
+  const copias = c.documentos.filter((x) => x.duplicado_de === d.id);
+  const historial = [
+    ...(d.historial || []).map((h) => ({ ...h, quien: "documento" })),
+    ...segs.flatMap((s) => (s.historial || []).map((h) => ({ ...h, quien: `segmento p${s.pagina_inicio}-${s.pagina_fin}` }))),
+    ...tareas.flatMap((t) => (t.historial || []).map((h) => ({ ...h, quien: `tarea ${t.clase}` }))),
+  ].sort((a, b) => a.cuando.localeCompare(b.cuando));
+  const tienePdf = !!d.pdf;
+
+  $("#principal").innerHTML = `
+    <div class="titulo-doc"><h2>${esc(nombreDoc(d))}</h2>
+      ${tienePdf ? `<button id="ver-pdf" class="${estado.pdf ? "activo" : ""}">${estado.pdf ? "Ocultar PDF" : "Ver PDF"}</button>` : ""}</div>
+    <div class="id">${esc(d.id)}</div>
+    <div class="barra">${chipEstado(d.estado)}<span class="chip">${esc(d.entrega)}</span>
+      <span class="chip">${esc(d.tipo_origen || "?")}</span>${d.paginas ? `<span class="chip">${d.paginas} pág.</span>` : ""}
+      ${d.anexo_nativo ? '<span class="chip">con anexo nativo</span>' : ""}
+      ${d.hash ? `<span class="chip" title="${esc(d.hash)}">huella ${esc(d.hash.slice(0, 12))}</span>` : ""}</div>
+    ${d.error ? `<div class="error"><b>${esc(d.error.codigo ?? "Error")}</b>${d.error.detalle ? "\n" + esc(d.error.detalle) : (typeof d.error === "string" ? "\n" + esc(d.error) : "")}</div>` : ""}
+    ${original ? `<div class="aviso">Copia exacta de <a data-ir="${esc(original.id)}">${esc(nombreDoc(original))}</a>: no se clasifica; toma lo del original.</div>` : ""}
+    ${copias.length ? `<div class="aviso">Tiene ${copias.length} copia${copias.length > 1 ? "s" : ""} exacta${copias.length > 1 ? "s" : ""}: ${copias.map((x) => `<a data-ir="${esc(x.id)}">${esc(nombreDoc(x))}</a>`).join(", ")}.</div>` : ""}
+    ${tareas.length ? `<h3>Tareas</h3><table><thead><tr><th>Clase</th><th>Motivo</th><th>Detalle</th><th>Estado</th></tr></thead><tbody>
+      ${tareas.map((t) => `<tr><td>${esc(t.clase)}</td><td>${esc(t.motivo)}</td><td>${esc(t.detalle ?? "")}
+        ${t.resolucion ? `<div class="umbral">resuelta por ${esc(t.resolucion.quien)}</div>` : ""}</td><td>${chipEstado(t.estado)}</td></tr>`).join("")}</tbody></table>` : ""}
+    ${segs.length ? `<h3>Segmentos</h3><table><thead><tr><th>Páginas</th><th>Tipo documental</th><th>Confianza</th><th>Estado</th><th>Solicitud</th></tr></thead><tbody>
+      ${segs.map((s) => {
+        const sol = c.solPorSeg.get(s.id);
+        return `<tr><td><a data-pag="${s.pagina_inicio}">${s.pagina_inicio === s.pagina_fin ? s.pagina_inicio : `${s.pagina_inicio}–${s.pagina_fin}`}</a></td>
+          <td><b>${esc(s.tipo_documental)}</b>${s.subtipo ? ` <span class="chip">${esc(s.subtipo)}</span>` : ""}
+            <div class="umbral">${esc(c.datos.tipos[s.tipo_documental] || "")}</div>
+            ${s.tipo_sugerido ? `<div class="umbral">el clasificador sugería ${esc(s.tipo_sugerido)}</div>` : ""}
+            ${s.asignado_por && s.asignado_por !== "clasificador" ? `<div class="umbral">asignado por ${esc(s.asignado_por)}</div>` : ""}</td>
+          <td>${confianzaHTML(s)}</td>
+          <td>${chipEstado(s.estado)}${s.clasificacion_dudosa ? ' <span class="chip alerta">dudosa</span>' : ""}</td>
+          <td>${sol ? `<details><summary>ver</summary><pre>${esc(JSON.stringify(sol, null, 2))}</pre></details>` : nulo("—")}</td></tr>`;
+      }).join("")}</tbody></table>` : ""}
+    <div id="lectura"></div>
+    <h3>Historial</h3>
+    ${historial.map((h) => `<div class="linea"><span class="hora">${esc(new Date(h.cuando).toLocaleTimeString("es-CO"))}</span>
+      <span>${esc(h.quien)}</span><span>${h.de ? esc(NOMBRE_ESTADO[h.de] ?? h.de) + " → " : ""}<b>${esc(NOMBRE_ESTADO[h.a] ?? h.a)}</b> <span class="meta">${esc(h.motivo ?? "")}</span></span></div>`).join("") || nulo("sin historial")}
+    <details style="margin-top:16px"><summary>Registro completo</summary><pre>${esc(JSON.stringify(d, null, 2))}</pre></details>`;
+
+  $("#ver-pdf")?.addEventListener("click", () => {
+    if (estado.pdf) { estado.pdf = false; $("#panel-pdf").classList.remove("visible"); $("#ver-pdf").classList.remove("activo"); $("#ver-pdf").textContent = "Ver PDF"; }
+    else verPagina(estado.pagina || 1);
+  });
+  document.querySelectorAll("[data-pag]").forEach((a) => a.onclick = () => verPagina(Number(a.dataset.pag)));
+  document.querySelectorAll("[data-ir]").forEach((a) => a.onclick = () => abrirDocumento(a.dataset.ir));
+  if (estado.pdf && tienePdf) verPagina(estado.pagina || 1);
+  else $("#panel-pdf").classList.remove("visible");
+
+  if (!d.lectura) return;
+  const pedido = d.id;
+  try {
+    const l = await api("/api/lectura?" + q({ corrida: estado.corrida, documento: d.id }));
+    if (estado.documento !== pedido) return;
+    const tipos = contar(l.paginas, (p) => p.tipo);
+    const firmas = l.firma_digital || [];
+    $("#lectura").innerHTML = `<h3>Lectura</h3>
+      <div class="chips" style="margin-bottom:8px">${Object.entries(tipos).map(([t, n]) => `<span class="chip">${esc(t)}: ${n}</span>`).join("")}
+        ${firmas.length ? `<span class="chip acento">${firmas.length} firma${firmas.length > 1 ? "s" : ""} digital${firmas.length > 1 ? "es" : ""}</span>` : ""}</div>
+      <div class="paginas">${l.paginas.map((p) => `<div class="pag ${esc(p.tipo)}" data-pag="${p.pagina}"
+        title="Página ${p.pagina}: ${esc(p.tipo)}, ${p.caracteres} caracteres${p.anclas ? `, ${p.anclas} anclas` : ""}">${p.pagina}</div>`).join("")}</div>`;
+    document.querySelectorAll("#lectura [data-pag]").forEach((a) => a.onclick = () => verPagina(Number(a.dataset.pag)));
+  } catch (_) { /* sin lectura: no se muestra */ }
+}
+
+function pintarTareas() {
+  const orden = { abierta: 0, resuelta: 1 };
+  const lista = [...c.tareas].sort((a, b) => (orden[a.estado] ?? 2) - (orden[b.estado] ?? 2) || a.entrega.localeCompare(b.entrega));
+  if (!lista.length) { $("#principal").innerHTML = '<div class="vacio">Sin tareas.</div>'; return; }
+  $("#principal").innerHTML = `<table><thead><tr><th>Entrega</th><th>Clase</th><th>Motivo</th><th>Documento</th><th>Detalle</th><th>Estado</th></tr></thead><tbody>
+    ${lista.map((t) => {
+      const id = t.id_documento || (t.referencia?.tipo === "documento" ? t.referencia.id : null);
+      const d = id && c.docPorId.get(id);
+      return `<tr ${d ? `class="clic" data-ir="${esc(d.id)}"` : ""}><td>${esc(t.entrega)}</td><td>${esc(t.clase)}</td><td>${esc(t.motivo)}</td>
+        <td>${d ? esc(nombreDoc(d)) : (t.referencia ? esc(`${t.referencia.tipo} ${t.referencia.id}`) : nulo("—"))}</td>
+        <td>${esc(t.detalle ?? "")}</td><td>${chipEstado(t.estado)}</td></tr>`;
+    }).join("")}</tbody></table>`;
+  document.querySelectorAll("tr[data-ir]").forEach((tr) => tr.onclick = () => abrirDocumento(tr.dataset.ir));
+}
+
+function pintarErrores() {
+  const entregasConError = c.oferentes.filter((o) => o.error);
+  if (!c.errores.length && !entregasConError.length) { $("#principal").innerHTML = '<div class="vacio">Ningún mensaje quedó en errores.</div>'; return; }
+  $("#principal").innerHTML = `
+    ${c.errores.length ? `<h3>Mensajes en las colas de errores</h3><table><thead><tr><th>Cola</th><th>Motivo</th><th>Mensaje</th></tr></thead><tbody>
+      ${c.errores.map((e) => `<tr><td>${esc(e.cola)}</td><td>${esc(e.motivo)}</td><td><pre>${esc(JSON.stringify(e.cuerpo, null, 2))}</pre></td></tr>`).join("")}</tbody></table>` : ""}
+    ${entregasConError.length ? `<h3>Entregas con error</h3><table><thead><tr><th>Entrega</th><th>Estado</th><th>Error</th></tr></thead><tbody>
+      ${entregasConError.map((o) => `<tr><td>${esc(o.id)}</td><td>${chipEstado(o.estado)}</td><td>${esc(o.error)}</td></tr>`).join("")}</tbody></table>` : ""}`;
+}
+
+// --- Eventos ---
+
+$("#corrida").onchange = (e) => { estado.corrida = e.target.value; cargarCorrida(); };
+document.querySelectorAll("[data-vista]").forEach((b) => b.onclick = () => { estado.vista = b.dataset.vista; pintar(); });
+$("#texto").oninput = (e) => { estado.texto = e.target.value; pintarDocs(); };
+$("#f-entrega").onchange = (e) => { estado.entrega = e.target.value; pintarDocs(); };
+$("#f-estado").onchange = (e) => { estado.filtroEstado = e.target.value; pintarDocs(); };
+
+cargarCorridas().catch((e) => { $("#principal").innerHTML = `<div class="error">No se pudo cargar: ${esc(e.message)}</div>`; });
+</script>
+</body>
+</html>

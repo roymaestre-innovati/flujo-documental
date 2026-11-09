@@ -24,8 +24,7 @@ from normalizacion.almacen import AlmacenLocal
 
 from . import VERSION
 from .clasificador import ClasificadorFalso
-from .cola import COLAS
-from .local import Corrida, aviso, conteos
+from .local import Corrida, aviso, conteos, guardar_salida
 from .origen import OrigenLocal
 from .parametros import PARAMETROS
 from .registros import configurar
@@ -86,13 +85,7 @@ def main(argv: list[str] | None = None) -> int:
         if archivo_registros:
             archivo_registros.close()
 
-    corrida.estado.guardar(salida / "estado.json")
-    with open(salida / "solicitudes-extraccion.jsonl", "w", encoding="utf-8") as f:
-        for solicitud in corrida.solicitudes:
-            f.write(json.dumps(solicitud, ensure_ascii=False) + "\n")
-    errores = [{"cola": c, "motivo": e.motivo, "cuerpo": e.mensaje.cuerpo} for c in COLAS for e in corrida.cola.errores(c)]
-    (salida / "errores.json").write_text(json.dumps(errores, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-    (salida / "conteos.json").write_text(json.dumps(resumen, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    guardar_salida(corrida, salida, resumen)
 
     print(json.dumps(resumen, ensure_ascii=False, indent=2))
     return 1 if resumen["mensajes_en_errores"] else 0
