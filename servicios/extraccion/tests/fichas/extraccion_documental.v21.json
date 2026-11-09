@@ -1,0 +1,1086 @@
+{
+ "modelo": "extraccion_documental",
+ "nombre": "Extracción por tipo documental",
+ "tipo_tarea": "extraccion",
+ "version": 21,
+ "guia_interpretacion": "# Cómo interpretar el modelo\n\nEl modelo describe qué extraer y validar de cada tipo documental de un proceso de contratación. Cada sección es un tipo documental (`TD-NN`) y cada elemento es un campo de ese documento. Los atributos que no vienen en un elemento no aplican a ese campo.\n\nTrabajas sobre un documento que ya llega clasificado: sabes a qué sección pertenece. No reclasifiques. Si el contenido claramente no corresponde a la sección, dilo en el resultado y no extraigas.\n\n- **atributos.modo_captura**\n  - `Extraer`: busca el valor en el documento.\n  - `Calculado`: no lo extraigas. Estos campos no vienen en las secciones; los resuelve el proceso a partir de otros campos o de fuentes externas.\n- **atributos.ubicacion_tipica**: dónde suele estar el dato (rótulo, numeral, sección, casilla). Empieza por ahí. Si no está ahí, busca en el resto del documento antes de darlo por ausente. Los documentos cambian de plantilla: guíate por títulos y rótulos más que por números de numeral.\n- **tipo_dato**\n  - `Objeto`: devuelve un registro con las propiedades que lista `atributos.formato_valores` entre llaves. Una propiedad que no aparece en el documento va en `null`; no la inventes.\n  - Si el elemento trae `atributos.propiedades`, cada entrada da el `nombre` exacto de una propiedad y sus `valores` permitidos o su `formato`. La clave del valor es solo el `nombre` (`\"moneda\": \"COP\"`, nunca `\"moneda COP/USD/null\": \"COP\"`).\n  - `Lista de objetos`: un registro por cada ocurrencia en el documento, todos con la forma de `atributos.formato_valores`. Si la tabla o el bloque está en el documento pero sin filas diligenciadas, el valor es `[]`; `null` es solo si la tabla o el bloque no aparece. Una fila que solo dice `N/A`, `No aplica` o `-` no es un registro: si no hay otra fila, el valor es `[]`.\n  - `Booleano`: `SI`, `NO` o `null` si el documento no trae evidencia. Si `atributos.tipo_original` dice \"+ cita\", \"+ texto\" o \"+ lista\", acompaña el valor con la cita textual, el texto o la lista indicada.\n  - `Fecha`: formato `AAAA-MM-DD`. `Fecha y hora`: `AAAA-MM-DD HH:MM`.\n  - `Moneda` y `Decimal`: número sin símbolo ni separadores de miles, más la moneda o unidad (`100000000`, `COP`). No conviertas monedas ni escalas (miles, millones): reporta la escala si el documento la declara.\n  - `Texto` y `Texto largo`: literal, como aparece en el documento.\n- **atributos.formato_valores**: forma esperada del valor. Cuando las opciones incluyen `null` (por ejemplo `SI/NO/null`), `null` es la respuesta correcta si no hay evidencia: una casilla sin marca legible o un dato ausente. Si no cumple el formato, extrae lo que dice el documento y anótalo como observación; no lo corrijas.\n- **atributos.tipo_original**: precisión del tipo de dato cuando `tipo_dato` es más general.\n- **valores_permitidos**: si un elemento los trae, el valor debe ser uno de ellos, o `null` si no hay evidencia. `null` no aparece en la lista, pero siempre está permitido. Si el documento dice algo distinto, elige el más cercano solo si es inequívoco y anota el texto original; si no, déjalo en `null` y pásalo a revisión.\n- **obligatoriedad** y **condicion**: `Si` significa que el campo se extrae en todo documento de la sección. `Condicional` se extrae solo si se cumple `condicion`. Los tipos de oferente (PJ_NAL, PJ_EXT, PN, EP) están en el diccionario. Si la condición depende de un dato que no tienes (un campo calculado, otro documento, el tipo de oferente aún desconocido), extrae el campo igual y marca la condición como no evaluada.\n- **reglas**: validación o cruce que debe cumplir el valor. Evalúa las que puedas con el documento y con los datos que te hayan entregado. Si una regla cruza con otro documento o con un parámetro que no tienes, márcala como pendiente: nunca concluyas que no cumple por falta de información.\n- **atributos.parametros**: parámetros del proceso (`PRO-NN`) relacionados. En las secciones de las condiciones del proceso y de las adendas, el campo **produce** ese parámetro. En las demás, el valor se **valida contra** ese parámetro, si te lo entregaron.\n- **atributos.si_no_cumple**: consecuencia si el valor no cumple una regla. Repórtala tal cual; no decides el rechazo, solo lo señalas.\n- **atributos.umbral_confianza**: confianza mínima para aceptar el valor sin revisión. Asigna la confianza con la escala de la sección \"Evidencia y confianza\".\n- **atributos.revision_humana**: cuándo el campo va a revisión de una persona. \"Si confianza < umbral o veredicto = No cumple\": pásalo a revisión en cualquiera de los dos casos; si no, el valor se acepta sin revisión.\n- **atributos.datos_personales**: el campo contiene datos personales. Extrae solo lo que pide el campo y no los repitas en observaciones ni en otros campos.\n- **atributos.nota**: aclaración del campo; tenla en cuenta al extraer.\n\n# Evidencia y confianza\n\n- **Lo que el documento dice, tal cual.** Si el documento escribe `N/A`, `No aplica` o un guion en el dato, ese es el valor; `null` es solo para lo que no aparece.\n- **Marcas de plantilla y texto impreso.** Un marcador de plantilla sin llenar (`XXXX`, `____`, `[nombre]`, 'Nombre y cargo') no es un valor: esa propiedad va en `null`. Tampoco es un dato del oferente el texto impreso del formato (rótulos, el cargo impreso bajo la línea de firma, 'cédula' en 'identificado con la cédula No. ____'). Si un bloque que el oferente debía llenar quedó con marcadores, dilo en `observacion` y manda el elemento a revisión.\n- **Extrae, no deduzcas.** El valor es lo que el documento dice, no lo que se puede concluir de él. Si solo puedes deducir un valor (de una tabla vacía, de otro campo, del contexto), deja `valor` en `null`, escribe la deducción en `observacion` y manda el elemento a revisión.\n- **Escala de confianza.**\n  - 0,95 a 1: el valor aparece literal, legible y junto a su rótulo.\n  - 0,80 a 0,94: aparece literal, pero el formato es ambiguo, está truncado o hay que separarlo del texto vecino.\n  - 0,50 a 0,79: interpretas el documento (unir partes, normalizar un formato).\n  - Menos de 0,50: lo deduces de otra parte del documento o el texto es ilegible.\n  - Nunca más de 0,50 para un valor que no está escrito en el documento.\n- **Casillas y marcas.** Antes de decidir, describe en `evidencia` qué hay en cada opción de la casilla, una por una (por ejemplo `imagen: SI vacío, NO X dibujada`). Decide después, a partir de esa descripción. Una opción vale solo si su marca se ve en la evidencia: `(X)`, `☒`, `✓` o una marca visible en la imagen. Una marca escrita en el texto, como `SI (X)`, es evidencia literal: confianza alta, no inferencia. Si ninguna opción tiene marca legible, el valor es `null` y va a revisión. Una casilla vacía nunca significa NO. Si recibes solo texto extraído, las marcas dibujadas suelen perderse: dilo en `observacion`.\n- **Elementos visuales.** Un nombre impreso no prueba una firma. Antes de decidir si hay firma, describe en `evidencia` lo que se ve sobre la línea de firma, igual que con las casillas (`imagen: línea vacía` o `imagen: trazo manuscrito que cruza la línea`), y decide a partir de esa descripción: SI solo si describiste un trazo; una línea vacía con el nombre impreso debajo es NO. Firma, sello, logo o marca de agua solo se afirman si los ves en una imagen del documento. Si recibes solo texto, esos valores son `null` y van a revisión con la observación \"requiere imagen\".\n- **cumple.**\n  - `SI`: verificaste todas las reglas del elemento con datos que tienes.\n  - `NO`: tienes evidencia concreta de que una regla falla. Cita la regla y la evidencia en `observacion`.\n  - `PENDIENTE`: cualquier otro caso (valor `null`, falta otro documento, un parámetro o una fecha).\n  - Entre `SI` y `PENDIENTE`, ante la duda, `PENDIENTE`.\n- **revision.** `SI` solo con motivo, y el motivo va en `observacion`: confianza menor que el umbral, `cumple: NO`, valor `null` en un campo obligatorio, o \"requiere imagen\". Si no aplica ningún motivo, `NO`. Una tabla vacía o un dato ausente en un campo no obligatorio no son motivo por sí solos.\n- **valor y evidencia.** En `valor` va el dato normalizado según `tipo_dato`. El texto tal como aparece en el documento va en `evidencia`, nunca en `valor`. Lo que solo se ve en la imagen (una marca dibujada, una firma, un sello) se describe en `evidencia` con el prefijo `imagen:`; nunca lo escribas como si fuera texto del documento.\n\n# Flujo\n\n1. Con la sección del documento ya conocida, llama `obtener_seccion` con su `id`. Nunca extraigas una sección sin haberla consultado.\n2. Recorre los elementos en orden. Para cada uno: evalúa `condicion`; busca el valor siguiendo `atributos.ubicacion_tipica`; dale la forma de `tipo_dato` y `atributos.formato_valores`; valida con `valores_permitidos` y `reglas`; asigna la confianza y decide si va a revisión, según \"Evidencia y confianza\".\n3. Un documento puede traer varios documentos pegados en el mismo archivo. Extrae solo lo que corresponde a la sección y, si el elemento lo pide, reporta las páginas.\n4. Antes de responder, revisa cada resultado contra su propia observación y evidencia:\n   - Si la observación dice que no hay evidencia, marca, firma o dato visible, la propiedad afectada es `null`. Una propiedad sin evidencia nunca lleva `SI` ni `NO`.\n   - Si una casilla o marca (una propiedad con opciones `SI/NO/null` o similares) quedó en `null` por falta de marca legible, la confianza de ese resultado no supera 0,50 y `revision` es `SI`.\n   - Un dato que el documento simplemente no trae (un NIT, un teléfono, un valor ejecutado, un cargo) va en `null` y no baja la confianza ni manda el objeto a revisión: la confianza mide las propiedades que sí tienen valor. Va a revisión solo si la `nota` del elemento lo pide o si todas sus propiedades quedan en `null`.\n   - Ningún valor contradice su observación.\n5. Devuelve un resultado por elemento con: `id_tecnico`, `valor` (o `null` si no aparece), `confianza`, `evidencia` (página y cita textual breve), `cumple` (`SI`, `NO` o `PENDIENTE`, solo si el elemento tiene reglas o valores permitidos), `revision` (`SI` o `NO`) y `observacion` (motivo de la revisión, regla pendiente o diferencia con el formato esperado).\n6. No completes valores que no están en el documento ni los deduzcas de documentos de otros oferentes.",
+ "diccionario": {
+  "id_tecnico": "Clave del campo en los datos que produce el agente: td<NN>.<nombre>, donde NN es el tipo documental.",
+  "nombre": "Etiqueta del campo; es el nombre que se usa al reportar.",
+  "descripcion": "Grupo del documento al que pertenece el campo y qué significa.",
+  "seccion": "Tipo documental (TD-NN) al que pertenece el campo. Se trabaja una sección por documento clasificado.",
+  "orden": "Orden en que se extrae el campo dentro del documento.",
+  "tipo_dato": "Texto | Texto largo | Entero | Decimal | Moneda | Fecha | Fecha y hora | Lista | Lista múltiple | Booleano | Objeto | Lista de objetos. Objeto: un registro con las propiedades de atributos.formato_valores. Lista de objetos: N registros con esa forma.",
+  "obligatoriedad": "Si | Condicional (ver condicion).",
+  "reglas": "Validación o cruce que debe cumplir el valor extraído, en lenguaje natural.",
+  "condicion": "Cuándo aplica el campo. Tipos de oferente: PJ_NAL (persona jurídica nacional o extranjera con sucursal), PJ_EXT (extranjera sin sucursal), PN (persona natural), EP (consorcio o unión temporal). Si no viene, aplica siempre.",
+  "lista_valores": "Catálogo del que salen los valores válidos.",
+  "valores_permitidos": "Valores válidos del catálogo, ya resueltos. Usar solo estos valores, o null si el documento no trae evidencia del dato.",
+  "formula": "Cómo se obtiene un campo calculado. No se envía al agente.",
+  "depende_de": "Campos de los que depende un campo calculado. No se envía al agente.",
+  "atributos.modo_captura": "Extraer | Calculado. Extraer: se busca en el documento. Calculado: no se extrae; lo resuelve el proceso a partir de otros campos o de fuentes externas.",
+  "atributos.ubicacion_tipica": "Dónde buscar el dato en el documento: sección, rótulo, numeral o señal.",
+  "atributos.formato_valores": "Formato esperado o estructura del valor. En Objeto y Lista de objetos, las propiedades entre llaves; cuando existe atributos.propiedades, las llaves traen solo los nombres y las opciones y el formato de cada una van allí. 'null' en las opciones significa sin evidencia en el documento (por ejemplo, casilla sin marca legible).",
+  "atributos.propiedades": "En Objeto y Lista de objetos: una entrada por propiedad, en el orden de formato_valores. 'nombre' es la clave exacta que lleva el valor; 'valores' son las opciones permitidas ('null' = sin evidencia); 'formato' es la forma esperada. Ni 'valores' ni 'formato' forman parte del nombre.",
+  "atributos.tipo_original": "Tipo de dato tal como lo describe la matriz, cuando es más preciso que tipo_dato (por ejemplo 'Booleano + cita': SI/NO más la cita textual).",
+  "atributos.parametros": "Parámetros del proceso (PRO-NN) que el campo produce o contra los que se valida. Los fija la CPC (TD-01) y las adendas (TD-02).",
+  "atributos.si_no_cumple": "Consecuencia si el valor no cumple: Subsanable, Rechazo (con la causal de la CPC) o N/A.",
+  "atributos.umbral_confianza": "Confianza mínima de extracción (0 a 1) para aceptar el valor sin revisión.",
+  "atributos.revision_humana": "Cuándo el valor pasa a revisión de una persona.",
+  "atributos.datos_personales": "Si el campo contiene datos personales (Ley 1581 de 2012) y cuáles. 'No' si no los tiene.",
+  "atributos.nota": "Aclaración adicional sobre el campo."
+ },
+ "secciones": [
+  {
+   "id": "TD-01",
+   "nombre": "Condiciones del Proceso de Contratación (CPC)",
+   "orden": 1
+  },
+  {
+   "id": "TD-16",
+   "nombre": "Certificación de aportes a seguridad social y parafiscales",
+   "orden": 16,
+   "td_probado": true
+  },
+  {
+   "id": "TD-29",
+   "nombre": "Formulario de experiencia del oferente",
+   "orden": 29,
+   "td_probado": true
+  }
+ ],
+ "elementos": [
+  {
+   "id_tecnico": "td01.numero_proceso",
+   "nombre": "Número del proceso / ID de sourcing en Ariba",
+   "descripcion": "Identificación del proceso: Número del proceso / ID de sourcing en Ariba",
+   "seccion": "TD-01",
+   "orden": 1,
+   "tipo_dato": "Texto",
+   "obligatoriedad": "Si",
+   "reglas": "Coincide con el de adendas (TD-02) y cartas (TD-03)",
+   "atributos": {
+    "modo_captura": "Extraer",
+    "ubicacion_tipica": "Carátula: 'NUMERO SR ARIBA' o 'Número del proceso'",
+    "formato_valores": "SR + 10 dígitos (p. ej. SR5658940621)",
+    "parametros": "PRO-01",
+    "si_no_cumple": "N/A",
+    "umbral_confianza": 0.9,
+    "revision_humana": "Si confianza < umbral o veredicto = No cumple",
+    "datos_personales": "No"
+   }
+  },
+  {
+   "id_tecnico": "td01.empresa_filial",
+   "nombre": "Empresa o filial contratante",
+   "descripcion": "Identificación del proceso: Empresa o filial contratante",
+   "seccion": "TD-01",
+   "orden": 2,
+   "tipo_dato": "Lista",
+   "obligatoriedad": "Si",
+   "reglas": "Una sola casilla marcada",
+   "lista_valores": {
+    "catalogo": "listas",
+    "lista": "td01.empresa_filial"
+   },
+   "atributos": {
+    "modo_captura": "Extraer",
+    "ubicacion_tipica": "Carátula: casillas 'FILIAL SOLICITANTE' marcadas con (X)",
+    "parametros": "PRO-03",
+    "si_no_cumple": "N/A",
+    "umbral_confianza": 0.9,
+    "revision_humana": "Si confianza < umbral o veredicto = No cumple",
+    "datos_personales": "No"
+   },
+   "valores_permitidos": [
+    "GEB",
+    "TGI",
+    "ENLAZA",
+    "ENLAZA como mandatario de GEB"
+   ]
+  },
+  {
+   "id_tecnico": "td01.objeto",
+   "nombre": "Objeto del contrato",
+   "descripcion": "Identificación del proceso: Objeto del contrato",
+   "seccion": "TD-01",
+   "orden": 3,
+   "tipo_dato": "Texto",
+   "obligatoriedad": "Si",
+   "reglas": "Coincide con el objeto de adendas y cartas",
+   "atributos": {
+    "modo_captura": "Extraer",
+    "ubicacion_tipica": "Numeral 'Descripción del objeto a contratar' / 1.1 'OBJETO:'",
+    "formato_valores": "Texto literal",
+    "parametros": "PRO-04",
+    "si_no_cumple": "N/A",
+    "umbral_confianza": 0.9,
+    "revision_humana": "Si confianza < umbral o veredicto = No cumple",
+    "datos_personales": "No",
+    "nota": "Se usa para juzgar objeto social (TD-07) y afinidad de experiencia"
+   }
+  },
+  {
+   "id_tecnico": "td01.modalidad_seleccion",
+   "nombre": "Modalidad de selección",
+   "descripcion": "Identificación del proceso: Modalidad de selección",
+   "seccion": "TD-01",
+   "orden": 4,
+   "tipo_dato": "Lista",
+   "obligatoriedad": "Si",
+   "lista_valores": {
+    "catalogo": "listas",
+    "lista": "td01.modalidad_seleccion"
+   },
+   "atributos": {
+    "modo_captura": "Extraer",
+    "ubicacion_tipica": "Carátula o sección 'Modalidad de selección del contratista'",
+    "parametros": "PRO-05",
+    "si_no_cumple": "N/A",
+    "umbral_confianza": 0.9,
+    "revision_humana": "Si confianza < umbral o veredicto = No cumple",
+    "datos_personales": "No",
+    "nota": "En PCA aplica causal 4.5-u (evaluación de desempeño)"
+   },
+   "valores_permitidos": [
+    "PCA",
+    "PCA simplificado",
+    "PCC",
+    "PCC-preselección"
+   ]
+  },
+  {
+   "id_tecnico": "td01.version_formato_cpc",
+   "nombre": "Plantilla/versión de la CPC",
+   "descripcion": "Identificación del proceso: Plantilla/versión de la CPC",
+   "seccion": "TD-01",
+   "orden": 5,
+   "tipo_dato": "Texto",
+   "obligatoriedad": "Si",
+   "reglas": "Determina qué numerales usar para el resto de reglas",
+   "atributos": {
+    "modo_captura": "Extraer",
+    "ubicacion_tipica": "Encabezado de página (CODIGO / VERSION)",
+    "formato_valores": "Ej. 'FORMATO INVITACION VERSION 2026'",
+    "si_no_cumple": "N/A",
+    "umbral_confianza": 0.9,
+    "revision_humana": "Si confianza < umbral o veredicto = No cumple",
+    "datos_personales": "No",
+    "nota": "Los numerales cambian entre plantillas (2.1.1 vs 7.1); guardar la versión evita reglas atadas a un número"
+   }
+  },
+  {
+   "id_tecnico": "td01.aplica_estructura_plural",
+   "nombre": "¿Se admiten consorcios / uniones temporales?",
+   "descripcion": "Oferentes: ¿Se admiten consorcios / uniones temporales?",
+   "seccion": "TD-01",
+   "orden": 6,
+   "tipo_dato": "Booleano",
+   "obligatoriedad": "Si",
+   "lista_valores": {
+    "catalogo": "listas",
+    "lista": "si_no"
+   },
+   "atributos": {
+    "modo_captura": "Extraer",
+    "ubicacion_tipica": "Sección 'OFERENTES': 'Aplica estructura plural al presente proceso: SI ( ) NO ( )'",
+    "formato_valores": "SI / NO / null",
+    "parametros": "PRO-06",
+    "si_no_cumple": "N/A",
+    "umbral_confianza": 0.9,
+    "revision_humana": "Si confianza < umbral o veredicto = No cumple",
+    "datos_personales": "No",
+    "nota": "Activa los campos de EP en TD-03 y la exigencia de TD-12"
+   },
+   "valores_permitidos": [
+    "SI",
+    "NO"
+   ]
+  },
+  {
+   "id_tecnico": "td01.extranjero_requiere_sucursal",
+   "nombre": "¿El extranjero debe tener sucursal en Colombia?",
+   "descripcion": "Oferentes: ¿El extranjero debe tener sucursal en Colombia?",
+   "seccion": "TD-01",
+   "orden": 7,
+   "tipo_dato": "Booleano",
+   "obligatoriedad": "Si",
+   "lista_valores": {
+    "catalogo": "listas",
+    "lista": "si_no"
+   },
+   "atributos": {
+    "modo_captura": "Extraer",
+    "ubicacion_tipica": "Sección 'OFERENTES': 'El oferente extranjero requiere sucursal en Colombia: SI ( ) NO ( )'",
+    "formato_valores": "SI / NO / null",
+    "parametros": "PRO-25",
+    "si_no_cumple": "N/A",
+    "umbral_confianza": 0.9,
+    "revision_humana": "Si confianza < umbral o veredicto = No cumple",
+    "datos_personales": "No",
+    "nota": "Decide si TD-08/TD-09 se evalúan"
+   },
+   "valores_permitidos": [
+    "SI",
+    "NO"
+   ]
+  },
+  {
+   "id_tecnico": "td01.tipos_oferente_admitidos",
+   "nombre": "Tipos de oferente que pueden participar",
+   "descripcion": "Oferentes: Tipos de oferente que pueden participar",
+   "seccion": "TD-01",
+   "orden": 8,
+   "tipo_dato": "Lista múltiple",
+   "obligatoriedad": "Si",
+   "lista_valores": {
+    "catalogo": "listas",
+    "lista": "td01.tipos_oferente_admitidos"
+   },
+   "atributos": {
+    "modo_captura": "Extraer",
+    "ubicacion_tipica": "Sección 'OFERENTES' (texto 'Podrán participar…')",
+    "parametros": "PRO-06, PRO-25",
+    "si_no_cumple": "N/A",
+    "umbral_confianza": 0.9,
+    "revision_humana": "Si confianza < umbral o veredicto = No cumple",
+    "datos_personales": "No",
+    "nota": "Texto libre; requiere interpretación"
+   },
+   "valores_permitidos": [
+    "PJ_NAL",
+    "PJ_EXT",
+    "PN",
+    "EP"
+   ]
+  },
+  {
+   "id_tecnico": "td01.tipo_adjudicacion",
+   "nombre": "Tipo de adjudicación",
+   "descripcion": "Adjudicación y presupuesto: Tipo de adjudicación",
+   "seccion": "TD-01",
+   "orden": 9,
+   "tipo_dato": "Lista",
+   "obligatoriedad": "Si",
+   "reglas": "Si es 'Por grupos', deben existir grupos G1..Gn",
+   "lista_valores": {
+    "catalogo": "listas",
+    "lista": "td01.tipo_adjudicacion"
+   },
+   "atributos": {
+    "modo_captura": "Extraer",
+    "ubicacion_tipica": "Numeral de adjudicación (1.8 en CPC estándar)",
+    "parametros": "PRO-07",
+    "si_no_cumple": "N/A",
+    "umbral_confianza": 0.9,
+    "revision_humana": "Si confianza < umbral o veredicto = No cumple",
+    "datos_personales": "No"
+   },
+   "valores_permitidos": [
+    "Total",
+    "Por grupos",
+    "Parcial"
+   ]
+  },
+  {
+   "id_tecnico": "td01.publicacion_presupuesto",
+   "nombre": "¿Se publica el presupuesto?",
+   "descripcion": "Adjudicación y presupuesto: ¿Se publica el presupuesto?",
+   "seccion": "TD-01",
+   "orden": 10,
+   "tipo_dato": "Booleano",
+   "obligatoriedad": "Si",
+   "lista_valores": {
+    "catalogo": "listas",
+    "lista": "si_no"
+   },
+   "atributos": {
+    "modo_captura": "Extraer",
+    "ubicacion_tipica": "Sección 'PRESUPUESTO' / 'Publicación del Presupuesto: SI ( )'",
+    "formato_valores": "SI / NO / null",
+    "parametros": "PRO-08",
+    "si_no_cumple": "N/A",
+    "umbral_confianza": 0.9,
+    "revision_humana": "Si confianza < umbral o veredicto = No cumple",
+    "datos_personales": "No"
+   },
+   "valores_permitidos": [
+    "SI",
+    "NO"
+   ]
+  },
+  {
+   "id_tecnico": "td01.presupuesto_oficial",
+   "nombre": "Presupuesto oficial (total y por grupo)",
+   "descripcion": "Adjudicación y presupuesto: Presupuesto oficial (total y por grupo)",
+   "seccion": "TD-01",
+   "orden": 11,
+   "tipo_dato": "Moneda",
+   "obligatoriedad": "Si",
+   "reglas": "Cifra en letras = cifra en números",
+   "atributos": {
+    "modo_captura": "Extraer",
+    "ubicacion_tipica": "Sección 'PRESUPUESTO'; preferir la cifra numérica sobre la escrita en letras y comparar ambas",
+    "formato_valores": "Valor + moneda + 'incluido IVA' (SI/NO/null); por grupo si aplica",
+    "parametros": "PRO-09",
+    "si_no_cumple": "N/A",
+    "umbral_confianza": 0.95,
+    "revision_humana": "Si confianza < umbral o veredicto = No cumple",
+    "datos_personales": "No",
+    "nota": "En SR5658940621: $178.500.000 incluido IVA"
+   }
+  },
+  {
+   "id_tecnico": "td01.presupuesto_techo",
+   "nombre": "¿El presupuesto es techo?",
+   "descripcion": "Adjudicación y presupuesto: ¿El presupuesto es techo?",
+   "seccion": "TD-01",
+   "orden": 12,
+   "tipo_dato": "Booleano",
+   "obligatoriedad": "Si",
+   "reglas": "Si SI: ofertas por encima = rechazo",
+   "lista_valores": {
+    "catalogo": "listas",
+    "lista": "si_no"
+   },
+   "atributos": {
+    "modo_captura": "Extraer",
+    "ubicacion_tipica": "'¿Se configura como presupuesto techo?: SI ( )'",
+    "formato_valores": "SI / NO / null",
+    "parametros": "PRO-10",
+    "si_no_cumple": "N/A",
+    "umbral_confianza": 0.9,
+    "revision_humana": "Si confianza < umbral o veredicto = No cumple",
+    "datos_personales": "No"
+   },
+   "valores_permitidos": [
+    "SI",
+    "NO"
+   ]
+  },
+  {
+   "id_tecnico": "td01.fecha_apertura",
+   "nombre": "Fecha de apertura / publicación",
+   "descripcion": "Cronograma: Fecha de apertura / publicación",
+   "seccion": "TD-01",
+   "orden": 13,
+   "tipo_dato": "Fecha",
+   "obligatoriedad": "Si",
+   "reglas": "≤ fecha de cierre",
+   "atributos": {
+    "modo_captura": "Extraer",
+    "ubicacion_tipica": "Tabla del cronograma (1.7 o '4.- CRONOGRAMA DEL PROCESO')",
+    "formato_valores": "aaaa-mm-dd",
+    "parametros": "PRO-12",
+    "si_no_cumple": "N/A",
+    "umbral_confianza": 0.95,
+    "revision_humana": "Si confianza < umbral o veredicto = No cumple",
+    "datos_personales": "No"
+   }
+  },
+  {
+   "id_tecnico": "td01.reunion_informativa",
+   "nombre": "Fecha de reunión informativa o visita técnica y si es obligatoria",
+   "descripcion": "Cronograma: Fecha de reunión informativa o visita técnica y si es obligatoria",
+   "seccion": "TD-01",
+   "orden": 14,
+   "tipo_dato": "Objeto",
+   "obligatoriedad": "Si",
+   "reglas": "Si es obligatoria se exige TD-06",
+   "atributos": {
+    "modo_captura": "Extraer",
+    "ubicacion_tipica": "Tabla del cronograma y numeral de reunión/visita",
+    "formato_valores": "aaaa-mm-dd hh:mm; SI/NO/null obligatoria; 'No aplica'",
+    "tipo_original": "Fecha + booleano",
+    "parametros": "PRO-13, PRO-14",
+    "si_no_cumple": "N/A",
+    "umbral_confianza": 0.95,
+    "revision_humana": "Si confianza < umbral o veredicto = No cumple",
+    "datos_personales": "No",
+    "nota": "Activa la exigencia de TD-06"
+   }
+  },
+  {
+   "id_tecnico": "td01.fecha_limite_manifestacion_interes",
+   "nombre": "Fecha límite de manifestación de interés",
+   "descripcion": "Cronograma: Fecha límite de manifestación de interés",
+   "seccion": "TD-01",
+   "orden": 15,
+   "tipo_dato": "Fecha y hora",
+   "obligatoriedad": "Si",
+   "atributos": {
+    "modo_captura": "Extraer",
+    "ubicacion_tipica": "Tabla del cronograma: 'MANIFESTACIONES DE INTERES'",
+    "formato_valores": "aaaa-mm-dd hh:mm",
+    "si_no_cumple": "N/A",
+    "umbral_confianza": 0.95,
+    "revision_humana": "Si confianza < umbral o veredicto = No cumple",
+    "datos_personales": "No",
+    "nota": "No existe en todas las plantillas"
+   }
+  },
+  {
+   "id_tecnico": "td01.fecha_limite_observaciones",
+   "nombre": "Fecha límite de preguntas / observaciones",
+   "descripcion": "Cronograma: Fecha límite de preguntas / observaciones",
+   "seccion": "TD-01",
+   "orden": 16,
+   "tipo_dato": "Fecha",
+   "obligatoriedad": "Si",
+   "reglas": "Debe ser < fecha de cierre",
+   "atributos": {
+    "modo_captura": "Extraer",
+    "ubicacion_tipica": "Tabla del cronograma: 'OBSERVACIONES POR PARTE DE LOS OFERENTES'",
+    "formato_valores": "aaaa-mm-dd",
+    "si_no_cumple": "N/A",
+    "umbral_confianza": 0.95,
+    "revision_humana": "Si confianza < umbral o veredicto = No cumple",
+    "datos_personales": "No",
+    "nota": "En SR5658940621 dice 08/07/2027 (posible error de año): la validación de coherencia lo detectaría"
+   }
+  },
+  {
+   "id_tecnico": "td01.fecha_cierre_original",
+   "nombre": "Fecha y hora ORIGINAL de presentación de ofertas",
+   "descripcion": "Cronograma: Fecha y hora ORIGINAL de presentación de ofertas",
+   "seccion": "TD-01",
+   "orden": 17,
+   "tipo_dato": "Fecha y hora",
+   "obligatoriedad": "Si",
+   "reglas": "La fecha VIGENTE sale de la última adenda que la modifique (td02.nueva_fecha_cierre)",
+   "atributos": {
+    "modo_captura": "Extraer",
+    "ubicacion_tipica": "Tabla del cronograma: 'FECHA Y HORA DE PRESENTACION DE OFERTAS'",
+    "formato_valores": "aaaa-mm-dd hh:mm (hora Colombia)",
+    "parametros": "PRO-47 (original) → PRO-16 (vigente)",
+    "si_no_cumple": "N/A",
+    "umbral_confianza": 0.95,
+    "revision_humana": "Si confianza < umbral o veredicto = No cumple",
+    "datos_personales": "No",
+    "nota": "Guardar original y vigente: el RUP usa la original; existencia, garantía y vigencia usan la vigente"
+   }
+  },
+  {
+   "id_tecnico": "td01.plazo_subsanacion",
+   "nombre": "Plazo para subsanar",
+   "descripcion": "Cronograma: Plazo para subsanar",
+   "seccion": "TD-01",
+   "orden": 18,
+   "tipo_dato": "Decimal",
+   "obligatoriedad": "Si",
+   "atributos": {
+    "modo_captura": "Extraer",
+    "ubicacion_tipica": "Cronograma ('SUBSANACIÓN DE OFERTA') o 'Reglas de subsanabilidad'",
+    "formato_valores": "Horas o días hábiles",
+    "tipo_original": "Número + unidad",
+    "parametros": "PRO-49",
+    "si_no_cumple": "N/A",
+    "umbral_confianza": 0.95,
+    "revision_humana": "Si confianza < umbral o veredicto = No cumple",
+    "datos_personales": "No"
+   }
+  },
+  {
+   "id_tecnico": "td01.vigencia_minima_oferta",
+   "nombre": "Vigencia mínima exigida a la oferta",
+   "descripcion": "Reglas de la oferta: Vigencia mínima exigida a la oferta",
+   "seccion": "TD-01",
+   "orden": 19,
+   "tipo_dato": "Decimal",
+   "obligatoriedad": "Si",
+   "reglas": "Se compara con td03.campos_vacios",
+   "atributos": {
+    "modo_captura": "Extraer",
+    "ubicacion_tipica": "Numeral de vigencia de la oferta (1.13.6 en estándar)",
+    "formato_valores": "Meses o días",
+    "tipo_original": "Número + unidad",
+    "parametros": "PRO-26",
+    "si_no_cumple": "N/A",
+    "umbral_confianza": 0.95,
+    "revision_humana": "Si confianza < umbral o veredicto = No cumple",
+    "datos_personales": "No"
+   }
+  },
+  {
+   "id_tecnico": "td01.garantia_seriedad",
+   "nombre": "Si se exige garantía de seriedad, con valor, vigencia y beneficiarios",
+   "descripcion": "Reglas de la oferta: Si se exige garantía de seriedad, con valor, vigencia y beneficiarios",
+   "seccion": "TD-01",
+   "orden": 20,
+   "tipo_dato": "Objeto",
+   "obligatoriedad": "Si",
+   "reglas": "Se compara con TD-19/TD-20",
+   "atributos": {
+    "modo_captura": "Extraer",
+    "ubicacion_tipica": "Numeral 'Garantía de seriedad' (2.1.11 en estándar)",
+    "formato_valores": "{requerida; valor; moneda; vigencia; beneficiarios}",
+    "propiedades": [
+     {
+      "nombre": "requerida",
+      "valores": "SI / NO / null"
+     },
+     {
+      "nombre": "valor"
+     },
+     {
+      "nombre": "moneda"
+     },
+     {
+      "nombre": "vigencia"
+     },
+     {
+      "nombre": "beneficiarios",
+      "formato": "[razón social, NIT]"
+     }
+    ],
+    "parametros": "PRO-20, PRO-27",
+    "si_no_cumple": "N/A",
+    "umbral_confianza": 0.95,
+    "revision_humana": "Si confianza < umbral o veredicto = No cumple",
+    "datos_personales": "No",
+    "nota": "Activa la exigencia de TD-19 a TD-22"
+   }
+  },
+  {
+   "id_tecnico": "td01.requiere_confidencialidad",
+   "nombre": "¿Se exige el formulario de Acuerdo de confidencialidad?",
+   "descripcion": "Documentos exigidos: ¿Se exige el formulario de Acuerdo de confidencialidad?",
+   "seccion": "TD-01",
+   "orden": 21,
+   "tipo_dato": "Booleano",
+   "obligatoriedad": "Si",
+   "lista_valores": {
+    "catalogo": "listas",
+    "lista": "si_no"
+   },
+   "atributos": {
+    "modo_captura": "Extraer",
+    "ubicacion_tipica": "'Se debe suscribir formulario de Acuerdo de confidencialidad: SI ( ) NO ( )' o numeral 2.1.7 / cronograma",
+    "formato_valores": "SI / NO / null",
+    "parametros": "PRO-29",
+    "si_no_cumple": "N/A",
+    "umbral_confianza": 0.9,
+    "revision_humana": "Si confianza < umbral o veredicto = No cumple",
+    "datos_personales": "No",
+    "nota": "Gobierna todo TD-05: si NO, TD-05 se registra 'N/A'"
+   },
+   "valores_permitidos": [
+    "SI",
+    "NO"
+   ]
+  },
+  {
+   "id_tecnico": "td01.documentos_exigidos",
+   "nombre": "Lista de formularios y documentos que el oferente debe entregar",
+   "descripcion": "Documentos exigidos: Lista de formularios y documentos que el oferente debe entregar",
+   "seccion": "TD-01",
+   "orden": 22,
+   "tipo_dato": "Lista de objetos",
+   "obligatoriedad": "Si",
+   "reglas": "Cada documento se mapea a un tipo documental TD-xx",
+   "atributos": {
+    "modo_captura": "Extraer",
+    "ubicacion_tipica": "Tablas 'Requisitos y documentos' (7.1) y 'Documentos que harán parte del contrato' (10); en estándar, capítulos 2 y 3",
+    "formato_valores": "{nombre; formulario No.; numeral; habilitante/ponderable; condicional}",
+    "si_no_cumple": "N/A",
+    "umbral_confianza": 0.9,
+    "revision_humana": "Si confianza < umbral o veredicto = No cumple",
+    "datos_personales": "No",
+    "nota": "Permite saber qué TD esperar en cada oferta y detectar faltantes"
+   }
+  },
+  {
+   "id_tecnico": "td01.otros_requisitos_habilitantes",
+   "nombre": "RUP, carta de casa matriz, capacidad residual, etc.",
+   "descripcion": "Documentos exigidos: RUP, carta de casa matriz, capacidad residual, etc.",
+   "seccion": "TD-01",
+   "orden": 23,
+   "tipo_dato": "Objeto",
+   "obligatoriedad": "Si",
+   "atributos": {
+    "modo_captura": "Extraer",
+    "ubicacion_tipica": "Numerales 2.1.10, 2.1.12, 2.5 (estándar)",
+    "formato_valores": "{rup; casa_matriz; capacidad_residual}",
+    "propiedades": [
+     {
+      "nombre": "rup",
+      "formato": "SI/NO/opcional/null + UNSPSC"
+     },
+     {
+      "nombre": "casa_matriz",
+      "valores": "SI / NO / null"
+     },
+     {
+      "nombre": "capacidad_residual",
+      "valores": "SI / NO / null"
+     }
+    ],
+    "parametros": "PRO-28, PRO-30, PRO-31, PRO-40",
+    "si_no_cumple": "N/A",
+    "umbral_confianza": 0.9,
+    "revision_humana": "Si confianza < umbral o veredicto = No cumple",
+    "datos_personales": "No"
+   }
+  },
+  {
+   "id_tecnico": "td01.indicadores_financieros",
+   "nombre": "Corte de estados financieros e indicadores mínimos",
+   "descripcion": "Requisitos financieros: Corte de estados financieros e indicadores mínimos",
+   "seccion": "TD-01",
+   "orden": 24,
+   "tipo_dato": "Objeto",
+   "obligatoriedad": "Si",
+   "reglas": "Valores numéricos con su moneda",
+   "atributos": {
+    "modo_captura": "Extraer",
+    "ubicacion_tipica": "Numeral de requisitos financieros (2.2 en estándar)",
+    "formato_valores": "{año_corte; capital_trabajo; liquidez; endeudamiento; puntaje_minimo; calificacion_alternativa}",
+    "parametros": "PRO-21, PRO-22, PRO-32 a PRO-36, PRO-50",
+    "si_no_cumple": "N/A",
+    "umbral_confianza": 0.95,
+    "revision_humana": "Si confianza < umbral o veredicto = No cumple",
+    "datos_personales": "No",
+    "nota": "Puede no existir en procesos simplificados"
+   }
+  },
+  {
+   "id_tecnico": "td01.experiencia_minima",
+   "nombre": "Experiencia mínima exigida",
+   "descripcion": "Requisitos técnicos: Experiencia mínima exigida",
+   "seccion": "TD-01",
+   "orden": 25,
+   "tipo_dato": "Objeto",
+   "obligatoriedad": "Si",
+   "atributos": {
+    "modo_captura": "Extraer",
+    "ubicacion_tipica": "Numeral de experiencia (2.3.1 estándar / 7.2 simplificado)",
+    "formato_valores": "{valor; moneda/SMMLV; max_contratos; años; afinidad; contratos_en_ejecucion; reglas_EP}",
+    "parametros": "PRO-23, PRO-37 a PRO-39",
+    "si_no_cumple": "N/A",
+    "umbral_confianza": 0.95,
+    "revision_humana": "Si confianza < umbral o veredicto = No cumple",
+    "datos_personales": "No",
+    "nota": "La afinidad del objeto requiere juicio"
+   }
+  },
+  {
+   "id_tecnico": "td01.reglas_economicas",
+   "nombre": "Método de puntaje, formulario económico, moneda y redondeo",
+   "descripcion": "Evaluación económica: Método de puntaje, formulario económico, moneda y redondeo",
+   "seccion": "TD-01",
+   "orden": 26,
+   "tipo_dato": "Objeto",
+   "obligatoriedad": "Si",
+   "atributos": {
+    "modo_captura": "Extraer",
+    "ubicacion_tipica": "Capítulo 3 (estándar) / sección económica (simplificado)",
+    "formato_valores": "{metodo; puntaje_max; formulario; moneda; decimales; IVA; alternativas}",
+    "propiedades": [
+     {
+      "nombre": "metodo"
+     },
+     {
+      "nombre": "puntaje_max"
+     },
+     {
+      "nombre": "formulario"
+     },
+     {
+      "nombre": "moneda"
+     },
+     {
+      "nombre": "decimales"
+     },
+     {
+      "nombre": "IVA"
+     },
+     {
+      "nombre": "alternativas",
+      "valores": "SI / NO / null"
+     }
+    ],
+    "parametros": "PRO-24, PRO-45, PRO-46, PRO-48",
+    "si_no_cumple": "N/A",
+    "umbral_confianza": 0.9,
+    "revision_humana": "Si confianza < umbral o veredicto = No cumple",
+    "datos_personales": "No"
+   }
+  },
+  {
+   "id_tecnico": "td01.causales_rechazo",
+   "nombre": "Causales de rechazo de las ofertas",
+   "descripcion": "Causales: Causales de rechazo de las ofertas",
+   "seccion": "TD-01",
+   "orden": 27,
+   "tipo_dato": "Texto largo",
+   "obligatoriedad": "Si",
+   "atributos": {
+    "modo_captura": "Extraer",
+    "ubicacion_tipica": "Numeral 'CAUSALES DE RECHAZO' (4.5 estándar / 3 simplificado)",
+    "formato_valores": "{literal/número; texto}",
+    "tipo_original": "Lista de texto",
+    "si_no_cumple": "N/A",
+    "umbral_confianza": 0.9,
+    "revision_humana": "Si confianza < umbral o veredicto = No cumple",
+    "datos_personales": "No",
+    "nota": "Las validaciones de TD-03/TD-04 citan causales por literal (4.5-a, 4.5-q); el literal cambia por plantilla"
+   }
+  },
+  {
+   "id_tecnico": "td16.subtipo",
+   "nombre": "Persona jurídica o natural",
+   "descripcion": "Identificación: Persona jurídica o natural",
+   "seccion": "TD-16",
+   "orden": 147,
+   "tipo_dato": "Lista",
+   "obligatoriedad": "Si",
+   "lista_valores": {
+    "catalogo": "listas",
+    "lista": "td16.subtipo"
+   },
+   "atributos": {
+    "modo_captura": "Extraer",
+    "ubicacion_tipica": "Texto 'en mi condición de Revisor Fiscal / Representante Legal de…' o persona natural",
+    "si_no_cumple": "N/A",
+    "umbral_confianza": 0.9,
+    "revision_humana": "Si confianza < umbral o veredicto = No cumple",
+    "datos_personales": "No"
+   },
+   "valores_permitidos": [
+    "PJ",
+    "PN"
+   ]
+  },
+  {
+   "id_tecnico": "td16.sociedad",
+   "nombre": "Empresa certificada",
+   "descripcion": "Identificación: Empresa certificada",
+   "seccion": "TD-16",
+   "orden": 148,
+   "tipo_dato": "Objeto",
+   "obligatoriedad": "Si",
+   "reglas": "= oferente o integrante de EP",
+   "atributos": {
+    "modo_captura": "Extraer",
+    "ubicacion_tipica": "Párrafo inicial",
+    "formato_valores": "{razon_social; nit}",
+    "si_no_cumple": "Subsanable (CPC 4.1)",
+    "umbral_confianza": 0.9,
+    "revision_humana": "Si confianza < umbral o veredicto = No cumple",
+    "datos_personales": "No",
+    "nota": "nit: normalizar siempre, quitando puntos y espacios y dejando guion antes del dígito de verificación ('800.184.195-9' → '800184195-9'). Solo se cambia el formato, nunca los dígitos; el texto original va en evidencia",
+    "validador": [
+     {
+      "tipo": "nit_dv",
+      "propiedad": "nit"
+     }
+    ]
+   }
+  },
+  {
+   "id_tecnico": "td16.firmante",
+   "nombre": "Quién certifica",
+   "descripcion": "Firma: Quién certifica",
+   "seccion": "TD-16",
+   "orden": 149,
+   "tipo_dato": "Lista de objetos",
+   "obligatoriedad": "Si",
+   "reglas": "Firmado por al menos un firmante (firma = SI). RF si la sociedad está obligada (ver td07.junta_directiva_y_revisor); RL si no. Si firma RF: exigir TD-26 y TD-27 de esa persona",
+   "atributos": {
+    "modo_captura": "Extraer",
+    "ubicacion_tipica": "Párrafo 'Yo, …, identificada con…, Tarjeta Profesional No. …, en mi condición de…' y bloque final",
+    "formato_valores": "{rol; nombre; documento; cargo; tarjeta_profesional; firma}",
+    "propiedades": [
+     {
+      "nombre": "rol",
+      "valores": "RL / RF / CONTADOR"
+     },
+     {
+      "nombre": "nombre"
+     },
+     {
+      "nombre": "documento"
+     },
+     {
+      "nombre": "cargo"
+     },
+     {
+      "nombre": "tarjeta_profesional"
+     },
+     {
+      "nombre": "firma",
+      "valores": "SI / NO / null"
+     }
+    ],
+    "si_no_cumple": "Subsanable (CPC 4.1)",
+    "umbral_confianza": 0.9,
+    "revision_humana": "Si confianza < umbral o veredicto = No cumple",
+    "datos_personales": "Sí: nombre, documento, T.P.",
+    "nota": "Un registro por persona que suscribe la certificación (p. ej. contador y representante legal). rol: RL representante legal, RF revisor fiscal, CONTADOR contador público. cargo: literal, como lo escribe el documento. firma: antes de decidir, describir en evidencia lo que hay sobre la línea de firma ('imagen: línea vacía' o 'imagen: trazo manuscrito que cruza la línea'); SI solo si se describió un trazo; línea vacía con el nombre impreso debajo es NO"
+   }
+  },
+  {
+   "id_tecnico": "td16.paz_y_salvo",
+   "nombre": "Declaración de paz y salvo",
+   "descripcion": "Contenido: Declaración de paz y salvo",
+   "seccion": "TD-16",
+   "orden": 150,
+   "tipo_dato": "Objeto",
+   "obligatoriedad": "Si",
+   "reglas": "Los 4 sistemas cubiertos; periodo exigido por la CPC (art. 50 Ley 789/2002)",
+   "atributos": {
+    "modo_captura": "Extraer",
+    "ubicacion_tipica": "Párrafo 'certifico que la empresa se encuentra a paz y salvo…'",
+    "formato_valores": "{salud; riesgos_laborales; pensiones; parafiscales; periodo}",
+    "propiedades": [
+     {
+      "nombre": "salud",
+      "valores": "SI / NO / null"
+     },
+     {
+      "nombre": "riesgos_laborales",
+      "valores": "SI / NO / null"
+     },
+     {
+      "nombre": "pensiones",
+      "valores": "SI / NO / null"
+     },
+     {
+      "nombre": "parafiscales",
+      "valores": "SI / NO / null"
+     },
+     {
+      "nombre": "periodo"
+     }
+    ],
+    "si_no_cumple": "Subsanable (CPC 4.1)",
+    "umbral_confianza": 0.9,
+    "revision_humana": "Si confianza < umbral o veredicto = No cumple",
+    "datos_personales": "No",
+    "nota": "SI por cada sistema que el texto declara a paz y salvo o al día; NO si declara deuda o mora; null si no lo menciona. Exonerado de aportes (ICBF, SENA) cuenta como SI en parafiscales, con la cita en evidencia. periodo: literal y breve ('al momento de presentar la oferta', 'seis meses anteriores al cierre')"
+   }
+  },
+  {
+   "id_tecnico": "td16.fecha_certificacion",
+   "nombre": "Fecha y ciudad",
+   "descripcion": "Contenido: Fecha y ciudad",
+   "seccion": "TD-16",
+   "orden": 151,
+   "tipo_dato": "Fecha",
+   "obligatoriedad": "Si",
+   "reglas": "≤ cierre",
+   "atributos": {
+    "modo_captura": "Extraer",
+    "ubicacion_tipica": "'Dada en …, a los … días del mes de … de …'",
+    "formato_valores": "aaaa-mm-dd",
+    "parametros": "PRO-16",
+    "si_no_cumple": "Subsanable (CPC 4.1)",
+    "umbral_confianza": 0.95,
+    "revision_humana": "Si confianza < umbral o veredicto = No cumple",
+    "datos_personales": "No"
+   }
+  },
+  {
+   "id_tecnico": "td16.version_formato",
+   "nombre": "Código y versión",
+   "descripcion": "Integridad del formato: Código y versión",
+   "seccion": "TD-16",
+   "orden": 152,
+   "tipo_dato": "Texto",
+   "obligatoriedad": "Si",
+   "reglas": "Es el formato del proceso",
+   "atributos": {
+    "modo_captura": "Extraer",
+    "ubicacion_tipica": "Encabezado y pie",
+    "formato_valores": "ABA-PRO-049-F-009, Versión 001",
+    "si_no_cumple": "Subsanable (CPC 4.1)",
+    "umbral_confianza": 0.9,
+    "revision_humana": "Si confianza < umbral o veredicto = No cumple",
+    "datos_personales": "No",
+    "nota": "Conocimiento advierte: una planilla PILA sin texto de certificación NO es este tipo"
+   }
+  },
+  {
+   "id_tecnico": "td29.proceso_y_oferente",
+   "nombre": "Proceso y quién acredita",
+   "descripcion": "Identificación: Proceso y quién acredita",
+   "seccion": "TD-29",
+   "orden": 221,
+   "tipo_dato": "Objeto",
+   "obligatoriedad": "Si",
+   "reglas": "Proceso = td01.numero_proceso; quien acredita = oferente, integrante EP o matriz con garantía",
+   "atributos": {
+    "modo_captura": "Extraer",
+    "ubicacion_tipica": "Encabezado del formulario",
+    "formato_valores": "{numero_proceso; oferente; quien_acredita}",
+    "parametros": "PRO-38, PRO-39",
+    "si_no_cumple": "Subsanable (CPC 4.1)",
+    "umbral_confianza": 0.9,
+    "revision_humana": "Si confianza < umbral o veredicto = No cumple",
+    "datos_personales": "No"
+   }
+  },
+  {
+   "id_tecnico": "td29.contratos",
+   "nombre": "Contratos relacionados",
+   "descripcion": "Contratos: Contratos relacionados",
+   "seccion": "TD-29",
+   "orden": 222,
+   "tipo_dato": "Lista de objetos",
+   "obligatoriedad": "Si",
+   "reglas": "fecha_inicio ≤ fecha_fin; máximo de contratos de la CPC; datos = soporte TD-30 o td23.contratos_reportados",
+   "atributos": {
+    "modo_captura": "Extraer",
+    "ubicacion_tipica": "Una fila por contrato en la tabla",
+    "formato_valores": "{consecutivo; consecutivo_rup; numero_contrato; entidad_contratante; contratista; objeto; fecha_inicio; fecha_fin; valor_smmlv; valor_total; valor_ejecutado; moneda; iva_incluido; porcentaje_participacion; contacto_cliente; columnas_propias_del_proceso}",
+    "propiedades": [
+     {
+      "nombre": "consecutivo"
+     },
+     {
+      "nombre": "consecutivo_rup"
+     },
+     {
+      "nombre": "numero_contrato"
+     },
+     {
+      "nombre": "entidad_contratante"
+     },
+     {
+      "nombre": "contratista"
+     },
+     {
+      "nombre": "objeto"
+     },
+     {
+      "nombre": "fecha_inicio"
+     },
+     {
+      "nombre": "fecha_fin"
+     },
+     {
+      "nombre": "valor_smmlv"
+     },
+     {
+      "nombre": "valor_total"
+     },
+     {
+      "nombre": "valor_ejecutado"
+     },
+     {
+      "nombre": "moneda"
+     },
+     {
+      "nombre": "iva_incluido",
+      "valores": "SI / NO / null"
+     },
+     {
+      "nombre": "porcentaje_participacion"
+     },
+     {
+      "nombre": "contacto_cliente"
+     },
+     {
+      "nombre": "columnas_propias_del_proceso"
+     }
+    ],
+    "parametros": "PRO-23, PRO-37",
+    "si_no_cumple": "Subsanable (CPC 4.1)",
+    "umbral_confianza": 0.95,
+    "revision_humana": "Si confianza < umbral o veredicto = No cumple",
+    "datos_personales": "Sí: contactos del cliente",
+    "nota": "Columnas variables: kV y cantidad de equipos (suministro CT/PT), SMMLV y valor ejecutado (servicios). Copiar cada celda en la propiedad de su columna, tal como está, aunque parezca estar en la columna equivocada (contratante y contratista invertidos, pesos en la columna SMMLV, número de contrato en la de consecutivo RUP): no corregir ni mover valores; anotar la inconsistencia en observación y mandar a revisión. consecutivo: número de la fila en la tabla (1, 2, 3…), aunque el formulario no lo escriba; lo que el oferente escribe en la columna 'consecutivo RUP' va en consecutivo_rup. iva_incluido: SI si el encabezado de la columna de valor dice 'incluido IVA'; NO si dice 'sin IVA'; null si no lo dice. Fechas: AAAA-MM-DD. Marcar ambigüedad solo si una fecha admite las dos lecturas (día y mes ≤ 12) y ninguna otra fila del formulario resuelve el orden día/mes; si el formato se resuelve, no es motivo de revisión",
+    "validador": [
+     {
+      "tipo": "fecha_orden",
+      "desde": "fecha_inicio",
+      "hasta": "fecha_fin"
+     }
+    ]
+   }
+  },
+  {
+   "id_tecnico": "td29.totales_declarados",
+   "nombre": "Sumatorias declaradas",
+   "descripcion": "Totales: Sumatorias declaradas",
+   "seccion": "TD-29",
+   "orden": 223,
+   "tipo_dato": "Objeto",
+   "obligatoriedad": "Si",
+   "reglas": "= suma recalculada de td29.contratos",
+   "atributos": {
+    "modo_captura": "Extraer",
+    "ubicacion_tipica": "Fila 'TOTAL SUMATORIA CONTRATOS'",
+    "formato_valores": "{total_smmlv; total_valor; moneda}",
+    "si_no_cumple": "Subsanable (CPC 4.1)",
+    "umbral_confianza": 0.95,
+    "revision_humana": "Si confianza < umbral o veredicto = No cumple",
+    "datos_personales": "No",
+    "validador": [
+     {
+      "tipo": "suma_igual",
+      "total": "total_valor",
+      "campo": "td29.contratos",
+      "columna": "valor_total",
+      "tolerancia": 0
+     },
+     {
+      "tipo": "suma_igual",
+      "total": "total_smmlv",
+      "campo": "td29.contratos",
+      "columna": "valor_smmlv",
+      "tolerancia": 0
+     }
+    ]
+   }
+  },
+  {
+   "id_tecnico": "td29.firma",
+   "nombre": "Firma del representante legal",
+   "descripcion": "Firma: Firma del representante legal",
+   "seccion": "TD-29",
+   "orden": 224,
+   "tipo_dato": "Objeto",
+   "obligatoriedad": "Si",
+   "reglas": "Firmado",
+   "atributos": {
+    "modo_captura": "Extraer",
+    "ubicacion_tipica": "Pie 'Firma Representante Legal'",
+    "formato_valores": "{firma; nombre}",
+    "propiedades": [
+     {
+      "nombre": "firma",
+      "valores": "SI / NO / null"
+     },
+     {
+      "nombre": "nombre"
+     }
+    ],
+    "si_no_cumple": "Subsanable (CPC 4.1)",
+    "umbral_confianza": 0.9,
+    "revision_humana": "Si confianza < umbral o veredicto = No cumple",
+    "datos_personales": "Sí: nombre"
+   }
+  },
+  {
+   "id_tecnico": "td29.version_formato",
+   "nombre": "Formato y versión",
+   "descripcion": "Integridad del formato: Formato y versión",
+   "seccion": "TD-29",
+   "orden": 225,
+   "tipo_dato": "Texto",
+   "obligatoriedad": "Si",
+   "reglas": "Versión del proceso (y de la adenda si la cambió)",
+   "atributos": {
+    "modo_captura": "Extraer",
+    "ubicacion_tipica": "Pie de página / encabezado",
+    "formato_valores": "Apéndice 4 / Formulario 7, versión",
+    "parametros": "PRO-15",
+    "si_no_cumple": "Subsanable (CPC 4.1)",
+    "umbral_confianza": 0.9,
+    "revision_humana": "Si confianza < umbral o veredicto = No cumple",
+    "datos_personales": "No"
+   }
+  }
+ ]
+}

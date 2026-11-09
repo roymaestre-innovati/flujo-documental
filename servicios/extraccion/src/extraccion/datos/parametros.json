@@ -1,0 +1,25 @@
+{
+  "version": "1",
+  "pagina": {
+    "dpi": 100,
+    "calidad_jpeg": 80
+  },
+  "firma": {
+    "dpi": 300,
+    "renglones_arriba": 3,
+    "renglones_abajo": 1,
+    "alto_renglon_pt": 14,
+    "margen_lateral_pt": 36
+  },
+  "anexo": {
+    "max_caracteres": 60000
+  },
+  "llamada": {
+    "concurrencia": 3,
+    "reintentos_falla_pasajera": 3,
+    "esperas_falla_pasajera_s": [2, 4, 8],
+    "reintentos_respuesta_invalida": 2,
+    "espera_limite_uso_s": 30,
+    "espera_limite_uso_total_s": 900
+  }
+}

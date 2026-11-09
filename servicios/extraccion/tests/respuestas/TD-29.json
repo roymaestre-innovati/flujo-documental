@@ -1,0 +1,224 @@
+{
+ "corresponde": true,
+ "motivo_no_corresponde": null,
+ "resultados": [
+  {
+   "id_tecnico": "td29.proceso_y_oferente",
+   "evidencia": [
+    {
+     "pagina": 1,
+     "cita": "PROCESO COMPETITIVO ABIERTO No. SR0000000001",
+     "visual": null
+    },
+    {
+     "pagina": 1,
+     "cita": "OFERENTE EJEMPLO LTDA",
+     "visual": null
+    }
+   ],
+   "valor": {
+    "numero_proceso": "SR0000000001",
+    "oferente": "OFERENTE EJEMPLO LTDA",
+    "quien_acredita": "OFERENTE EJEMPLO LTDA"
+   },
+   "confianza": 0.95,
+   "cumple": null,
+   "reglas_pendientes": [
+    {
+     "texto": "Proceso = td01.numero_proceso",
+     "requiere": [
+      "TD-01"
+     ]
+    },
+    {
+     "texto": "Quien acredita = oferente, integrante EP o matriz con garantía",
+     "requiere": [
+      "PRO-38",
+      "PRO-39"
+     ]
+    }
+   ],
+   "motivos": [],
+   "observacion": null
+  },
+  {
+   "id_tecnico": "td29.contratos",
+   "evidencia": [
+    {
+     "pagina": 1,
+     "cita": "3036202 | N/A | OFERENTE EJEMPLO LTDA | ENTIDAD CONTRATANTE A S.A. | ... | 5/01/2021 | 30/06/2026 | 114830 | $ 201.055.609.246,00 | 100% | $ 201.055.609.246,00",
+     "visual": null
+    },
+    {
+     "pagina": 1,
+     "cita": "N/A | OFERENTE EJEMPLO LTDA | ENTIDAD CONTRATANTE A S.A. | ... | 10/07/2027 | 31/12/2020 | 98115 | $ 86.125.395.592,00 | 100% | $ 86.125.395.592,00",
+     "visual": null
+    },
+    {
+     "pagina": 1,
+     "cita": "1-05-00000-0000-2021 | N/A | OFERENTE EJEMPLO LTDA | ENTIDAD CONTRATANTE B E.S.P. | ... | 6/05/2022 | 11/08/2023 | 1039 | $ 1.204.880.000,00 | 100% | $ 1.204.880.000,00",
+     "visual": null
+    }
+   ],
+   "valor": [
+    {
+     "consecutivo": "1",
+     "consecutivo_rup": "3036202",
+     "numero_contrato": "N/A",
+     "entidad_contratante": "OFERENTE EJEMPLO LTDA",
+     "contratista": "ENTIDAD CONTRATANTE A S.A.",
+     "objeto": "SERVICIOS TÉCNICOS DE ASEGURAMIENTO DE CALIDAD E INSPECCIÓN",
+     "fecha_inicio": "2021-01-05",
+     "fecha_fin": "2026-06-30",
+     "valor_smmlv": "114830",
+     "valor_total": "201055609246.00",
+     "valor_ejecutado": "201055609246.00",
+     "moneda": "COP",
+     "iva_incluido": "SI",
+     "porcentaje_participacion": "100%",
+     "contacto_cliente": null,
+     "columnas_propias_del_proceso": null
+    },
+    {
+     "consecutivo": "2",
+     "consecutivo_rup": null,
+     "numero_contrato": "N/A",
+     "entidad_contratante": "OFERENTE EJEMPLO LTDA",
+     "contratista": "ENTIDAD CONTRATANTE A S.A.",
+     "objeto": "SERVICIOS TÉCNICOS DE ASEGURAMIENTO DE CALIDAD E INSPECCIÓN DE EQUIPOS",
+     "fecha_inicio": "2027-07-10",
+     "fecha_fin": "2020-12-31",
+     "valor_smmlv": "98115",
+     "valor_total": "86125395592.00",
+     "valor_ejecutado": "86125395592.00",
+     "moneda": "COP",
+     "iva_incluido": "SI",
+     "porcentaje_participacion": "100%",
+     "contacto_cliente": null,
+     "columnas_propias_del_proceso": null
+    },
+    {
+     "consecutivo": "3",
+     "consecutivo_rup": "1-05-00000-0000-2021",
+     "numero_contrato": "N/A",
+     "entidad_contratante": "OFERENTE EJEMPLO LTDA",
+     "contratista": "ENTIDAD CONTRATANTE B E.S.P.",
+     "objeto": "INVENTARIO Y CARACTERIZACIÓN DE EQUIPOS SEGÚN ISO 14224:2016",
+     "fecha_inicio": "2022-05-06",
+     "fecha_fin": "2023-08-11",
+     "valor_smmlv": "1039",
+     "valor_total": "1204880000.00",
+     "valor_ejecutado": "1204880000.00",
+     "moneda": "COP",
+     "iva_incluido": "SI",
+     "porcentaje_participacion": "100%",
+     "contacto_cliente": null,
+     "columnas_propias_del_proceso": null
+    }
+   ],
+   "confianza": 0.89,
+   "cumple": "NO",
+   "reglas_pendientes": [
+    {
+     "texto": "Máximo de contratos de la CPC",
+     "requiere": [
+      "PRO-23"
+     ]
+    },
+    {
+     "texto": "Datos = soporte TD-30 o td23.contratos_reportados",
+     "requiere": [
+      "TD-30",
+      "TD-23"
+     ]
+    }
+   ],
+   "motivos": [],
+   "observacion": "Regla td29.contratos.r1 'fecha_inicio ≤ fecha_fin': la fila 2 dice inicio 10/07/2027 y fin 31/12/2020 (validador fecha_orden). Las columnas de entidad contratante y contratista parecen invertidas en las tres filas; se copiaron tal como están."
+  },
+  {
+   "id_tecnico": "td29.totales_declarados",
+   "evidencia": [
+    {
+     "pagina": 1,
+     "cita": "TOTAL SUMATORIA CONTRATOS | 213982,946 | $ 288.385.884.838,00",
+     "visual": null
+    }
+   ],
+   "valor": {
+    "total_smmlv": "213982.946",
+    "total_valor": "288385884838.00",
+    "moneda": "COP"
+   },
+   "confianza": 0.96,
+   "cumple": "PENDIENTE",
+   "reglas_pendientes": [],
+   "motivos": [],
+   "observacion": "Validador suma_igual: el valor total coincide con la suma de las filas; el total en SMMLV difiere en 1,054 (filas: 213984). La tolerancia no está definida (NEG-13)."
+  },
+  {
+   "id_tecnico": "td29.firma",
+   "evidencia": [
+    {
+     "pagina": 1,
+     "cita": "Firma Representante Legal",
+     "visual": "ampliación de la zona de firma: rúbrica manuscrita tenue, gris, que cruza la línea y baja sobre el rótulo"
+    },
+    {
+     "pagina": 1,
+     "cita": "Carlos Ruiz Mora - Representante Legal Suplente",
+     "visual": null
+    }
+   ],
+   "valor": {
+    "firma": "SI",
+    "nombre": "Carlos Ruiz Mora - Representante Legal Suplente"
+   },
+   "confianza": 0.98,
+   "cumple": "SI",
+   "reglas_pendientes": [],
+   "motivos": [],
+   "observacion": null
+  },
+  {
+   "id_tecnico": "td29.version_formato",
+   "evidencia": [
+    {
+     "pagina": 1,
+     "cita": "APENDICE No 4 - EXPERIENCIA DEL OFERENTE",
+     "visual": null
+    },
+    {
+     "pagina": 1,
+     "cita": "Versión: 002",
+     "visual": null
+    }
+   ],
+   "valor": "APENDICE No 4 - EXPERIENCIA DEL OFERENTE / Versión: 002",
+   "confianza": 0.97,
+   "cumple": null,
+   "reglas_pendientes": [
+    {
+     "texto": "Versión del proceso (y de la adenda si la cambió)",
+     "requiere": [
+      "PRO-15"
+     ]
+    }
+   ],
+   "motivos": [],
+   "observacion": null
+  }
+ ],
+ "alertas": [
+  {
+   "codigo": "FECHAS_INVERTIDAS",
+   "mensaje": "Fila 2 de la tabla de contratos: la fecha de inicio es posterior a la de fin.",
+   "id_tecnico": "td29.contratos"
+  },
+  {
+   "codigo": "COLUMNAS_INVERTIDAS",
+   "mensaje": "La tabla parece tener invertidas las columnas de entidad contratante y contratista.",
+   "id_tecnico": "td29.contratos"
+  }
+ ]
+}
