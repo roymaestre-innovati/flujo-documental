@@ -2,7 +2,7 @@
 
 Sale de `plan.md`. Cada tarea termina con sus pruebas en verde y un commit propio.
 
-**Estado al 2026-11-09:** T01 a T05 fusionadas; T06 hecha, en revisión.
+**Estado al 2026-11-09:** T01 a T06 fusionadas; T07 hecha, en revisión.
 
 ## Para quien implemente
 
@@ -21,7 +21,7 @@ Sale de `plan.md`. Cada tarea termina con sus pruebas en verde y un commit propi
 - [x] **T04 — Bucle y errores.** El bucle común que corre un manejador sobre un mensaje y traduce cada excepción a su clase: reintentos con demora creciente, espera pedida por el servicio sin contar intento, cola de errores, `error_proceso`, registro de alerta y `reenviar_errores`. Se prueba con manejadores de juguete. Requisitos R18 a R21 y R23.
 - [x] **T05 — Apertura.** Manejador de `procesos-listos`: valida el aviso, abre el proceso con `crear_si_no_existe`, fija las versiones, reparte las entregas (con la lista de archivos del aviso, sin leer el origen, o listando las carpetas) y publica un `normalizar` por entrega. Requisitos R1 a R5.
 - [x] **T06 — Normalizar.** Manejador de `normalizar`: baja los originales de `Origen` a una carpeta temporal que se borra al terminar, llama a `normalizar_entrega` con la versión fijada, registra cada documento, crea la tarea `documento_con_error` por cada `error_entrada` y publica un `clasificar` por documento normalizado. `ErrorEntrega` es clase 4. Requisitos R3, R6 a R8. (El límite de 2 entregas a la vez pasó a T10: ver la nota de T06.)
-- [ ] **T07 — Clasificar.** Manejador de `clasificar`: arma la solicitud del contrato, llama al clasificador, valida la respuesta (un reintento), aplica los umbrales fijados, crea los segmentos y las tareas de clasificación. Las copias toman los segmentos del original. TD-98 y TD-99 quedan `sin_extraccion`. Requisitos R9 a R14.
+- [x] **T07 — Clasificar.** Manejador de `clasificar`: arma la solicitud del contrato, llama al clasificador, valida la respuesta (un reintento), aplica los umbrales fijados, crea los segmentos y las tareas de clasificación. Las copias no llegan aquí (ver la nota de T07). TD-98 y TD-99 quedan `sin_extraccion`. Requisitos R9 a R14.
 - [ ] **T08 — Solicitudes de extracción.** Por cada segmento que se extrae, arma la solicitud 0.2, la valida contra el esquema y la publica en `extraer`. Incluye los documentos del proceso sin oferente. Requisitos R16 y R17.
 - [ ] **T09 — Tareas.** Resolver una tarea de clasificación (asigna TD, registra quién y publica la solicitud) y `escalar_fallas(ahora)` para las 24 horas. Requisitos R15 y R22.
 - [ ] **T10 — Punta a punta.** Comando `orquestar`, que normaliza como máximo 2 entregas a la vez (`paralelo_normalizar`), y prueba de punta a punta con un proceso inventado (proceso y dos oferentes, con copia, contraseña, dudosa, baja confianza y TD-99). Prueba de mensajes repetidos: cada mensaje entregado dos veces da el mismo estado y las mismas solicitudes. README del servicio completo (ya existe uno parcial). Criterios A2 y A3.
@@ -118,4 +118,17 @@ Lo que se decidió al escribir y conviene revisar:
 6. **El documento guarda del manifiesto** su ruta de origen, huella, tipo, URI del PDF, anexo y lectura, páginas, `duplicado_de` y error. La ruta de origen hace falta para la solicitud al clasificador.
 7. **La tarea "documento con error"** lleva el código y el `detalle` que escribe la normalización, que dice qué pedirle al oferente y no trae texto del documento.
 8. **Al volver de `error_proceso`** la entrega borra su `error`. El historial conserva el paso por el error.
+
+### T07 — Clasificar (2026-11-09)
+
+`clasificar.py`: el manejador de `clasificar` y `problemas_de_la_respuesta`. `tareas.py`: tareas humanas con identificador determinista, que ahora usa también la normalización. `tests/fabrica.py`: PDF inventados y un mundo local, compartidos por las pruebas. 132 pruebas.
+
+1. **Las copias exactas no se clasifican ni tienen segmentos.** La tarea decía "las copias toman los segmentos del original", pero en T03 quedó que una copia se queda `duplicado`: si tuviera segmentos, se extraería dos veces lo mismo. "Toma el resultado del original" (R10) se cumple con `duplicado_de`: quien consulta la copia llega al original y a su clasificación.
+2. **El reintento de una respuesta inválida es inmediato y dentro del mismo mensaje**, no un mensaje nuevo: el manejador llama al clasificador dos veces. Así la segunda falla crea la tarea de clasificación y no termina en la cola de errores, que es para fallas técnicas. Plan ajustado.
+3. **Qué se revisa de la respuesta:** el contrato; páginas sin huecos, sin solapes, sin páginas de más y ningún segmento al revés; que cada TD exista en la versión de tipos fijada; y que `id_documento` y `version_ontologia` coincidan con la solicitud. Los problemas van en el `detalle` de la tarea, solo con códigos y números de página.
+4. **Huella del PDF en la solicitud:** sale de `hash_pdf` de la lectura, que es la del PDF normalizado. La del manifiesto es la del original, que no coincide cuando hubo conversión.
+5. **Umbrales:** la confianza igual al umbral se extrae normal y la igual al piso (0,75) se extrae como dudosa. Los umbrales y los tipos se leen de las versiones fijadas en el proceso, no de las vigentes.
+6. **La tarea de confianza baja** dice qué TD sugiere el clasificador y con qué confianza, para ayudar a la persona. El documento queda `clasificado` y solo ese segmento espera; los demás del archivo siguen.
+7. **Pedir la extracción está detrás de una interfaz (`Solicitudes`)**, que implementa T08. Las pruebas de T07 usan un doble que solo anota qué se pidió. Un mensaje repetido no vuelve a pedir nada; una caída antes de terminar sí puede pedir dos veces el mismo segmento, y la extracción lo absorbe con su clave de idempotencia (D22).
+8. **Clasificador caído:** reintentos de la clase 2 y, si se agotan, el documento queda en `error_proceso`. Al reenviar, se clasifica y borra su `error`.
 

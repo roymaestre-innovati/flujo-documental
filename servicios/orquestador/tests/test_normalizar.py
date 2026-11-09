@@ -1,76 +1,25 @@
 """Normalizar cada entrega (T06; R3, R6 a R8)."""
 
-import io
-
-import pikepdf
 import pytest
-from normalizacion.almacen import AlmacenLocal
-from reportlab.pdfgen import canvas
 
+from fabrica import P, RUTA, escribir, pdf, pdf_con_contrasena
+from fabrica import Mundo as MundoBase
 from orquestador import cola as c
 from orquestador import estados
-from orquestador.apertura import Apertura
-from orquestador.errores import procesar_uno, reenviar_errores
-from orquestador.estado import EstadoEnMemoria
-from orquestador.normalizar import Normalizar, ruta_en_la_entrega
-from orquestador.origen import OrigenLocal
-from orquestador.reloj import RelojManual
-
-P = "SR0000000001"
-RUTA = "procesos/SR0000000001"
-
-
-def pdf(paginas: int, texto: str) -> bytes:
-    salida = io.BytesIO()
-    lienzo = canvas.Canvas(salida)
-    for n in range(paginas):
-        lienzo.drawString(72, 720, f"{texto}, página {n + 1}. Documento inventado para pruebas.")
-        lienzo.showPage()
-    lienzo.save()
-    return salida.getvalue()
-
-
-def pdf_con_contrasena() -> bytes:
-    salida = io.BytesIO()
-    with pikepdf.open(io.BytesIO(pdf(1, "secreto"))) as documento:
-        documento.save(salida, encryption=pikepdf.Encryption(user="clave", owner="clave"))
-    return salida.getvalue()
+from orquestador.errores import reenviar_errores
+from orquestador.normalizar import ruta_en_la_entrega
 
 
 def _escribir(raiz, ruta, contenido):
-    archivo = raiz / "datalake" / RUTA / ruta
-    archivo.parent.mkdir(parents=True, exist_ok=True)
-    archivo.write_bytes(contenido)
+    escribir(raiz, ruta, contenido)
 
 
-class Mundo:
-    def __init__(self, raiz):
-        self.reloj = RelojManual()
-        self.cola = c.ColaEnMemoria(self.reloj)
-        self.estado = EstadoEnMemoria()
-        self.origen = OrigenLocal(raiz / "datalake")
-        self.almacen = AlmacenLocal(raiz / "salida")
-        self.salida = raiz / "salida"
-        self.apertura = Apertura(self.cola, self.estado, self.origen, self.reloj)
-        self.normalizar = Normalizar(self.cola, self.estado, self.origen, self.almacen, self.reloj)
-
-    def abrir(self):
-        self.cola.publicar(c.PROCESOS_LISTOS, {"contrato": "modulo5-orquestador/0.1", "id_proceso": P, "ruta": RUTA,
-                                                "fecha": "2026-11-06T09:00:00-05:00"})
-        assert procesar_uno(self.cola, self.apertura).desenlace == "ok"
-
+class Mundo(MundoBase):
     def correr(self):
-        resultados = []
-        while (r := procesar_uno(self.cola, self.normalizar)) is not None:
-            resultados.append(r)
-        return resultados
+        return super().correr(self.normalizar)
 
     def clasificar(self):
-        mensajes = []
-        while (m := self.cola.recibir(c.CLASIFICAR)) is not None:
-            mensajes.append(m.cuerpo)
-            self.cola.completar(m)
-        return mensajes
+        return self.sacar(c.CLASIFICAR)
 
     def documentos(self, entrega):
         return {r.id: r.datos for r in self.estado.listar(P, estados.DOCUMENTO) if r.datos["entrega"] == entrega}
