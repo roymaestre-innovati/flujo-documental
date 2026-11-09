@@ -2,7 +2,7 @@
 
 Sale de `plan.md`. Cada tarea termina con sus pruebas en verde y un commit propio.
 
-**Estado al 2026-11-09:** T01 a T06 fusionadas; T07 hecha, en revisión.
+**Estado al 2026-11-09:** T01 a T07 fusionadas; T08 hecha, en revisión.
 
 ## Para quien implemente
 
@@ -22,7 +22,7 @@ Sale de `plan.md`. Cada tarea termina con sus pruebas en verde y un commit propi
 - [x] **T05 — Apertura.** Manejador de `procesos-listos`: valida el aviso, abre el proceso con `crear_si_no_existe`, fija las versiones, reparte las entregas (con la lista de archivos del aviso, sin leer el origen, o listando las carpetas) y publica un `normalizar` por entrega. Requisitos R1 a R5.
 - [x] **T06 — Normalizar.** Manejador de `normalizar`: baja los originales de `Origen` a una carpeta temporal que se borra al terminar, llama a `normalizar_entrega` con la versión fijada, registra cada documento, crea la tarea `documento_con_error` por cada `error_entrada` y publica un `clasificar` por documento normalizado. `ErrorEntrega` es clase 4. Requisitos R3, R6 a R8. (El límite de 2 entregas a la vez pasó a T10: ver la nota de T06.)
 - [x] **T07 — Clasificar.** Manejador de `clasificar`: arma la solicitud del contrato, llama al clasificador, valida la respuesta (un reintento), aplica los umbrales fijados, crea los segmentos y las tareas de clasificación. Las copias no llegan aquí (ver la nota de T07). TD-98 y TD-99 quedan `sin_extraccion`. Requisitos R9 a R14.
-- [ ] **T08 — Solicitudes de extracción.** Por cada segmento que se extrae, arma la solicitud 0.2, la valida contra el esquema y la publica en `extraer`. Incluye los documentos del proceso sin oferente. Requisitos R16 y R17.
+- [x] **T08 — Solicitudes de extracción.** Por cada segmento que se extrae, arma la solicitud 0.2, la valida contra el esquema y la publica en `extraer`. Incluye los documentos del proceso sin oferente. Requisitos R16 y R17.
 - [ ] **T09 — Tareas.** Resolver una tarea de clasificación (asigna TD, registra quién y publica la solicitud) y `escalar_fallas(ahora)` para las 24 horas. Requisitos R15 y R22.
 - [ ] **T10 — Punta a punta.** Comando `orquestar`, que normaliza como máximo 2 entregas a la vez (`paralelo_normalizar`), y prueba de punta a punta con un proceso inventado (proceso y dos oferentes, con copia, contraseña, dudosa, baja confianza y TD-99). Prueba de mensajes repetidos: cada mensaje entregado dos veces da el mismo estado y las mismas solicitudes. README del servicio completo (ya existe uno parcial). Criterios A2 y A3.
 - [ ] **T11 — Corrida con la muestra.** `scripts/correr_muestra.py`: convierte `manifiesto.csv` de la clasificación manual al CSV del clasificador falso y corre `orquestar` sobre la muestra, imprimiendo solo conteos (criterio A4). Lo corre el usuario en su máquina; se le dan los comandos y cuánto tarda.
@@ -131,4 +131,15 @@ Lo que se decidió al escribir y conviene revisar:
 6. **La tarea de confianza baja** dice qué TD sugiere el clasificador y con qué confianza, para ayudar a la persona. El documento queda `clasificado` y solo ese segmento espera; los demás del archivo siguen.
 7. **Pedir la extracción está detrás de una interfaz (`Solicitudes`)**, que implementa T08. Las pruebas de T07 usan un doble que solo anota qué se pidió. Un mensaje repetido no vuelve a pedir nada; una caída antes de terminar sí puede pedir dos veces el mismo segmento, y la extracción lo absorbe con su clave de idempotencia (D22).
 8. **Clasificador caído:** reintentos de la clase 2 y, si se agotan, el documento queda en `error_proceso`. Al reenviar, se clasifica y borra su `error`.
+
+### T08 — Solicitudes de extracción (2026-11-09)
+
+`extraer.py`: `solicitud` arma el mensaje 0.2 y `Extraer` lo valida y lo publica en `extraer`. Es la implementación de `Solicitudes` que usa T07. 139 pruebas.
+
+1. **Huella del PDF:** se lee `hash_pdf` de la lectura, como en la solicitud de clasificación. Leer la lectura otra vez cuesta poco y evita guardar la huella en dos lugares.
+2. **`tipo_oferente` no se manda.** Es opcional en el contrato y todavía no se sabe de dónde sale (O3). Sin él, la extracción deja sin evaluar los campos condicionales.
+3. **`confianza_clasificacion` va en `null`** cuando el tipo lo asignó una persona (T09).
+4. **`anexos`** lleva el Excel original cuando el documento lo tiene, si no va vacía. No hay prueba con un Excel real porque convertirlo necesita LibreOffice: se prueba armando la solicitud con un documento de ejemplo.
+5. **Una solicitud que no cumple el contrato es un bug** (`SolicitudInvalida`, clase 4): el documento queda en `error_proceso` y operación lo ve. No pasa con datos bien formados; la prueba la provoca con un TD-99.
+6. **`forzar_reproceso`** no se manda: lo activa `reprocesar`, que es de la entrega 2.
 
