@@ -1,6 +1,6 @@
 # Handoff: implementación del flujo documental (opción A)
 
-Estado al 2026-11-09. Cerradas la entrega 1 de la iniciativa 003 (normalización y lectura) y la entrega 1 de la 005 (orquestador, del aviso a la cola de extracción), las dos en local. **No hay nada en curso:** lo siguiente se elige con el usuario (ver "Lo que viene después").
+Estado al 2026-11-09. Cerradas la entrega 1 de la iniciativa 003 (normalización y lectura) y la entrega 1 de la 005 (orquestador, del aviso a la cola de extracción), las dos en local. **Lo siguiente es la extracción** (entrega 2 de la 003), a cargo de otro agente: su punto de partida es `contexto/HANDOFF-extraccion.md`.
 
 Las rutas relativas son de este repositorio (`~/GEB/flujo-documental-repo`, en GitHub `roymaestre-innovati/flujo-documental`); lo que está en otros repos va con ruta completa. `contexto/flujo-documental-opcion-a.md` sigue siendo la fuente de verdad del diseño. Este archivo no repite el diseño: dice qué existe, qué falta, qué está abierto y cómo trabaja el usuario.
 
@@ -9,7 +9,7 @@ Las rutas relativas son de este repositorio (`~/GEB/flujo-documental-repo`, en G
 - **Iniciativa 003, entrega 1 (normalización y lectura): cerrada.** Las tareas T01 a T16 de `specs/003-validacion-extraccion/tasks.md` están hechas y fusionadas en `main`, con 413 pruebas sobre documentos inventados. Normalizador `0.2.0`, contrato `modulo3-normalizacion/0.2`, parámetros versión 1.
 - **Medida con la muestra real** (7 oferentes, 1.034 páginas, dos mediciones): `specs/003-validacion-extraccion/resultados-muestra.md`. Los criterios A3 a A5 se cumplen y los umbrales no cambian. De la primera medición salieron T14 (el sello de tiempo no cuenta como firma), T15 (PowerPoint) y T16 (vínculos a otros libros en Excel); la segunda medición los confirma.
 - **Checklist de habeas data:** borrador en `specs/003-validacion-extraccion/checklist-habeas-data.md`, sin respuestas de cumplimiento todavía. Las mediciones se hicieron antes de tenerlas: el usuario lo cuenta al pasar el checklist.
-- **Iniciativa 005, entrega 1 (orquestador): cerrada** el 2026-11-09. T01 a T11 de `specs/005-orquestador/tasks.md`, con 166 pruebas sobre documentos inventados. Va del aviso del proceso a las solicitudes de extracción, todo local, con interfaces que tienen versión en memoria (Service Bus, Cosmos y OneLake reales en la entrega 2). Comando `orquestar` y `scripts/correr_muestra.py`. Lo que cambió respecto del plan está al final de `plan.md`, en "Lo que cambió al implementar".
+- **Iniciativa 005, entrega 1 (orquestador): cerrada** el 2026-11-09. T01 a T11 de `specs/005-orquestador/tasks.md`, con 166 pruebas sobre documentos inventados (182 con las del visor). Va del aviso del proceso a las solicitudes de extracción, todo local, con interfaces que tienen versión en memoria (Service Bus, Cosmos y OneLake reales en la entrega 2). Comando `orquestar` y `scripts/correr_muestra.py`. Lo que cambió respecto del plan está al final de `plan.md`, en "Lo que cambió al implementar".
 - **Corrida con la muestra real (A4, 2026-11-09):** las 7 entregas llegan a las solicitudes o a una tarea; nada atascado ni en errores; 75 solicitudes de extracción, 13 tareas `NO_SOPORTADO` (los ZIP y RAR ya conocidos), 270 s. OF-007 no tiene clasificación manual que coincida con sus archivos y sale todo TD-99. Detalle en la nota de T11.
 
 ## Cómo trabaja el usuario
@@ -129,7 +129,7 @@ Si se cambia un parámetro, sube `version_parametros`: ya hubo corridas reales.
 ## Lo que viene después
 
 - **Entrega 2 del orquestador:** resultados de la extracción, ficha del proceso, menor precio, tareas en la Power App, `reprocesar` y las piezas en Azure (Service Bus, Cosmos, OneLake, Blob, alertas). Antes de OneLake, la prueba de acceso (decisión 35).
-- **Entrega 2 de la iniciativa 003: extracción.** El contrato 0.2 ya está (T01 de la 005), así que empieza por el servicio. Depende de S2 (enviar datos a eastus).
+- **Entrega 2 de la iniciativa 003: extracción.** Es lo siguiente, elegido el 2026-11-09. El contrato 0.2 ya está (T01 de la 005), así que empieza por el servicio. Depende de S2 (enviar datos a eastus). Todo lo que hace falta para empezar está en `contexto/HANDOFF-extraccion.md`.
 - **Módulo 4: reglas e informe**, con la hoja Reglas de la matriz (decisión 28).
 
 ## Riesgos y datos técnicos conocidos
