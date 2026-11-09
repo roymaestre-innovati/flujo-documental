@@ -10,6 +10,9 @@ dependencies = [
     "rfc3339-validator>=0.1.4",
 ]
 
+[project.scripts]
+orquestar = "orquestador.cli:main"
+
 [tool.uv.sources]
 normalizacion = { path = "../normalizacion", editable = true }
 

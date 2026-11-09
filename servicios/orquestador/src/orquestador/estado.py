@@ -14,6 +14,8 @@ cosas que el resto necesita:
 """
 
 import copy
+import functools
+import threading
 import json
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
@@ -69,14 +71,31 @@ def _revisar(tipo: str, datos: dict) -> dict:
     return json.loads(json.dumps(datos, ensure_ascii=False))
 
 
+
+def _con_candado(metodo):
+    """Una operación a la vez: el comando local normaliza varias entregas en
+    hilos, y la versión en memoria debe portarse como el servicio real, donde
+    cada operación es atómica."""
+
+    @functools.wraps(metodo)
+    def envuelto(self, *args, **kwargs):
+        with self._candado:
+            return metodo(self, *args, **kwargs)
+
+    return envuelto
+
+
 class EstadoEnMemoria(Estado):
     def __init__(self) -> None:
         self._registros: dict[tuple[str, str, str], Registro] = {}
+        self._candado = threading.RLock()
 
+    @_con_candado
     def leer(self, id_proceso: str, tipo: str, id: str) -> Registro | None:
         registro = self._registros.get((id_proceso, tipo, id))
         return copy.deepcopy(registro)
 
+    @_con_candado
     def crear_si_no_existe(self, id_proceso: str, tipo: str, id: str, datos: dict) -> tuple[Registro, bool]:
         datos = _revisar(tipo, datos)
         clave = (id_proceso, tipo, id)
@@ -86,6 +105,7 @@ class EstadoEnMemoria(Estado):
         self._registros[clave] = registro
         return copy.deepcopy(registro), True
 
+    @_con_candado
     def reemplazar(self, registro: Registro, datos: dict) -> Registro:
         datos = _revisar(registro.tipo, datos)
         clave = (registro.id_proceso, registro.tipo, registro.id)
@@ -98,6 +118,7 @@ class EstadoEnMemoria(Estado):
         self._registros[clave] = nuevo
         return copy.deepcopy(nuevo)
 
+    @_con_candado
     def listar(self, id_proceso: str, tipo: str | None = None) -> list[Registro]:
         if tipo is not None and tipo not in TIPOS:
             raise ErrorEstado(f"Tipo desconocido: {tipo}")
@@ -106,9 +127,11 @@ class EstadoEnMemoria(Estado):
         ]
         return copy.deepcopy(sorted(encontrados, key=lambda r: (TIPOS.index(r.tipo), r.id)))
 
+    @_con_candado
     def procesos(self) -> list[str]:
         return sorted({p for p, _, _ in self._registros})
 
+    @_con_candado
     def guardar(self, ruta: Path) -> None:
         """Escribe todo el estado en un JSON, para revisar una corrida local."""
         contenido = [

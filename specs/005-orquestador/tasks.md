@@ -2,7 +2,7 @@
 
 Sale de `plan.md`. Cada tarea termina con sus pruebas en verde y un commit propio.
 
-**Estado al 2026-11-09:** T01 a T08 fusionadas; T09 hecha, en revisión.
+**Estado al 2026-11-09:** T01 a T09 fusionadas; T10 hecha, en revisión.
 
 ## Para quien implemente
 
@@ -24,7 +24,7 @@ Sale de `plan.md`. Cada tarea termina con sus pruebas en verde y un commit propi
 - [x] **T07 — Clasificar.** Manejador de `clasificar`: arma la solicitud del contrato, llama al clasificador, valida la respuesta (un reintento), aplica los umbrales fijados, crea los segmentos y las tareas de clasificación. Las copias no llegan aquí (ver la nota de T07). TD-98 y TD-99 quedan `sin_extraccion`. Requisitos R9 a R14.
 - [x] **T08 — Solicitudes de extracción.** Por cada segmento que se extrae, arma la solicitud 0.2, la valida contra el esquema y la publica en `extraer`. Incluye los documentos del proceso sin oferente. Requisitos R16 y R17.
 - [x] **T09 — Tareas.** Resolver una tarea de clasificación (asigna TD, registra quién y publica la solicitud) y `escalar_fallas(ahora)` para las 24 horas. Requisitos R15 y R22.
-- [ ] **T10 — Punta a punta.** Comando `orquestar`, que normaliza como máximo 2 entregas a la vez (`paralelo_normalizar`), y prueba de punta a punta con un proceso inventado (proceso y dos oferentes, con copia, contraseña, dudosa, baja confianza y TD-99). Prueba de mensajes repetidos: cada mensaje entregado dos veces da el mismo estado y las mismas solicitudes. README del servicio completo (ya existe uno parcial). Criterios A2 y A3.
+- [x] **T10 — Punta a punta.** Comando `orquestar`, que normaliza como máximo 2 entregas a la vez (`paralelo_normalizar`), y prueba de punta a punta con un proceso inventado (proceso y dos oferentes, con copia, contraseña, dudosa, baja confianza y TD-99). Prueba de mensajes repetidos: cada mensaje entregado dos veces da el mismo estado y las mismas solicitudes. README del servicio completo (ya existe uno parcial). Criterios A2 y A3.
 - [ ] **T11 — Corrida con la muestra.** `scripts/correr_muestra.py`: convierte `manifiesto.csv` de la clasificación manual al CSV del clasificador falso y corre `orquestar` sobre la muestra, imprimiendo solo conteos (criterio A4). Lo corre el usuario en su máquina; se le dan los comandos y cuánto tarda.
 
 **Al cerrar la entrega:** actualizar el estado en `spec.md`, `plan.md` (sección "Lo que cambió al implementar"), el README del repo y `contexto/HANDOFF-implementacion.md`.
@@ -156,3 +156,14 @@ Lo que se decidió al escribir y conviene revisar:
 5. **Escalar a las 24 horas** mira entregas y documentos en `error_proceso` con `error_desde` más viejo que `horas_escalamiento`. Crea una tarea `falla_tecnica` por cada uno, una sola vez, con una referencia a lo que falló. En producción corre como trabajo periódico (entrega 2).
 6. **Si lo escalado se recupera después** (operación lo reenvía y sale bien), la tarea `falla_tecnica` sigue abierta: no se cierra sola. Cerrarla automáticamente es simple, pero no está pedido; queda para decidirlo con el uso.
 
+### T10 — Punta a punta (2026-11-09)
+
+`local.py`: `Corrida`, que arma los manejadores sobre las versiones en memoria y vacía las colas, y `conteos`. `cli.py`: el comando `orquestar`. La cola y el estado en memoria ahora tienen un candado, porque la normalización corre en hilos. README del servicio completo. 164 pruebas, una de ellas con LibreOffice.
+
+1. **Cómo corre la corrida local:** vacía `procesos-listos`, después `normalizar` con 2 hilos (`paralelo_normalizar`, o `--paralelo`), después `clasificar`, y saca lo que haya en `extraer` como las solicitudes de la corrida. Repite hasta que no queda nada. Si solo quedan reintentos con demora, adelanta el reloj en vez de esperar.
+2. **Prueba de punta a punta (A2):** proceso con el CPC y dos oferentes: una carta y su copia, un PDF con contraseña, un documento de dos páginas con la segunda dudosa (TD-16 con 0,80), uno de baja confianza (TD-24 con 0,60) y un TD-99. Salen 5 solicitudes, todas válidas contra el 0.2, y dos tareas. Después se resuelve la de baja confianza y sale la sexta.
+3. **Mensajes repetidos (A3), en tres formas:** cada aviso y cada pedido publicado dos veces da exactamente el mismo estado (incluidas las versiones de cada registro) y las mismas solicitudes; lo mismo con dos entregas a la vez, donde las dos copias de un `normalizar` pueden correr juntas (ahí se comparan conteos y solicitudes, porque el historial puede cambiar de orden); y un trabajador que se cae antes de completar cada mensaje.
+4. **"Atascados" en los conteos:** registros en un estado intermedio que no están esperando a una persona. A4 pide que sea 0: todo llega a las solicitudes o a una tarea. Lo que espera a una persona ya tiene su tarea.
+5. **El comando imprime solo conteos** y deja en `<salida>` el estado, las solicitudes, los errores y los conteos. Se niega a escribir dentro de un repositorio git, porque la salida trae datos personales. Termina con 1 si algo quedó en errores.
+6. **El comando no resuelve tareas.** Resolver queda como función, para la Power App en la entrega 2. Para la muestra (T11) no hace falta: basta con ver cuántas tareas quedan.
+7. **Para la entrega 2:** dos trabajadores pueden normalizar la misma entrega a la vez si el `normalizar` llega repetido. En local da el mismo resultado, pero escriben los mismos archivos del almacén al mismo tiempo. Con Blob conviene revisar que la escritura sea de reemplazo completo (lo es por defecto) o tomar un lease por entrega.
