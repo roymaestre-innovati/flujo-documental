@@ -2,7 +2,7 @@
 
 Sale de `plan-extraccion.md`. Cada tarea termina con sus pruebas en verde y un commit propio.
 
-**Estado al 2026-11-09:** spec, plan y tareas aprobados. T01 y T02 fusionadas. T03 hecha, en revisión.
+**Estado al 2026-11-09:** spec, plan y tareas aprobados. T01 a T03 fusionadas. T04 hecha, en revisión del prompt.
 
 ## Para quien implemente
 
@@ -20,7 +20,7 @@ Sale de `plan-extraccion.md`. Cada tarea termina con sus pruebas en verde y un c
 - [x] **T01 — Esqueleto y dobles.** `servicios/extraccion/` con `pyproject.toml` (uv, pytest, `normalizacion` como dependencia de ruta), `VERSION = "0.1.0"`, `datos/parametros.json`, `datos/respuesta.schema.json`, `contratos.py`, las interfaces `FuenteModelo` (con `FuenteModeloArchivo`), `ClienteLLM` (con `LLMFalso`) y `Resultados` (con `ResultadosEnCarpeta`), y el reloj. Fichas de prueba de TD-16, TD-29 y TD-01 con la forma de `obtener_seccion`, y respuestas falsas que dan los ejemplos del contrato. Pruebas: los ejemplos del contrato y las respuestas falsas validan contra sus esquemas.
 - [x] **T02 — Entrada.** Mover `en_el_almacen` a `normalizacion.almacen` (el visor la importa de ahí). `entrada.py`: valida la solicitud, resuelve las URI, comprueba las huellas, lee la lectura y revisa el rango, con los errores de la tabla del plan. Requisitos R26 a R30.
 - [x] **T03 — Preprocesamiento.** `preproceso.py`: qué va de cada página según su tipo, imagen con pypdfium2, firma ampliada a 300 dpi desde las anclas, valores del anexo con openpyxl y tope con `ANEXO_RECORTADO`, y `lectura` de la salida. Pruebas con PDF y xlsx inventados pasados por `normalizar_entrega`. Requisitos R31 a R34 y R36.
-- [ ] **T04 — Mensaje y prompt.** `datos/prompt.md` (los cambios del plan sobre el `prompt.md` del modelo semántico) y `mensaje.py` (sistema: prompt + guía; usuario: ficha + contenido). Pruebas: el mensaje solo lleva las páginas del segmento, numeradas sobre el documento completo, y la ficha de la versión pedida. **Alto para que el usuario revise el prompt.** Requisito R35.
+- [x] **T04 — Mensaje y prompt.** `datos/prompt.md` (los cambios del plan sobre el `prompt.md` del modelo semántico) y `mensaje.py` (sistema: prompt + guía; usuario: ficha + contenido). Pruebas: el mensaje solo lleva las páginas del segmento, numeradas sobre el documento completo, y la ficha de la versión pedida. **Alto para que el usuario revise el prompt.** Requisito R35.
 - [ ] **T05 — Posvalidación.** `posvalidacion.py` y `validadores.py`: forma, `no_corresponde`, alineación con la ficha, citas fuera del segmento, validadores, motivos, `datos_personales` y sobre validado contra el contrato. Con el `LLMFalso`, las solicitudes de ejemplo dan las salidas de ejemplo (criterio A7). Requisitos R37 a R48, R55 y R56.
 - [ ] **T06 — Llamada.** `llm_azure.py` (chat completions con `json_object`, traducción de 429, tiempo agotado y 5xx a las excepciones de `llm.py`, y rechazo de un deployment `mini`) y `llamada.py` (reintentos de la tabla del plan y semáforo global). Las pruebas no tocan la red: un cliente HTTP falso para `llm_azure` y el `LLMFalso` con fallas programadas para `llamada`. Requisitos R49 a R52 y R54.
 - [ ] **T07 — Servicio, idempotencia y comando.** `servicio.py` (`extraer_segmento`), la clave y el guardado de `resultados.py`, el comando `extraer` con su confirmación antes de mandar documentos, los registros sin datos personales y el README. Prueba de punta a punta (criterio A8): un proceso inventado normalizado, solicitudes armadas con `orquestador.extraer.solicitud` (solo en pruebas), dos corridas. Requisito R53.
@@ -83,3 +83,25 @@ Lo que se decidió al escribir y conviene revisar:
 3. **Firmas en páginas `escaneo_con_ocr`:** también se amplían cuando la capa del escáner trajo el rótulo y la normalización encontró el ancla.
 4. **Anexos:** se leen con openpyxl solo los xlsx y xlsm, con los valores que guardó Excel (no calcula fórmulas). Un xls, un ods o un archivo dañado no frena la extracción: queda la alerta `ANEXO_NO_LEIDO` y se usa solo el PDF. El tope es de 60.000 caracteres por anexo, con la alerta `ANEXO_RECORTADO`.
 5. **Las alertas del preprocesamiento** no traen datos del documento, solo el número del anexo. Van a la salida junto con las del LLM (T05).
+
+### T04 — Mensaje y prompt (2026-11-09)
+
+`datos/prompt.md` (versión `extraccion/prompt@1`) y `mensaje.py` con `mensajes(entrada, ficha, contenido)`. 60 pruebas. Una prueba guarda la huella del prompt por versión: si alguien cambia el texto sin subir `VERSION_PROMPT`, falla.
+
+Cómo queda el mensaje:
+
+- **Sistema:** el prompt del servicio y, a continuación, la guía de interpretación de la versión fijada. Es el mismo para todos los segmentos de una versión, así que sirve de prefijo para la caché de prompt.
+- **Usuario:** el encabezado (tipo documental con su nombre, versión del modelo, tipo de oferente o "no informado" y rango de páginas), la ficha del TD en JSON (solo los elementos que se extraen) y el contenido: por página, el rótulo `--- Página N ---` con su texto (o "(sin texto: ver la imagen)" o "(página en blanco)"), la imagen y cada ampliación de firma con su rótulo. Los anexos legibles van al final.
+
+Tamaño medido con la ficha de prueba: prompt unos 7.200 caracteres, guía v21 unos 10.300, ficha de TD-16 o TD-29 unos 5.900 y la de TD-01 unos 22.000. En tokens, del orden de 4.500 fijos más 1.500 de la ficha, antes del documento.
+
+Cambios frente al `prompt.md` del modelo semántico, que no se tocó:
+
+1. **Sin herramientas:** la ficha ya viene en el mensaje. Si la guía dice que se consulte una sección, se toma como hecho. Si la guía y el prompt chocan en la forma de la respuesta, la evidencia, `cumple` o la revisión, manda el prompt (choque conocido con la guía v21, ver riesgos del plan).
+2. **Sin parámetros ni datos de otros documentos** (D8): se quitó "Si te entregan parámetros del proceso…".
+3. **Respuesta:** un único objeto JSON con `corresponde`, `motivo_no_corresponde`, `resultados` y `alertas`, sin líneas después (D10). Las "tres líneas para el evaluador" pasan a `alertas` con código.
+4. **Evidencia estructurada** `{pagina, cita, visual}` (D12), con la página tal como dice el rótulo.
+5. **`cumple`** solo con las reglas que resuelve el documento, `null` si el elemento no tiene ninguna; las demás en `reglas_pendientes` con su texto y lo que requieren (D14).
+6. **Sin `revision`:** el LLM solo propone los cuatro motivos que se reconocen leyendo (`REQUIERE_IMAGEN`, `PLANTILLA_SIN_LLENAR`, `NOTA_ELEMENTO`, `CONTRADICCION`). La revisión la calcula el código.
+7. **Confianza de un valor `null`:** `null` si el dato no aparece; 0,50 o menos si está pero no se lee (casilla sin marca legible). Así la casilla ilegible va a revisión por `CONFIANZA_BAJA` y el dato ausente de un campo no obligatorio no.
+8. **Texto de escáner, ampliaciones de firma y anexos de hoja de cálculo** se explican en la entrada, que el prompt original no tenía.
