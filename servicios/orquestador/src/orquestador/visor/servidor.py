@@ -17,8 +17,10 @@ import json
 import sys
 import webbrowser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from pathlib import Path, PurePosixPath
-from urllib.parse import parse_qs, unquote, urlparse
+from pathlib import Path
+from urllib.parse import parse_qs, urlparse
+
+from normalizacion.almacen import en_el_almacen
 
 from .. import datos
 
@@ -97,24 +99,6 @@ def corrida(carpeta: Path) -> dict:
         "conteos": _leer_json(carpeta / "conteos.json"),
         "datos": _datos_de_version(proceso.get("versiones", {})),
     }
-
-
-def en_el_almacen(carpeta: Path, uri: str | None) -> Path | None:
-    """El archivo local de una URI del almacén de la corrida, o None.
-
-    Las URI del estado son absolutas (`file:///…/almacen/…`). Se toma lo que va
-    después de `almacen/`, para que la corrida se pueda mover de carpeta, y no se
-    deja salir del almacén.
-    """
-    if not uri:
-        return None
-    partes = PurePosixPath(unquote(urlparse(uri).path)).parts
-    if "almacen" not in partes:
-        return None
-    resto = partes[len(partes) - 1 - partes[::-1].index("almacen") + 1:]
-    base = (carpeta / "almacen").resolve()
-    ruta = base.joinpath(*resto).resolve() if resto else base
-    return ruta if ruta.is_file() and ruta.is_relative_to(base) else None
 
 
 def _documento(carpeta: Path, id_documento: str) -> dict | None:

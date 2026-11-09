@@ -2,7 +2,7 @@
 
 Sale de `plan-extraccion.md`. Cada tarea termina con sus pruebas en verde y un commit propio.
 
-**Estado al 2026-11-09:** spec, plan y tareas aprobados. T01 hecha, en revisión.
+**Estado al 2026-11-09:** spec, plan y tareas aprobados. T01 fusionada. T02 hecha, en revisión.
 
 ## Para quien implemente
 
@@ -18,7 +18,7 @@ Sale de `plan-extraccion.md`. Cada tarea termina con sus pruebas en verde y un c
 ## Tareas
 
 - [x] **T01 — Esqueleto y dobles.** `servicios/extraccion/` con `pyproject.toml` (uv, pytest, `normalizacion` como dependencia de ruta), `VERSION = "0.1.0"`, `datos/parametros.json`, `datos/respuesta.schema.json`, `contratos.py`, las interfaces `FuenteModelo` (con `FuenteModeloArchivo`), `ClienteLLM` (con `LLMFalso`) y `Resultados` (con `ResultadosEnCarpeta`), y el reloj. Fichas de prueba de TD-16, TD-29 y TD-01 con la forma de `obtener_seccion`, y respuestas falsas que dan los ejemplos del contrato. Pruebas: los ejemplos del contrato y las respuestas falsas validan contra sus esquemas.
-- [ ] **T02 — Entrada.** Mover `en_el_almacen` a `normalizacion.almacen` (el visor la importa de ahí). `entrada.py`: valida la solicitud, resuelve las URI, comprueba las huellas, lee la lectura y revisa el rango, con los errores de la tabla del plan. Requisitos R26 a R30.
+- [x] **T02 — Entrada.** Mover `en_el_almacen` a `normalizacion.almacen` (el visor la importa de ahí). `entrada.py`: valida la solicitud, resuelve las URI, comprueba las huellas, lee la lectura y revisa el rango, con los errores de la tabla del plan. Requisitos R26 a R30.
 - [ ] **T03 — Preprocesamiento.** `preproceso.py`: qué va de cada página según su tipo, imagen con pypdfium2, firma ampliada a 300 dpi desde las anclas, valores del anexo con openpyxl y tope con `ANEXO_RECORTADO`, y `lectura` de la salida. Pruebas con PDF y xlsx inventados pasados por `normalizar_entrega`. Requisitos R31 a R34 y R36.
 - [ ] **T04 — Mensaje y prompt.** `datos/prompt.md` (los cambios del plan sobre el `prompt.md` del modelo semántico) y `mensaje.py` (sistema: prompt + guía; usuario: ficha + contenido). Pruebas: el mensaje solo lleva las páginas del segmento, numeradas sobre el documento completo, y la ficha de la versión pedida. **Alto para que el usuario revise el prompt.** Requisito R35.
 - [ ] **T05 — Posvalidación.** `posvalidacion.py` y `validadores.py`: forma, `no_corresponde`, alineación con la ficha, citas fuera del segmento, validadores, motivos, `datos_personales` y sobre validado contra el contrato. Con el `LLMFalso`, las solicitudes de ejemplo dan las salidas de ejemplo (criterio A7). Requisitos R37 a R48, R55 y R56.
@@ -57,3 +57,17 @@ Lo que se decidió al escribir y conviene revisar:
 4. **El LLM falso reconoce el TD** por la línea `Tipo documental: TD-NN` del mensaje del usuario. T04 tiene que armar el mensaje con esa línea.
 5. **Reproceso:** el resultado reemplazado queda como `<nombre>.anterior-<id de ejecución>.json`, al lado del vigente.
 6. **El reloj** de la extracción tiene `dormir` y `monotono`, además de `ahora`, para probar las esperas y medir la duración. Es una copia pequeña del del orquestador, porque la extracción no depende del orquestador.
+
+### T02 — Entrada (2026-11-09)
+
+`entrada.py` con `preparar(solicitud, almacen) → Entrada` (lectura, PDF, anexos y las páginas del segmento) y los errores de la tabla del plan. `tests/fabrica.py` normaliza PDF inventados con `normalizar_entrega` y arma las solicitudes como el orquestador. 38 pruebas en la extracción; la normalización (416) y el orquestador (182) siguen en verde.
+
+`en_el_almacen` pasó del visor a `normalizacion.almacen`, partida en dos: `ruta_en_el_almacen(uri)` da la ruta relativa al almacén (la usa la extracción para reubicar las URI en su `AlmacenLocal`) y `en_el_almacen(carpeta, uri)` da el archivo dentro de la corrida (la usa el visor, que ahora la importa). Diferencia con la anterior: solo acepta URI `file://`; las demás devuelven None.
+
+Lo que se decidió al escribir y conviene revisar:
+
+1. **Sin `version_modelo`:** el contrato la deja opcional, con la versión registrada del proceso como respaldo. La extracción no guarda las versiones de los procesos (las fija el orquestador, que la manda siempre), así que una solicitud sin versión da `error_proceso` `VERSION_NO_INDICADA`, no reintentable. Nunca se usa la vigente.
+2. **La lectura no se valida contra su esquema completo** (tiene una referencia al esquema del manifiesto). Solo se revisa que sea JSON, que su `id_documento` sea el de la solicitud y que traiga `paginas`. Si no, `error_proceso` `LECTURA_INVALIDA`, no reintentable.
+3. **Huella:** se compara el SHA-256 del PDF con `archivo.sha256` (si viene) y siempre con `hash_pdf` de la lectura. Si no coincide, `ARCHIVO_DISTINTO`.
+4. **Orden de las revisiones:** primero el contrato y la versión, después la lectura, el PDF y su huella, y al final el rango. Un documento que cambió se informa como falla técnica antes que como rango fuera.
+5. **El mensaje del rango** dice "de la N a la M", algo distinto del ejemplo `salida_error.json` ("hasta la 9"). El ejemplo es solo una muestra; el contrato no fija el texto.
