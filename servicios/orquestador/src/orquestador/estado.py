@@ -56,6 +56,11 @@ class Estado(ABC):
     def listar(self, id_proceso: str, tipo: str | None = None) -> list[Registro]:
         """Los registros de un proceso, de un tipo o de todos, ordenados por tipo e id."""
 
+    @abstractmethod
+    def procesos(self) -> list[str]:
+        """Los `id_proceso` que tienen registros, ordenados. En Cosmos es una
+        consulta entre particiones; la usan solo los trabajos periódicos."""
+
 
 def _revisar(tipo: str, datos: dict) -> dict:
     if tipo not in TIPOS:
@@ -100,6 +105,9 @@ class EstadoEnMemoria(Estado):
             r for (p, t, _), r in self._registros.items() if p == id_proceso and (tipo is None or t == tipo)
         ]
         return copy.deepcopy(sorted(encontrados, key=lambda r: (TIPOS.index(r.tipo), r.id)))
+
+    def procesos(self) -> list[str]:
+        return sorted({p for p, _, _ in self._registros})
 
     def guardar(self, ruta: Path) -> None:
         """Escribe todo el estado en un JSON, para revisar una corrida local."""
