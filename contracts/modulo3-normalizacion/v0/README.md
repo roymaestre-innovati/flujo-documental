@@ -82,6 +82,8 @@ Cambios:
 
 - **0.2 (2026-11-05):** `tipo_origen` suma `ppt`, `pptx` y `odp`. Las presentaciones se convierten a PDF, una página por diapositiva, sin anexo; las notas del orador no salen. Un consumidor que valide contra 0.1 rechazaría esos valores, por eso sube la versión. `version_normalizador` pasa a `0.2.0`.
 
+- **Normalizador 0.3.0, parámetros 2 (2026-11-10), sin cambio del contrato:** una página sin texto y sin imagen grande que tiene tinta al dibujarla (por ejemplo, texto convertido en curvas) ahora es `imagen` y no `vacia`. El esquema no cambia; los ejemplos llevan las versiones nuevas.
+
 Cambios dentro de 0.1, antes de que nadie lo use:
 
 - 2026-11-04, revisión del borrador: el duplicado repite todos los datos del original; rutas en NFC; `restricciones` y `firma_digital` en `null` cuando el documento no abre; campo nuevo `reparado`; `detalle` con lo que hay que pedir al oferente.

@@ -339,3 +339,15 @@ Revisadas una por una con el usuario a partir de `resultados-muestra.md`:
 - **Fábrica:** `pptx` (dos diapositivas, con notas del orador en la primera), hecho con `python-pptx`, que entra solo como dependencia de desarrollo; `ppt` y `odp` salen de él con LibreOffice. La prueba de conversión comprueba 2 páginas, el texto de las diapositivas y que la nota no aparece. La prueba de "no soportados" usaba un ODP; ahora usa un dibujo ODG, que sigue sin soporte.
 - **Con los PPTX reales de OF-007:** los dos se convierten (20 y 10 páginas, 4,4 s y 2,8 s).
 
+### Páginas con tinta y sin texto: normalizador 0.3.0 (2026-11-10)
+
+Hallado al proponer la clasificación del proceso SR5328654726 (prueba del flujo completo; ver `tasks-extraccion.md`). Había 5 documentos con todas sus páginas marcadas `vacia` que sí tenían contenido. Cuatro tenían miles de trazos vectoriales (texto convertido en curvas) y otro, texto sin caracteres legibles; entre 3 % y 20 % de tinta. Como `vacia`, la extracción no mandaba nada de ellas.
+
+Cambio, con autorización del usuario:
+
+- Una página que la regla deja en `vacia` (menos de `min_caracteres_texto` y cobertura de imagen menor que `cobertura_escaneo`) se dibuja con pdfium a `dpi_tinta` (36). Si al menos `tinta_min_imagen` (1 %) de sus píxeles tiene un gris menor que `gris_tinta` (200), pasa a `imagen`, sin anclas.
+- Las páginas que fallaron al leerse siguen `vacia`, sin dibujarse.
+- pdfium no admite hilos y el orquestador normaliza en hilos: el dibujo va bajo un candado (`lectura.PDFIUM`).
+- Normalizador 0.3.0 y parámetros versión 2. El contrato no cambia (sigue en 0.2); sus ejemplos llevan las versiones nuevas. `pypdfium2` pasa a ser dependencia directa (ya venía con pdfplumber).
+- Como cambió la versión de los parámetros, una entrega ya normalizada se procesa de nuevo entera la próxima vez.
+

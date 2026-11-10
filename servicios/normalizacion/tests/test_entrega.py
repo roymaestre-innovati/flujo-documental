@@ -311,10 +311,10 @@ def test_otra_version_de_parametros_procesa_todo(entrega_chica):
 
     base, _ = entrega_chica
     _normalizar(base / "entrega", base / "salida")
-    otros = dataclasses.replace(PARAMETROS, version="2")
+    otros = dataclasses.replace(PARAMETROS, version="otra")
     segunda = _normalizar(base / "entrega", base / "salida", parametros=otros)
     assert segunda.reusados == 0
-    assert segunda.manifiesto["version_parametros"] == "2"
+    assert segunda.manifiesto["version_parametros"] == "otra"
 
 
 def test_si_falta_un_archivo_del_almacen_se_procesa_de_nuevo(entrega_chica):
