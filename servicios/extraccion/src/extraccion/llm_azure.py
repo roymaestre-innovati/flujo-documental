@@ -70,7 +70,7 @@ class LLMAzureOpenAI(ClienteLLM):
             )
         if tiempo_limite_s is None:
             tiempo_limite_s = parametros()["llamada"]["tiempo_limite_s"]
-        self.deployment = deployment
+        self.deployment = self.modelo = deployment
         self._cliente = openai.OpenAI(
             base_url=url_base(endpoint), api_key=clave, timeout=tiempo_limite_s, max_retries=0, http_client=http,
         )
