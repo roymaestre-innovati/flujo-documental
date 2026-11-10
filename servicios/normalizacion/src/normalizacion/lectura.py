@@ -6,6 +6,11 @@ rotación y anclas. Las palabras con su posición van en un archivo aparte.
 Es determinista: el mismo PDF con los mismos parámetros da siempre la misma
 lectura. No hay LLM ni OCR propio.
 
+**Páginas sin texto ni imagen grande** (0.3.0). Antes eran siempre `vacia`, pero
+hay PDF con el texto dibujado como vectores: se ven escritos y no tienen ni texto
+ni imagen. Esas páginas se dibujan a baja resolución con pdfium y, si tienen
+tinta, son `imagen`, para que la extracción mande su imagen.
+
 **Rotación.** pdfplumber devuelve las coordenadas ya giradas según `/Rotate`, y
 el texto de una página girada sale con una palabra por línea. El contrato pide
 las cajas sobre la página sin rotar, así que se lee una copia interna del PDF con
@@ -16,10 +21,12 @@ import hashlib
 import io
 import logging
 import math
+import threading
 from dataclasses import dataclass
 
 import pdfplumber
 import pikepdf
+import pypdfium2
 
 from . import CONTRATO, VERSION, anclas
 from .firma import FirmaDigital
@@ -35,6 +42,9 @@ VACIA = "vacia"
 ORIGEN_POR_TIPO = {TEXTO: "nativo", ESCANEO_CON_OCR: "ocr_escaner", IMAGEN: None, VACIA: None}
 
 DECIMALES_CAJA = 2
+
+PDFIUM = threading.Lock()
+"""pdfium no admite dos hilos a la vez en el mismo proceso, y el orquestador normaliza en hilos."""
 
 
 @dataclass(frozen=True)
@@ -66,6 +76,37 @@ def tipo_de_pagina(caracteres: int, cobertura_imagen: float, parametros: Paramet
     if not con_texto:
         return IMAGEN if escaneada else VACIA
     return ESCANEO_CON_OCR if escaneada else TEXTO
+
+
+def fraccion_con_tinta(pagina: pypdfium2.PdfPage, parametros: Parametros = PARAMETROS) -> float:
+    """Fracción de píxeles con tinta de la página dibujada a `dpi_tinta`."""
+    bitmap = pagina.render(scale=parametros.dpi_tinta / 72, grayscale=True)
+    try:
+        imagen = bitmap.to_pil().convert("L")
+        histograma = imagen.histogram()
+        return sum(histograma[: parametros.gris_tinta]) / (imagen.width * imagen.height)
+    finally:
+        bitmap.close()
+
+
+def _revisar_vacias(datos: bytes, paginas: list[dict], leidas: set[int], parametros: Parametros) -> None:
+    """Las páginas `vacia` que se leyeron bien y tienen tinta pasan a `imagen` (sin anclas)."""
+    candidatas = [p for p in paginas if p["tipo"] == VACIA and p["pagina"] in leidas]
+    if not candidatas:
+        return
+    with PDFIUM:
+        pdf = pypdfium2.PdfDocument(datos)
+        try:
+            for p in candidatas:
+                pagina = pdf[p["pagina"] - 1]
+                try:
+                    tinta = fraccion_con_tinta(pagina, parametros)
+                finally:
+                    pagina.close()
+                if tinta >= parametros.tinta_min_imagen:
+                    p.update(tipo=IMAGEN, origen_texto=ORIGEN_POR_TIPO[IMAGEN], anclas=[])
+        finally:
+            pdf.close()
 
 
 def cobertura(cajas: list[tuple[float, float, float, float]], pagina: tuple[float, float, float, float], celdas: int) -> float:
@@ -217,12 +258,14 @@ def leer(
     sin_rotar, rotaciones = _sin_rotacion(datos)
     paginas: list[dict] = []
     palabras: list[dict] = []
+    leidas: set[int] = set()
     try:
         with pdfplumber.open(io.BytesIO(sin_rotar)) as pdf:
             for indice, rotacion in enumerate(rotaciones):
                 numero = indice + 1
                 try:
                     lectura_pagina, palabras_pagina = _leer_pagina(pdf.pages[indice], numero, rotacion, parametros)
+                    leidas.add(numero)
                 except Exception as error:  # noqa: BLE001 - una página rota no frena el documento
                     registro.warning("Página %d sin leer: %s", numero, type(error).__name__)
                     lectura_pagina, palabras_pagina = _pagina_vacia(numero, rotacion)
@@ -235,6 +278,11 @@ def leer(
             lectura_pagina, palabras_pagina = _pagina_vacia(indice + 1, rotaciones[indice])
             paginas.append(lectura_pagina)
             palabras.append(palabras_pagina)
+
+    try:
+        _revisar_vacias(sin_rotar, paginas, leidas, parametros)
+    except Exception as error:  # noqa: BLE001 - si no se puede dibujar, quedan como estaban
+        registro.warning("Páginas sin texto sin revisar: %s", type(error).__name__)
 
     lectura = {
         "contrato": CONTRATO,

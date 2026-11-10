@@ -170,7 +170,7 @@ def test_r18_campos_de_la_lectura(tmp_path):
     lectura = resultado.lectura
     assert lectura["contrato"] == "modulo3-normalizacion/0.2"
     assert lectura["hash_pdf"] == hashlib.sha256(datos).hexdigest()
-    assert lectura["version_normalizador"] == "0.2.0" and lectura["version_parametros"] == "1"
+    assert lectura["version_normalizador"] == "0.3.0" and lectura["version_parametros"] == "2"
     assert lectura["firma_digital"] == [firma.como_dict() for firma in firmas]
     assert lectura["palabras"] == URI_PALABRAS
     (pagina,) = lectura["paginas"]
@@ -333,3 +333,55 @@ def test_las_cajas_se_recortan_al_borde_de_la_pagina():
     assert palabras["recortada"][2] == fabrica.ANCHO
     for ancla in resultado.lectura["paginas"][0]["anclas"]:
         assert ancla["caja"][0] >= 0
+
+
+# --- Páginas sin texto ni imagen grande (0.3.0) ---
+
+def _pdf_vectores(trazos: int) -> bytes:
+    """Una página sin texto ni imágenes, con `trazos` renglones dibujados como vectores (como un texto en curvas)."""
+    salida, lienzo = fabrica._lienzo()
+    for n in range(trazos):
+        y = 720 - n * 14
+        camino = lienzo.beginPath()
+        camino.moveTo(72, y)
+        for x in range(72, 520, 6):
+            camino.curveTo(x + 1, y + 5, x + 3, y - 5, x + 6, y)
+        lienzo.setLineWidth(2.5)
+        lienzo.drawPath(camino, stroke=1, fill=0)
+    lienzo.showPage()
+    lienzo.save()
+    return salida.getvalue()
+
+
+def test_pagina_dibujada_con_vectores_es_imagen():
+    resultado = _leer(_pdf_vectores(40))
+    [pagina] = resultado.lectura["paginas"]
+    assert pagina["caracteres"] == 0 and pagina["cobertura_imagen"] == 0
+    assert pagina["tipo"] == "imagen" and pagina["origen_texto"] is None and pagina["anclas"] == []
+    _valida(resultado)
+
+
+def test_pagina_con_una_marca_minima_sigue_vacia():
+    [pagina] = _leer(_pdf_vectores(1)).lectura["paginas"]
+    assert pagina["tipo"] == "vacia"
+
+
+def test_pagina_en_blanco_sigue_vacia():
+    salida, lienzo = fabrica._lienzo()
+    lienzo.showPage()
+    lienzo.save()
+    [pagina] = _leer(salida.getvalue()).lectura["paginas"]
+    assert pagina["tipo"] == "vacia"
+
+
+def test_fraccion_con_tinta_crece_con_el_dibujo():
+    import pypdfium2
+
+    def tinta(datos):
+        pdf = pypdfium2.PdfDocument(datos)
+        try:
+            return modulo_lectura.fraccion_con_tinta(pdf[0])
+        finally:
+            pdf.close()
+
+    assert tinta(_pdf_vectores(1)) < PARAMETROS.tinta_min_imagen <= tinta(_pdf_vectores(40))

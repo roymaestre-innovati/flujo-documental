@@ -5,5 +5,5 @@ manifiesto, los PDF normalizados, la lectura por página y las palabras, según 
 contrato `contracts/modulo3-normalizacion/v0`.
 """
 
-VERSION = "0.2.0"
+VERSION = "0.3.0"
 CONTRATO = "modulo3-normalizacion/0.2"

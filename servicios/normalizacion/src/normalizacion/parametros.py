@@ -15,6 +15,13 @@ class Parametros:
     min_caracteres_texto: int
     cobertura_escaneo: float
     celdas_grilla_cobertura: int
+    tinta_min_imagen: float
+    """Una página sin texto ni imagen grande es `imagen` si al menos esta fracción de sus píxeles tiene tinta
+    (texto dibujado como vectores, por ejemplo). Si no, es `vacia`."""
+    dpi_tinta: int
+    """Resolución a la que se dibuja la página para medir la tinta."""
+    gris_tinta: int
+    """Un píxel tiene tinta si su gris (0 negro, 255 blanco) es menor que esto."""
 
     # Anclas (plan, "Anclas")
     prefijo_firma: str
@@ -39,10 +46,13 @@ class Parametros:
 
 
 PARAMETROS = Parametros(
-    version="1",
+    version="2",
     min_caracteres_texto=20,
     cobertura_escaneo=0.80,
     celdas_grilla_cobertura=200,
+    tinta_min_imagen=0.01,
+    dpi_tinta=36,
+    gris_tinta=200,
     prefijo_firma="firma",
     palabras_rotulo_firma=("firma", "representante", "revisor", "contador"),
     min_guiones_bajos_firma=8,

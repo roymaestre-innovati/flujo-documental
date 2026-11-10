@@ -10,6 +10,7 @@ dependencies = [
     "pikepdf>=10.17.0",
     "pillow>=13.0.0",
     "pyhanko>=0.38.1",
+    "pypdfium2>=5.14.0",
 ]
 
 [project.scripts]
