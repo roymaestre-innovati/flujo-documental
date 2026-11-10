@@ -17,7 +17,7 @@ Validación, lectura y extracción de los documentos que entregan los oferentes 
 | Iniciativa | Estado |
 |---|---|
 | 003, entrega 1: normalización y lectura | Cerrada: `servicios/normalizacion/` (0.2.0), contrato `contracts/modulo3-normalizacion/v0/` (0.2), medida con la muestra real |
-| 003, entrega 2: extracción | En curso: `servicios/extraccion/`, T01 a T08 hechas (corre de punta a punta en local). Estado en `specs/003-validacion-extraccion/tasks-extraccion.md` |
+| 003, entrega 2: extracción | En curso: `servicios/extraccion/`, T01 a T09 hechas (corre de punta a punta en local y se ve en el visor). Estado en `specs/003-validacion-extraccion/tasks-extraccion.md` |
 | Orquestador (iniciativa 005), entrega 1: del aviso a la cola de extracción | Cerrada (T01 a T11, 2026-11-09): `servicios/orquestador/` (0.1.0), contrato `contracts/modulo5-orquestador/v0/` (0.1) |
 | Contrato de extracción 0.2 | Escrito en la 005: `contracts/modulo3-extraccion/v0.2/` |
 | Reglas e informe | Por planear |
