@@ -134,7 +134,7 @@ Hoy el evaluador abre, convierte y ordena a mano los archivos de cada oferente. 
 
 # Entrega 2 — Extracción
 
-Estado al 2026-11-09: **en revisión**. Paso 5 de `contexto/flujo-documental-opcion-a.md` y decisiones D10 a D24 de `contexto/refinamiento-grill-me-2.md`. Contrato: `contracts/modulo3-extraccion/v0.2/` (ya publicado, no cambia en esta entrega).
+Estado al 2026-11-10: **construida** (`tasks-extraccion.md`, T01 a T10; servicio 0.1.0 en `servicios/extraccion/`), con 207 pruebas sobre documentos inventados. Falta A9: la medición con los gold de TD-16 y TD-29, que corre el usuario con `medir-gold` después de autorizar que esos documentos vayan a gpt-5.4. Paso 5 de `contexto/flujo-documental-opcion-a.md` y decisiones D10 a D24 de `contexto/refinamiento-grill-me-2.md`. Contrato: `contracts/modulo3-extraccion/v0.2/` (ya publicado, no cambia en esta entrega).
 
 Decisiones del usuario que la enmarcan (2026-11-09):
 

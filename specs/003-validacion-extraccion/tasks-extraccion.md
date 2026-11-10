@@ -2,7 +2,7 @@
 
 Sale de `plan-extraccion.md`. Cada tarea termina con sus pruebas en verde y un commit propio.
 
-**Estado al 2026-11-09:** spec, plan y tareas aprobados. T01 a T08 fusionadas. T09 hecha, en revisión.
+**Estado al 2026-11-10:** spec, plan y tareas aprobados. T01 a T09 fusionadas. T10 hecha, en revisión: el código está; falta que el usuario corra la medición (A9).
 
 ## Para quien implemente
 
@@ -26,7 +26,7 @@ Sale de `plan-extraccion.md`. Cada tarea termina con sus pruebas en verde y un c
 - [x] **T07 — Servicio, idempotencia y comando.** `servicio.py` (`extraer_segmento`), la clave y el guardado de `resultados.py`, el comando `extraer` con su confirmación antes de mandar documentos, los registros sin datos personales y el README. Prueba de punta a punta (criterio A8): un proceso inventado normalizado, solicitudes armadas con `orquestador.extraer.solicitud` (solo en pruebas), dos corridas. Requisito R53.
 - [x] **T08 — Ficha desde el MCP.** `ficha_mcp.py`: `describir_modelo` y `obtener_seccion` con la versión fijada, guardadas en memoria por (versión, TD), y `--modelo mcp` en el comando. El comando guarda las fichas usadas en `extraccion/fichas/` para el visor. Prueba con un servidor MCP falso. El usuario la prueba contra el MCP real con un comando que solo pide la ficha de TD-16 v21 y cuenta sus elementos (no manda documentos). Requisito R30.
 - [x] **T09 — Visor.** El visor del orquestador muestra los resultados de `extraccion/`: estado por segmento, campos con valor, confianza contra umbral, motivos, reglas pendientes y citas que abren el PDF en su página. Los campos en revisión van resaltados. Pruebas del servidor del visor con una corrida inventada. Requisito R57.
-- [ ] **T10 — Medición con los gold (A9), solo con autorización.** Script `scripts/medir_gold.py`: corre el servicio sobre los documentos de un TD con gold y compara campo a campo con `gold_TD-NN.xlsx`. Imprime solo conteos de aciertos por campo, tokens y tiempo, al lado de los de la última corrida de `lote.py`. Antes de escribirlo se le pregunta al usuario cómo está armado el gold (columnas) y cómo se cuenta un acierto en los campos de tipo objeto o lista. **Lo corre el usuario**, con TD-16 y TD-29, después de autorizar que esos documentos vayan a gpt-5.4.
+- [x] **T10 — Medición con los gold (A9), solo con autorización.** Script `scripts/medir_gold.py`: corre el servicio sobre los documentos de un TD con gold y compara campo a campo con `gold_TD-NN.xlsx`. Imprime solo conteos de aciertos por campo, tokens y tiempo, al lado de los de la última corrida de `lote.py`. Antes de escribirlo se le pregunta al usuario cómo está armado el gold (columnas) y cómo se cuenta un acierto en los campos de tipo objeto o lista. **Lo corre el usuario**, con TD-16 y TD-29, después de autorizar que esos documentos vayan a gpt-5.4.
 
 **Al cerrar la entrega:** actualizar el estado en `spec.md` y en `plan-extraccion.md` (agregar "Lo que cambió al implementar"), el README del repo y `contexto/HANDOFF-extraccion.md`.
 
@@ -218,4 +218,33 @@ Lo que se decidió al escribir y conviene revisar:
    Los campos en revisión llevan fondo y borde de alerta. Arriba de cada tabla van el estado, "requiere revisión", "TD no probado", "repetido", la ejecución (modelo, prompt, tokens, duración, reintentos), el error si lo hay y las alertas.
 6. **En la lista de documentos:** un chip "revisión" y el filtro "Con campos en revisión".
 7. **Una falla en el comando `extraer` ahora se registra con el segmento** (antes salía sin contexto). Lo encontró la corrida a mano, por un TD-01 que el LLM falso no sabía responder.
+
+### T10 — Medición con los gold (2026-11-10)
+
+`medicion.py` con el comando `medir-gold`. 207 pruebas; las de T10 usan un gold inventado en las dos formas (la de TD-16 y la de TD-29), PDF inventados, una corrida de `lote.py` inventada y el LLM falso.
+
+**Cómo está armado el gold:** se tomó del código de `~/GEB/Extraccion/Documentos/pruebas/TD-NN/generar_plantilla_gold.py` y `TD-29/comparar_con_gold.py`, sin abrir los Excel, que traen datos reales. La hoja `Valores` tiene una fila por documento, campo y propiedad. Las columnas son `Documento`, `Campo`, `Propiedad`, `Prellenado`, `Estado`, `Valor en el documento`, `Comentario` e `id_tecnico`. El registro de una lista va en una columna numérica aparte (TD-29) o al principio de `Propiedad` ("1. rol", TD-16).
+
+**Decisiones del usuario (2026-11-10):**
+
+1. **Valor esperado según `Estado`:**
+   - Corregido: `Valor en el documento`.
+   - Igual al prellenado, o vacío: `Prellenado`.
+   - No aparece: se espera `null`.
+   - Ilegible: la fila no cuenta.
+
+   Una fila sin revisar y sin prellenado tampoco cuenta, como en `comparar_con_gold.py`.
+2. **Acierto por propiedad,** con los registros por posición y la normalización de `comparar_con_gold.py` (tildes, mayúsculas, espacios, números y coincidencia parcial en textos de más de 15 caracteres).
+3. **Se compara con la última corrida de `lote.py`** de la carpeta del TD (la de nombre más reciente con `_TD-NN_`), o con `--lote`.
+
+Lo que se decidió al escribir y conviene revisar:
+
+1. **Un comando del paquete, no `scripts/medir_gold.py`:** se corre con `uv run --project … medir-gold` desde la carpeta del modelo semántico, que tiene el `.env`, igual que `probar-ficha-mcp`.
+2. **Un segmento por documento,** con todas sus páginas. `lote.py` corta en 25 páginas por defecto. Si un documento del gold es más largo, la comparación no es pareja; los de TD-16 y TD-29 son cortos.
+3. **Una repetición,** porque el servicio guarda los resultados y una segunda corrida no vuelve a llamar. `lote.py` pudo correr varias: su exactitud se cuenta sobre todas sus repeticiones.
+4. **Solo se comparan los documentos que están en el gold, en el servicio (con resultado `ok`) y en `lote.py`.** El informe dice cuántos hay en cada uno. Un documento que falta en uno de los dos no castiga a ninguno.
+5. **"Baja"** quiere decir que la proporción de aciertos del campo es menor que la de `lote.py`, aunque sea por un solo acierto. El comando sale con 1 si algún campo baja. El informe también da los tokens por respuesta y el tiempo de los dos.
+6. **Números:** la regla de `comparar_con_gold.py` no leía `1.000.000` (puntos de miles). Ahora se leen `1.234.567,8`, `1,234,567.8` y `1234,8`. Un número con un solo punto y tres cifras (`1.234`) se toma como mil doscientos treinta y cuatro. Las fechas que Excel guarda como fecha se comparan como `AAAA-MM-DD`.
+7. **Copias exactas** dentro de la carpeta de un TD: se extraen una sola vez (la normalización las marca) y en la comparación cuentan con el resultado del original. Los tokens se suman una vez.
+8. **Nada de valores por pantalla:** a diferencia de `comparar_con_gold.py`, que imprime lo que falló, aquí salen solo conteos por `id_tecnico`, sin nombres de documentos.
 

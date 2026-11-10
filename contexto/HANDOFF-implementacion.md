@@ -1,6 +1,6 @@
 # Handoff: implementación del flujo documental (opción A)
 
-Estado al 2026-11-09. Cerradas la entrega 1 de la iniciativa 003 (normalización y lectura) y la entrega 1 de la 005 (orquestador, del aviso a la cola de extracción), las dos en local. **Lo siguiente es la extracción** (entrega 2 de la 003), a cargo de otro agente: su punto de partida es `contexto/HANDOFF-extraccion.md`.
+Estado al 2026-11-10. Cerradas la entrega 1 de la iniciativa 003 (normalización y lectura) y la entrega 1 de la 005 (orquestador, del aviso a la cola de extracción), las dos en local. **La extracción (entrega 2 de la 003) está construida** en `servicios/extraccion/`; le falta la medición con los gold (A9), que corre el usuario. Estado y pendientes al principio de `contexto/HANDOFF-extraccion.md`.
 
 Las rutas relativas son de este repositorio (`~/GEB/flujo-documental-repo`, en GitHub `roymaestre-innovati/flujo-documental`); lo que está en otros repos va con ruta completa. `contexto/flujo-documental-opcion-a.md` sigue siendo la fuente de verdad del diseño. Este archivo no repite el diseño: dice qué existe, qué falta, qué está abierto y cómo trabaja el usuario.
 
@@ -61,7 +61,8 @@ El usuario es dueño de todo el flujo menos tres piezas de otros equipos: la ent
 | **Normalización y lectura** | `servicios/normalizacion/` | Cerrada (entrega 1, T01 a T16). Versión 0.2.0. Comando `normalizar`, imagen Docker, script de la muestra |
 | **Contrato de normalización** | `contracts/modulo3-normalizacion/v0/` | Versión `modulo3-normalizacion/0.2` (0.2 sumó `ppt`, `pptx` y `odp`) |
 | **Orquestador** | `servicios/orquestador/` | Entrega 1 cerrada (T01 a T11). Versión 0.1.0. Manejadores de `procesos-listos`, `normalizar` y `clasificar`, solicitudes de extracción 0.2, tareas, escalamiento, comando `orquestar` y script de la muestra |
-| Visor de corridas | `servicios/orquestador/src/orquestador/visor/` (comando `visor`) | Página local (127.0.0.1) para revisar una corrida guardada con `--salida`: resumen, documentos con su PDF, tareas y errores. Hecho a imagen de `~/GEB/Extraccion/visor` |
+| **Extracción** | `servicios/extraccion/` | Entrega 2 de la 003 construida (T01 a T10). Versión 0.1.0. `extraer_segmento`, comandos `extraer`, `probar-ficha-mcp` y `medir-gold` |
+| Visor de corridas | `servicios/orquestador/src/orquestador/visor/` (comando `visor`) | Página local (127.0.0.1) para revisar una corrida guardada con `--salida`: resumen, documentos con su PDF, tareas, errores y los resultados de la extracción. Hecho a imagen de `~/GEB/Extraccion/visor` |
 | **Contrato del orquestador** | `contracts/modulo5-orquestador/v0/` | Versión 0.1: aviso de proceso listo (módulo 1) y solicitud y respuesta del clasificador. Propuesta para A-1 y C1 a C3 |
 | Contrato de extracción | `contracts/modulo3-extraccion/v0.2/` | Versión 0.2, con los ocho cambios del paso 5 del diseño más `id_segmento`. La 0.1 queda en `v0/`, sin cambios |
 | Resultados de la muestra real | `specs/003-validacion-extraccion/resultados-muestra.md` | Dos mediciones (2026-11-05). Solo conteos |

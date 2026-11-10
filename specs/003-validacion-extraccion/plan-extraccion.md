@@ -1,6 +1,6 @@
 # Plan 003 — Extracción (segunda entrega)
 
-Estado al 2026-11-09: **en revisión**. Implementa la sección "Entrega 2 — Extracción" de `spec.md`. El plan de la primera entrega es `plan.md`.
+Estado al 2026-11-10: **implementado** (T01 a T10). Lo que cambió al implementar está al final. Implementa la sección "Entrega 2 — Extracción" de `spec.md`. El plan de la primera entrega es `plan.md`.
 
 ## Resumen
 
@@ -276,3 +276,19 @@ Todo con documentos inventados y el `LLMFalso`. Para tener lecturas reales, las 
 - **Sin imagen en las páginas `texto` sin anclas** se pueden perder sellos o marcas que las anclas no encuentran (decisión 8). A9 lo muestra en TD-16 (firma) y TD-29.
 - **`TD_NO_PROBADO` en todo** hace que hoy todo vaya a revisión. Es lo esperado hasta que la matriz traiga la marca; el visor y los conteos lo muestran aparte para que no tape los otros motivos.
 - **429 con concurrencia 3:** el tope de espera total puede vencerse en un proceso grande. Queda como parámetro.
+
+## Lo que cambió al implementar
+
+El detalle de cada punto está en las notas de `tasks-extraccion.md`.
+
+- **Solicitud sin `version_modelo`** (T05): es `SolicitudInvalida`, no `error_proceso`. La salida exige la versión, así que no hay cómo contestar con un error válido.
+- **Errores que se sumaron a la tabla de entrada:** `LECTURA_INVALIDA` (T02); `LLM_NO_DISPONIBLE` y `RESPUESTA_INVALIDA`, reintentables (T06); `MODELO_NO_DISPONIBLE`, reintentable, cuando el MCP no responde (T08).
+- **Zona de la firma** (T03): margen fijo de media pulgada a cada lado, no "todo el ancho de la columna", porque la lectura no dice dónde están las columnas.
+- **`id_regla`** (T05): se numeran solo las reglas pendientes (`<id_tecnico>.r<n>`). La `observacion` suma la explicación de cada validador que falla.
+- **Tiempo límite por llamada al LLM** (T06): 300 s, nuevo en `parametros.json`, que pasó a la versión 2.
+- **pdfium no admite hilos** (T07): el preprocesamiento dibuja las páginas bajo un candado global. Las esperas al LLM siguen en paralelo.
+- **`describir_modelo` del MCP no recibe versión** (T08): el servicio comprueba que la guía sea de la versión fijada y, si no, da `FICHA_NO_ENCONTRADA`. Está pedido en el modelo semántico: `~/GEB/modelo-semantico/docs/tarea-version-en-describir-modelo.md`.
+- **Fichas guardadas para el visor** en `<corrida>/extraccion/fichas/v<N>/<TD>.json` (T08), con la ficha de archivo o la del MCP.
+- **Comandos de más:** `probar-ficha-mcp` (T08) y `medir-gold` (T10), este último en el paquete y no en `scripts/`.
+- **El visor** (T09) lee los archivos del contrato; no importa `extraccion`. El comando `extraer` registra las fallas internas con su segmento.
+
