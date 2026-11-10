@@ -16,6 +16,7 @@ los segmentos del proceso.
 """
 
 import threading
+from collections.abc import Callable
 from dataclasses import dataclass
 
 from .entrada import ERROR_PROCESO, ErrorDeSolicitud
@@ -74,7 +75,8 @@ class Llamador:
     def modelo(self) -> str:
         return self._cliente.modelo
 
-    def llamar(self, mensajes: list[dict]) -> Llamada:
+    def llamar(self, mensajes: list[dict], interpretar: Callable[[str], dict] = interpretar) -> Llamada:
+        """`interpretar` lee la respuesta o lanza `RespuestaInvalida`; por defecto, la de la extracción."""
         a = self._ajustes
         pasajeras = invalidas = 0
         espera_por_limite = 0.0
