@@ -1,6 +1,18 @@
 # Handoff: servicio de extracción (iniciativa 003, entrega 2)
 
-Estado al 2026-11-09. Para el agente que construye la extracción (paso 5 del diseño). **No hay nada empezado:** ni spec, ni plan, ni código. El primer paso es escribir la entrega 2 en `specs/003-validacion-extraccion/` y revisarla con el usuario.
+## Estado al 2026-11-10
+
+**La entrega 2 está construida:** T01 a T10 de `specs/003-validacion-extraccion/tasks-extraccion.md`, en `servicios/extraccion/` (servicio 0.1.0, 207 pruebas sobre documentos inventados). Corre de punta a punta en local: `orquestar`, después `extraer` (LLM falso o gpt-5.4; ficha de archivo o del MCP) y después `visor`. Lo que cambió respecto del plan está al final de `plan-extraccion.md`.
+
+Lo que queda abierto:
+
+1. **A9:** el usuario corre `medir-gold` con TD-16 y TD-29 (comando en el README del servicio) después de autorizar que esos documentos vayan a gpt-5.4, y pega los conteos. Si un campo baja frente a `lote.py`, no se usa la versión de una vuelta con documentos reales hasta corregirlo.
+2. **`describir_modelo` con versión**, en el modelo semántico: tarea escrita en `~/GEB/modelo-semantico/docs/tarea-version-en-describir-modelo.md`. Sin ella, con `--modelo mcp` la extracción se detiene cuando se publique la v22.
+3. **Cumplimiento (S2, HD-10 y HD-5):** sigue sin respuesta. Ver abajo.
+4. **Trabajo del modelo semántico** (`id_regla`, ámbito, validadores y `td_probado` en la matriz): sigue pendiente. Mientras tanto todo va a revisión por `TD_NO_PROBADO`.
+5. **Lo que sigue en el diseño:** la entrega 2 del orquestador (recibir los resultados en la cola `resultados`, tareas de revisión de campos), Azure (Service Bus, Container App, Blob para O2), las trazas de 30 días (D23) y el gate de regresión con los gold (D24, que puede partir de `medir-gold`).
+
+El resto de este archivo es el punto de partida que se escribió antes de empezar (2026-11-09). Sirve de contexto. La sección "Lo que está abierto" de más abajo se resolvió en la spec, salvo lo que lista esta sección.
 
 Este archivo dice qué existe, qué entra, qué tiene que salir y qué está abierto. El estado general del proyecto y el detalle de la normalización y del orquestador están en `contexto/HANDOFF-implementacion.md`.
 

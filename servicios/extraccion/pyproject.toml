@@ -19,6 +19,7 @@ dependencies = [
 [project.scripts]
 extraer = "extraccion.cli:main"
 probar-ficha-mcp = "extraccion.ficha_mcp:main"
+medir-gold = "extraccion.medicion:main"
 
 [tool.uv.sources]
 normalizacion = { path = "../normalizacion", editable = true }
