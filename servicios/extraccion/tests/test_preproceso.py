@@ -119,3 +119,17 @@ def test_anexo_que_no_se_puede_leer(mixto):
     contenido = preparar_contenido(_entrada_con_anexos(mixto, b"\xd0\xcf\x11\xe0 xls viejo"))
     assert contenido.anexos[0].texto is None
     assert [a["codigo"] for a in contenido.alertas] == ["ANEXO_NO_LEIDO"]
+
+
+def test_varios_hilos_a_la_vez(mixto):
+    # pdfium no admite dos hilos a la vez: sin el candado, esto rompe el proceso.
+    from concurrent.futures import ThreadPoolExecutor
+
+    corrida, documento = mixto
+    entrada = preparar(corrida.solicitud(documento, 1, 6), corrida.almacen)
+    with ThreadPoolExecutor(max_workers=8) as grupo:
+        contenidos = list(grupo.map(lambda _: preparar_contenido(entrada), range(16)))
+    primero = contenidos[0]
+    assert all(c.lectura() == primero.lectura() for c in contenidos)
+    assert all([p.imagen and p.imagen.jpeg for p in c.paginas] == [p.imagen and p.imagen.jpeg for p in primero.paginas]
+               for c in contenidos)

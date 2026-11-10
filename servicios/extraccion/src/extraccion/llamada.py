@@ -70,6 +70,10 @@ class Llamador:
         self._ajustes = ajustes or parametros()["llamada"]
         self._semaforo = threading.BoundedSemaphore(self._ajustes["concurrencia"])
 
+    @property
+    def modelo(self) -> str:
+        return self._cliente.modelo
+
     def llamar(self, mensajes: list[dict]) -> Llamada:
         a = self._ajustes
         pasajeras = invalidas = 0

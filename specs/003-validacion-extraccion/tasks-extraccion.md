@@ -2,7 +2,7 @@
 
 Sale de `plan-extraccion.md`. Cada tarea termina con sus pruebas en verde y un commit propio.
 
-**Estado al 2026-11-09:** spec, plan y tareas aprobados. T01 a T05 fusionadas. T06 hecha, en revisión.
+**Estado al 2026-11-09:** spec, plan y tareas aprobados. T01 a T06 fusionadas. T07 hecha, en revisión.
 
 ## Para quien implemente
 
@@ -23,7 +23,7 @@ Sale de `plan-extraccion.md`. Cada tarea termina con sus pruebas en verde y un c
 - [x] **T04 — Mensaje y prompt.** `datos/prompt.md` (los cambios del plan sobre el `prompt.md` del modelo semántico) y `mensaje.py` (sistema: prompt + guía; usuario: ficha + contenido). Pruebas: el mensaje solo lleva las páginas del segmento, numeradas sobre el documento completo, y la ficha de la versión pedida. **Alto para que el usuario revise el prompt.** Requisito R35.
 - [x] **T05 — Posvalidación.** `posvalidacion.py` y `validadores.py`: forma, `no_corresponde`, alineación con la ficha, citas fuera del segmento, validadores, motivos, `datos_personales` y sobre validado contra el contrato. Con el `LLMFalso`, las solicitudes de ejemplo dan las salidas de ejemplo (criterio A7). Requisitos R37 a R48, R55 y R56.
 - [x] **T06 — Llamada.** `llm_azure.py` (chat completions con `json_object`, traducción de 429, tiempo agotado y 5xx a las excepciones de `llm.py`, y rechazo de un deployment `mini`) y `llamada.py` (reintentos de la tabla del plan y semáforo global). Las pruebas no tocan la red: un cliente HTTP falso para `llm_azure` y el `LLMFalso` con fallas programadas para `llamada`. Requisitos R49 a R52 y R54.
-- [ ] **T07 — Servicio, idempotencia y comando.** `servicio.py` (`extraer_segmento`), la clave y el guardado de `resultados.py`, el comando `extraer` con su confirmación antes de mandar documentos, los registros sin datos personales y el README. Prueba de punta a punta (criterio A8): un proceso inventado normalizado, solicitudes armadas con `orquestador.extraer.solicitud` (solo en pruebas), dos corridas. Requisito R53.
+- [x] **T07 — Servicio, idempotencia y comando.** `servicio.py` (`extraer_segmento`), la clave y el guardado de `resultados.py`, el comando `extraer` con su confirmación antes de mandar documentos, los registros sin datos personales y el README. Prueba de punta a punta (criterio A8): un proceso inventado normalizado, solicitudes armadas con `orquestador.extraer.solicitud` (solo en pruebas), dos corridas. Requisito R53.
 - [ ] **T08 — Ficha desde el MCP.** `ficha_mcp.py`: `describir_modelo` y `obtener_seccion` con la versión fijada, guardadas en memoria por (versión, TD), y `--modelo mcp` en el comando. El comando guarda las fichas usadas en `extraccion/fichas/` para el visor. Prueba con un servidor MCP falso. El usuario la prueba contra el MCP real con un comando que solo pide la ficha de TD-16 v21 y cuenta sus elementos (no manda documentos). Requisito R30.
 - [ ] **T09 — Visor.** El visor del orquestador muestra los resultados de `extraccion/`: estado por segmento, campos con valor, confianza contra umbral, motivos, reglas pendientes y citas que abren el PDF en su página. Los campos en revisión van resaltados. Pruebas del servidor del visor con una corrida inventada. Requisito R57.
 - [ ] **T10 — Medición con los gold (A9), solo con autorización.** Script `scripts/medir_gold.py`: corre el servicio sobre los documentos de un TD con gold y compara campo a campo con `gold_TD-NN.xlsx`. Imprime solo conteos de aciertos por campo, tokens y tiempo, al lado de los de la última corrida de `lote.py`. Antes de escribirlo se le pregunta al usuario cómo está armado el gold (columnas) y cómo se cuenta un acierto en los campos de tipo objeto o lista. **Lo corre el usuario**, con TD-16 y TD-29, después de autorizar que esos documentos vayan a gpt-5.4.
@@ -145,4 +145,30 @@ Lo que se decidió al escribir y conviene revisar:
 7. **Respuesta inválida:** se manda otra vez el mensaje original más un mensaje del usuario con los errores de forma (hasta 10). No se reenvía la respuesta mala del LLM, y los errores no se acumulan: solo va el último. Los errores de forma no llevan valores del documento (los arma `contratos.errores`).
 8. **Una respuesta sin texto** (cortada por largo o por el filtro) se toma como texto vacío: la posvalidación la marca inválida y se pide otra vez.
 9. **Tokens y reintentos:** los tokens se suman sobre todos los intentos con respuesta (es lo que se paga). `reintentos` cuenta fallas pasajeras y respuestas inválidas, no los 429. `LlamadaFallida` es un `ErrorDeSolicitud` `error_proceso` reintentable que además lleva reintentos, tokens y modelo, para la `ejecucion` del resultado (T07).
+
+### T07 — Servicio, idempotencia y comando (2026-11-10)
+
+`servicio.py` (`Servicio`, `extraer_segmento`), `registros.py` y `cli.py` (comando `extraer`), más el README del servicio. Dependencias nuevas: `python-dotenv` (BSD-3), para leer el `.env`, y el orquestador como dependencia de ruta solo de las pruebas. 161 pruebas.
+
+**Criterio A8:** `test_cli.py` normaliza un proceso inventado (un documento del proceso y uno de un oferente), arma las solicitudes con `orquestador.extraer.solicitud`, corre `extraer` y valida cada resultado contra el contrato. La segunda corrida da los mismos resultados, todos repetidos y sin llamar al LLM.
+
+**Falla encontrada:** pdfium no admite dos hilos a la vez en el mismo proceso. Con el grupo de hilos del comando, el proceso se caía. El preprocesamiento ahora dibuja las páginas bajo un candado global (`preproceso.PDFIUM`) y cierra cada bitmap al terminar. El dibujo de las páginas va de a un segmento, pero las esperas al LLM siguen en paralelo. Hay una prueba que, sin el candado, tumba el proceso.
+
+Lo que se decidió al escribir y conviene revisar:
+
+1. **Orden de los pasos:** primero se busca el resultado guardado. Después vienen la entrada, la ficha, el preprocesamiento, el mensaje, la llamada y la posvalidación. Una solicitud repetida no lee el almacén ni pide la ficha.
+2. **Repetido:** se devuelve lo guardado con `desde_cache: true` y la `ejecucion` original (mismo `id`, tokens y duración). El archivo guardado no cambia.
+3. **Dos solicitudes iguales a la vez en el mismo proceso** pueden extraer las dos: no hay candado por clave. La segunda reemplaza a la primera y la deja como `.anterior-<id>`. Es raro (el orquestador manda un segmento una vez, salvo que se caiga un trabajador) y cuesta solo una llamada de más.
+4. **`modelo_llm` sin llamada** (un error de entrada, una ficha que no existe): el modelo configurado, como en el ejemplo `salida_error.json`.
+5. **`duracion_ms`** va del inicio a la respuesta del LLM. Deja fuera la posvalidación, que dura milisegundos, porque el sobre se valida con la `ejecucion` ya puesta.
+6. **`FICHA_NO_ENCONTRADA`** sale de la extracción, no de `entrada.py`. Una falla del MCP (caído, tiempo agotado) llega con T08 y será `error_proceso` reintentable.
+7. **Comando:**
+   - `--modelo` es obligatorio. `mcp` responde que llega en T08.
+   - `--llm falso` (por defecto) necesita `--respuestas`, una carpeta con `TD-NN.json`.
+   - La confirmación acepta `s`, `si` o `sí`. Cualquier otra respuesta, o ninguna, no manda nada y sale con 2.
+   - Corre con el doble de hilos que la concurrencia del LLM.
+   - `--forzar` pone `forzar_reproceso` en todas las solicitudes.
+8. **Una línea que no es JSON, una solicitud que no cumple el contrato o un bug en un segmento** no frenan los demás. Se cuentan, se registran (sin el mensaje de la excepción) y el comando sale con 1. También sale con 1 si algún segmento dio `error_proceso`.
+9. **Registros:** una línea por segmento, "Segmento extraído" o "Segmento repetido", con `id_segmento`, TD, versión, estado, campos, campos en revisión, motivos contados, tokens, duración, reintentos, `desde_cache` y el código de error si lo hay. El formato es el de la normalización más esos campos (`FormatoExtraccion`). Como en el orquestador, `id_documento` del contexto lleva el `id_segmento`.
+10. **Guardar las fichas usadas en `extraccion/fichas/`** para el visor queda para T08, junto con el MCP.
 

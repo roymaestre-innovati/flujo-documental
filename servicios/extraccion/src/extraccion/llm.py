@@ -39,6 +39,9 @@ class Respuesta:
 
 
 class ClienteLLM(ABC):
+    modelo: str
+    """El modelo configurado (el deployment). Va en `ejecucion.modelo_llm` cuando no hubo respuesta."""
+
     @abstractmethod
     def responder(self, mensajes: list[dict]) -> Respuesta:
         """Una vuelta: los mensajes (formato chat completions) y la respuesta."""
@@ -84,7 +87,7 @@ class LLMFalso(ClienteLLM):
         self._por_tipo = dict(por_tipo or {})
         self._responder_con = responder_con
         self._fila: deque[Salida] = deque()
-        self._modelo = modelo
+        self.modelo = modelo
         self._demora = demora
         self._candado = threading.Lock()
         self._en_curso = 0
@@ -111,7 +114,7 @@ class LLMFalso(ClienteLLM):
             if isinstance(salida, Respuesta):
                 return salida
             return Respuesta(texto=salida, tokens_entrada=len(_textos(mensajes)) // 4,
-                             tokens_salida=len(salida) // 4, modelo=self._modelo)
+                             tokens_salida=len(salida) // 4, modelo=self.modelo)
         finally:
             with self._candado:
                 self._en_curso -= 1

@@ -16,6 +16,7 @@ posterior). Los números (dpi, márgenes, topes) son parámetros con versión.
 """
 
 import io
+import threading
 from dataclasses import dataclass, field
 
 import pypdfium2
@@ -29,6 +30,9 @@ ESCANEO_CON_OCR = "escaneo_con_ocr"
 IMAGEN = "imagen"
 VACIA = "vacia"
 LINEA_FIRMA = "linea_firma"
+
+PDFIUM = threading.Lock()
+"""pdfium no admite dos hilos a la vez en el mismo proceso: todo lo que lo toca pasa por aquí."""
 
 DETALLE_ALTO = "high"
 DETALLE_ORIGINAL = "original"
@@ -85,10 +89,19 @@ def _jpeg(imagen: Image.Image, detalle: str) -> Imagen:
     return Imagen(jpeg=salida.getvalue(), detalle=detalle, ancho=imagen.width, alto=imagen.height)
 
 
+def _dibujado(pagina: pypdfium2.PdfPage, **opciones) -> Image.Image:
+    """La página dibujada, copiada fuera de pdfium. El bitmap se cierra aquí, no al recolectar basura."""
+    bitmap = pagina.render(**opciones)
+    try:
+        return bitmap.to_pil().copy()
+    finally:
+        bitmap.close()
+
+
 def _dibujar_pagina(pagina: pypdfium2.PdfPage, detalle: str) -> Imagen:
     escala = parametros()["pagina"]["dpi"] / 72
     # pdfium aplica la rotación de la página: la imagen sale como se ve.
-    return _jpeg(pagina.render(scale=escala).to_pil(), detalle)
+    return _jpeg(_dibujado(pagina, scale=escala), detalle)
 
 
 def zona_de_firma(caja: list[float], ancho: float, alto: float) -> tuple[float, float, float, float]:
@@ -117,7 +130,7 @@ def _dibujar_firma(pagina: pypdfium2.PdfPage, caja: list[float]) -> Imagen:
         ancho, alto = pagina.get_size()
         x0, y0, x1, y1 = zona_de_firma(caja, ancho, alto)
         recorte = (x0, alto - y1, ancho - x1, y0)  # lo que se corta: izquierda, abajo, derecha, arriba
-        imagen = pagina.render(scale=parametros()["firma"]["dpi"] / 72, crop=recorte).to_pil()
+        imagen = _dibujado(pagina, scale=parametros()["firma"]["dpi"] / 72, crop=recorte)
     finally:
         pagina.set_rotation(rotacion)
     if rotacion:
@@ -192,11 +205,12 @@ def _anexo(numero: int, datos: bytes) -> tuple[Anexo, list[dict]]:
 
 def preparar_contenido(entrada: Entrada) -> Contenido:
     """Las páginas del segmento y los anexos, listos para armar el mensaje."""
-    pdf = pypdfium2.PdfDocument(entrada.pdf)
-    try:
-        paginas = tuple(_pagina(p, pdf) for p in entrada.paginas())
-    finally:
-        pdf.close()
+    with PDFIUM:
+        pdf = pypdfium2.PdfDocument(entrada.pdf)
+        try:
+            paginas = tuple(_pagina(p, pdf) for p in entrada.paginas())
+        finally:
+            pdf.close()
     anexos, alertas = [], []
     for numero, datos in enumerate(entrada.anexos, start=1):
         anexo, avisos = _anexo(numero, datos)
