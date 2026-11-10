@@ -1,5 +1,5 @@
 {
- "modelo": "extraccion_documental",
+ "modelo": "tipos_documentales",
  "nombre": "Extracción por tipo documental",
  "tipo_tarea": "extraccion",
  "version": 21,

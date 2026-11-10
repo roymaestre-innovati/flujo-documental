@@ -184,7 +184,7 @@ Lo que se decidió al escribir y conviene revisar:
 
 Lo que se decidió al escribir y conviene revisar:
 
-1. **Proyecto y modelo:** `X-Proyecto: extraccion_documental` y modelo `extraccion_documental`, como `lote.py`. Fijos en el código. Se pueden volver variables si hace falta.
+1. **Proyecto y modelo:** `X-Proyecto: extraccion_documental` y modelo `tipos_documentales` (el `modelo` de `tipos_documentales.json`). Fijos en el código. Se pueden volver variables si hace falta. *Corregido el 2026-11-10:* al principio se usó `extraccion_documental` también como id del modelo, y el MCP real respondió "No existe el modelo". Las pruebas no lo vieron porque el doble y el servidor falso usaban el mismo nombre equivocado.
 2. **Una conexión por ficha nueva**, no una sesión abierta todo el proceso. Son pocas (una por versión y TD) y así no hay sesión que se caiga a la mitad. La descripción se guarda por versión y la ficha por (versión, TD). Un candado evita que dos hilos pidan lo mismo.
 3. **Errores:**
    - Lo que el servidor dice que no existe (modelo, versión, sección), según su texto ("no existe", "no tiene la versión"): `FichaNoEncontrada`, que da `FICHA_NO_ENCONTRADA`. Depende del texto de `servidor.py`. Si cambia, cae en el caso siguiente.

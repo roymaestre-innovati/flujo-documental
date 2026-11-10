@@ -17,6 +17,7 @@ from extraccion.servicio import Servicio, extraer_segmento
 from fabrica import Corrida, pdf
 
 MODELO = cargar(FICHA_V21)
+MODELO_V21 = MODELO
 
 
 def servidor_falso(vigente: int = 21, describir_con_version: bool = False, error: str | None = None):
@@ -29,8 +30,8 @@ def servidor_falso(vigente: int = 21, describir_con_version: bool = False, error
     def revisar(modelo: str, version: int | None) -> None:
         if error:
             raise ToolError(error)
-        if modelo != "extraccion_documental":
-            raise ToolError(f"No existe el modelo {modelo!r}. Modelos disponibles: extraccion_documental.")
+        if modelo != "tipos_documentales":
+            raise ToolError(f"No existe el modelo {modelo!r}. Modelos disponibles: tipos_documentales.")
         if version is not None and version != MODELO["version"]:
             raise ToolError(f"El modelo {modelo!r} no tiene la versión {version}. Versiones publicadas: 21.")
 
@@ -69,8 +70,8 @@ def test_da_la_misma_ficha_que_el_archivo():
     assert del_mcp == FuenteModeloArchivo(FICHA_V21).ficha(21, "TD-16")
     assert del_mcp.td_probado is True
     assert llamadas == [
-        ("describir_modelo", {"modelo": "extraccion_documental"}),
-        ("obtener_seccion", {"modelo": "extraccion_documental", "seccion": "TD-16", "version": 21}),
+        ("describir_modelo", {"modelo": "tipos_documentales"}),
+        ("obtener_seccion", {"modelo": "tipos_documentales", "seccion": "TD-16", "version": 21}),
     ]
 
 
@@ -108,7 +109,7 @@ def test_si_describir_acepta_version_se_le_pasa():
     servidor, llamadas = servidor_falso(vigente=22, describir_con_version=True)
     ficha = fuente(servidor).ficha(21, "TD-16")
     assert ficha.version == 21
-    assert llamadas[0] == ("describir_modelo", {"modelo": "extraccion_documental", "version": 21})
+    assert llamadas[0] == ("describir_modelo", {"modelo": "tipos_documentales", "version": 21})
 
 
 def test_al_mcp_solo_van_modelo_seccion_y_version():
@@ -176,3 +177,10 @@ def test_comando_de_prueba_con_error(capsys):
     servidor, _ = servidor_falso(vigente=22)
     assert main([], fuente=fuente(servidor)) == 1
     assert "FichaNoEncontrada" in capsys.readouterr().err
+
+
+def test_el_cliente_pide_el_modelo_de_la_ficha():
+    # El modelo del MCP es `tipos_documentales`, dentro del proyecto `extraccion_documental`.
+    from extraccion.ficha_mcp import MODELO, PROYECTO
+    assert MODELO == MODELO_V21["modelo"] == "tipos_documentales"
+    assert PROYECTO == "extraccion_documental"

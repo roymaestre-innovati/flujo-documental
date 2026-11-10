@@ -36,7 +36,8 @@ from mcp.client.streamable_http import streamable_http_client
 
 from .ficha import Ficha, FichaNoEncontrada, FuenteModelo, ficha_desde
 
-MODELO = "extraccion_documental"
+MODELO = "tipos_documentales"
+"""El id del modelo de extracción dentro del proyecto (`modelo` en `tipos_documentales.json`)."""
 PROYECTO = "extraccion_documental"
 """El header `X-Proyecto`: la colección del modelo en el servidor."""
 TIEMPO_LIMITE_S = 60

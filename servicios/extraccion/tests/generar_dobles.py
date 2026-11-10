@@ -59,7 +59,7 @@ def ficha(repo_modelo: Path) -> dict:
         if s["id"] in SECCIONES:
             secciones.append({**s, **({"td_probado": True} if s["id"] in PROBADOS else {})})
     return {
-        "modelo": "extraccion_documental",
+        "modelo": "tipos_documentales",
         "nombre": modelo["nombre"],
         "tipo_tarea": modelo["tipo_tarea"],
         "version": 21,
