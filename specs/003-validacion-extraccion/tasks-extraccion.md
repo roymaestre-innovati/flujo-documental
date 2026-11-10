@@ -2,7 +2,7 @@
 
 Sale de `plan-extraccion.md`. Cada tarea termina con sus pruebas en verde y un commit propio.
 
-**Estado al 2026-11-09:** spec, plan y tareas aprobados. T01 a T04 fusionadas. T05 hecha, en revisión.
+**Estado al 2026-11-09:** spec, plan y tareas aprobados. T01 a T05 fusionadas. T06 hecha, en revisión.
 
 ## Para quien implemente
 
@@ -22,7 +22,7 @@ Sale de `plan-extraccion.md`. Cada tarea termina con sus pruebas en verde y un c
 - [x] **T03 — Preprocesamiento.** `preproceso.py`: qué va de cada página según su tipo, imagen con pypdfium2, firma ampliada a 300 dpi desde las anclas, valores del anexo con openpyxl y tope con `ANEXO_RECORTADO`, y `lectura` de la salida. Pruebas con PDF y xlsx inventados pasados por `normalizar_entrega`. Requisitos R31 a R34 y R36.
 - [x] **T04 — Mensaje y prompt.** `datos/prompt.md` (los cambios del plan sobre el `prompt.md` del modelo semántico) y `mensaje.py` (sistema: prompt + guía; usuario: ficha + contenido). Pruebas: el mensaje solo lleva las páginas del segmento, numeradas sobre el documento completo, y la ficha de la versión pedida. **Alto para que el usuario revise el prompt.** Requisito R35.
 - [x] **T05 — Posvalidación.** `posvalidacion.py` y `validadores.py`: forma, `no_corresponde`, alineación con la ficha, citas fuera del segmento, validadores, motivos, `datos_personales` y sobre validado contra el contrato. Con el `LLMFalso`, las solicitudes de ejemplo dan las salidas de ejemplo (criterio A7). Requisitos R37 a R48, R55 y R56.
-- [ ] **T06 — Llamada.** `llm_azure.py` (chat completions con `json_object`, traducción de 429, tiempo agotado y 5xx a las excepciones de `llm.py`, y rechazo de un deployment `mini`) y `llamada.py` (reintentos de la tabla del plan y semáforo global). Las pruebas no tocan la red: un cliente HTTP falso para `llm_azure` y el `LLMFalso` con fallas programadas para `llamada`. Requisitos R49 a R52 y R54.
+- [x] **T06 — Llamada.** `llm_azure.py` (chat completions con `json_object`, traducción de 429, tiempo agotado y 5xx a las excepciones de `llm.py`, y rechazo de un deployment `mini`) y `llamada.py` (reintentos de la tabla del plan y semáforo global). Las pruebas no tocan la red: un cliente HTTP falso para `llm_azure` y el `LLMFalso` con fallas programadas para `llamada`. Requisitos R49 a R52 y R54.
 - [ ] **T07 — Servicio, idempotencia y comando.** `servicio.py` (`extraer_segmento`), la clave y el guardado de `resultados.py`, el comando `extraer` con su confirmación antes de mandar documentos, los registros sin datos personales y el README. Prueba de punta a punta (criterio A8): un proceso inventado normalizado, solicitudes armadas con `orquestador.extraer.solicitud` (solo en pruebas), dos corridas. Requisito R53.
 - [ ] **T08 — Ficha desde el MCP.** `ficha_mcp.py`: `describir_modelo` y `obtener_seccion` con la versión fijada, guardadas en memoria por (versión, TD), y `--modelo mcp` en el comando. El comando guarda las fichas usadas en `extraccion/fichas/` para el visor. Prueba con un servidor MCP falso. El usuario la prueba contra el MCP real con un comando que solo pide la ficha de TD-16 v21 y cuenta sus elementos (no manda documentos). Requisito R30.
 - [ ] **T09 — Visor.** El visor del orquestador muestra los resultados de `extraccion/`: estado por segmento, campos con valor, confianza contra umbral, motivos, reglas pendientes y citas que abren el PDF en su página. Los campos en revisión van resaltados. Pruebas del servidor del visor con una corrida inventada. Requisito R57.
@@ -129,3 +129,20 @@ Lo que se decidió al escribir y conviene revisar:
 8. **`datos_personales`:** `true` salvo que la ficha diga "No". "Posible: correo" (td07.domicilio_contacto, td13.ubicacion_contacto, td34.autoevaluacion) cuenta como sí.
 9. **Alineación:** un campo que el LLM no devolvió queda vacío con la alerta `CAMPO_SIN_RESPUESTA`; uno que no está en la ficha se descarta con `CAMPO_DESCONOCIDO`; uno repetido se toma la primera vez con `CAMPO_REPETIDO`. Las alertas van en este orden: preprocesamiento, LLM y alineación.
 10. **`no_corresponde`:** sin resultados, sin revisión, y con la alerta `NO_CORRESPONDE`, que lleva el motivo que dio el LLM.
+
+### T06 — Llamada (2026-11-10)
+
+`llm_azure.py` (`LLMAzureOpenAI`, con `desde_entorno`) y `llamada.py` (`Llamador`, `Llamada`, `LlamadaFallida`). Dependencia nueva: `openai` 3.49 (Apache-2.0), que trae `httpx2`. 133 pruebas; ninguna toca la red: `llm_azure` se prueba con un `httpx2.MockTransport` y `llamada` con el `LLMFalso` y el `RelojManual`.
+
+Lo que se decidió al escribir y conviene revisar:
+
+1. **Endpoint:** la API `…/openai/v1/` de Azure, como `chat.py` del modelo semántico. Se acepta el endpoint del recurso o la URL completa que muestra Foundry. Variables: `AZURE_OPENAI_ENDPOINT`, `AZURE_OPENAI_API_KEY` y `AZURE_OPENAI_DEPLOYMENT`; si falta alguna, el error dice cuál, nunca su valor.
+2. **Sin reintentos del cliente de `openai`** (`max_retries=0`): todos los hace `llamada.py`, para que la tabla del plan sea la única regla.
+3. **Qué es falla pasajera:** tiempo agotado, error de conexión, 408 y 5xx. Un 400, 401, 403 o 404 se deja pasar como bug (mala configuración o mensaje mal armado). Un 400 por el filtro de contenido también cae aquí; si pasa con documentos reales, habrá que decidir si es `error_proceso` no reintentable.
+4. **Tiempo límite por llamada:** 300 s, nuevo en `parametros.json` (`tiempo_limite_s`, versión 2 de los parámetros). Un segmento largo con imágenes puede tardar; es una propuesta.
+5. **Espera del 429:** `retry-after-ms` o `retry-after` en segundos; si viene una fecha o nada, 30 s. El tope total de 900 s se revisa antes de dormir: si la próxima espera lo pasa, se corta con `LLM_NO_DISPONIBLE`.
+6. **El semáforo rodea solo la llamada al cliente**, no las esperas: un segmento que espera por un 429 o una falla no ocupa uno de los 3 lugares. Un `Llamador` se comparte entre todos los segmentos del comando (T07).
+7. **Respuesta inválida:** se manda otra vez el mensaje original más un mensaje del usuario con los errores de forma (hasta 10). No se reenvía la respuesta mala del LLM, y los errores no se acumulan: solo va el último. Los errores de forma no llevan valores del documento (los arma `contratos.errores`).
+8. **Una respuesta sin texto** (cortada por largo o por el filtro) se toma como texto vacío: la posvalidación la marca inválida y se pide otra vez.
+9. **Tokens y reintentos:** los tokens se suman sobre todos los intentos con respuesta (es lo que se paga). `reintentos` cuenta fallas pasajeras y respuestas inválidas, no los 429. `LlamadaFallida` es un `ErrorDeSolicitud` `error_proceso` reintentable que además lleva reintentos, tokens y modelo, para la `ejecucion` del resultado (T07).
+
