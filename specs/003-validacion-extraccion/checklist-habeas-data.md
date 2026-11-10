@@ -1,6 +1,6 @@
 # Checklist de habeas data — Módulo 3 (validación y extracción documental)
 
-Estado al 2026-11-04. Borrador del equipo técnico para revisión de cumplimiento.
+Estado al 2026-11-10. Borrador del equipo técnico para revisión de cumplimiento. **Primera respuesta del equipo (2026-11-10):** ver "Respuestas" al final.
 
 Lo pide el principio 6 de la constitución: antes de procesar documentos reales de oferentes, se revisa el cumplimiento de la Ley 1581 de 2012 (protección de datos personales, o habeas data) y sus decretos reglamentarios.
 
@@ -180,3 +180,15 @@ Lo que falta definir con la plataforma: cifrado del almacenamiento, red privada 
 | HD-14 | ¿Se autoriza procesar la muestra real en la máquina del equipo? | Medición con la muestra real |
 
 **Lo mínimo para medir la muestra real** (criterios A3 a A5): HD-1 a HD-4 y HD-14.
+
+## Respuestas
+
+**2026-11-10, del equipo, transmitida por el usuario:** la autorización de habeas data se obtiene cuando los oferentes cargan sus documentos. Con ella, se pueden hacer pruebas con documentos reales.
+
+- **Lo que habilita:** las pruebas con documentos reales, incluida la extracción con gpt-5.4 y el MCP en eastus. Entre ellas, la medición con los gold (A9) y la prueba del flujo completo con la muestra. Responde HD-3 (la autorización está en la carga) y HD-14.
+- **Lo que no dice y queda por confirmar antes de producción:**
+  - si la autorización cubre a los terceros que aparecen en los documentos (HD-4);
+  - el tratamiento fuera de Colombia y sus condiciones (HD-10);
+  - Microsoft como encargado (HD-5);
+  - lo demás de uso en la nube (HD-6, HD-7, HD-9 y HD-11) y la traza de 30 días (HD-8).
+- **Lo que no cambia en las pruebas:** las corre el usuario en su máquina. Nada de documentos, resultados ni registros con datos personales va al repositorio, y por pantalla salen solo conteos.
