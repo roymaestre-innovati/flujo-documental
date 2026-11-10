@@ -2,7 +2,7 @@
 
 Sale de `plan-extraccion.md`. Cada tarea termina con sus pruebas en verde y un commit propio.
 
-**Estado al 2026-11-09:** spec, plan y tareas aprobados. T01 a T07 fusionadas. T08 hecha, en revisión.
+**Estado al 2026-11-09:** spec, plan y tareas aprobados. T01 a T08 fusionadas. T09 hecha, en revisión.
 
 ## Para quien implemente
 
@@ -25,7 +25,7 @@ Sale de `plan-extraccion.md`. Cada tarea termina con sus pruebas en verde y un c
 - [x] **T06 — Llamada.** `llm_azure.py` (chat completions con `json_object`, traducción de 429, tiempo agotado y 5xx a las excepciones de `llm.py`, y rechazo de un deployment `mini`) y `llamada.py` (reintentos de la tabla del plan y semáforo global). Las pruebas no tocan la red: un cliente HTTP falso para `llm_azure` y el `LLMFalso` con fallas programadas para `llamada`. Requisitos R49 a R52 y R54.
 - [x] **T07 — Servicio, idempotencia y comando.** `servicio.py` (`extraer_segmento`), la clave y el guardado de `resultados.py`, el comando `extraer` con su confirmación antes de mandar documentos, los registros sin datos personales y el README. Prueba de punta a punta (criterio A8): un proceso inventado normalizado, solicitudes armadas con `orquestador.extraer.solicitud` (solo en pruebas), dos corridas. Requisito R53.
 - [x] **T08 — Ficha desde el MCP.** `ficha_mcp.py`: `describir_modelo` y `obtener_seccion` con la versión fijada, guardadas en memoria por (versión, TD), y `--modelo mcp` en el comando. El comando guarda las fichas usadas en `extraccion/fichas/` para el visor. Prueba con un servidor MCP falso. El usuario la prueba contra el MCP real con un comando que solo pide la ficha de TD-16 v21 y cuenta sus elementos (no manda documentos). Requisito R30.
-- [ ] **T09 — Visor.** El visor del orquestador muestra los resultados de `extraccion/`: estado por segmento, campos con valor, confianza contra umbral, motivos, reglas pendientes y citas que abren el PDF en su página. Los campos en revisión van resaltados. Pruebas del servidor del visor con una corrida inventada. Requisito R57.
+- [x] **T09 — Visor.** El visor del orquestador muestra los resultados de `extraccion/`: estado por segmento, campos con valor, confianza contra umbral, motivos, reglas pendientes y citas que abren el PDF en su página. Los campos en revisión van resaltados. Pruebas del servidor del visor con una corrida inventada. Requisito R57.
 - [ ] **T10 — Medición con los gold (A9), solo con autorización.** Script `scripts/medir_gold.py`: corre el servicio sobre los documentos de un TD con gold y compara campo a campo con `gold_TD-NN.xlsx`. Imprime solo conteos de aciertos por campo, tokens y tiempo, al lado de los de la última corrida de `lote.py`. Antes de escribirlo se le pregunta al usuario cómo está armado el gold (columnas) y cómo se cuenta un acierto en los campos de tipo objeto o lista. **Lo corre el usuario**, con TD-16 y TD-29, después de autorizar que esos documentos vayan a gpt-5.4.
 
 **Al cerrar la entrega:** actualizar el estado en `spec.md` y en `plan-extraccion.md` (agregar "Lo que cambió al implementar"), el README del repo y `contexto/HANDOFF-extraccion.md`.
@@ -194,4 +194,28 @@ Lo que se decidió al escribir y conviene revisar:
 5. **Fichas guardadas para el visor:** `<corrida>/extraccion/fichas/v<versión>/<TD>.json`, con `modelo`, `version`, `seccion` y `elementos` (sin la guía, que el visor no usa). Se guardan con `--modelo mcp` y con `--modelo archivo:`, la primera vez que se usa cada una. Son metadatos del modelo, sin datos de documentos.
 6. **`probar-ficha-mcp --td TD-16 --version 21`:** pide una ficha e imprime solo conteos (elementos, a extraer, con valores permitidos, `td_probado`, largo de la guía). No manda documentos. Lee `MCP_URL` y `MCP_API_KEY` del entorno o del `.env` de la carpeta actual.
 7. **Sin prueba de las cabeceras HTTP reales** (`X-Proyecto`, `X-Api-Key`): el cliente HTTP se arma dentro de `desde_entorno`. Lo comprueba la corrida del usuario contra el MCP real: sin ellas, el servidor responde 401 o "Falta el header X-Proyecto".
+
+### T09 — Visor (2026-11-10)
+
+En `servicios/orquestador/src/orquestador/visor/`: el servidor lee `extraccion/` de la corrida (`/api/corrida` trae un resumen por segmento y `/api/extraccion` el resultado completo de uno) y la página muestra la extracción en el resumen y en el detalle de cada documento. El visor no importa `extraccion`: lee los archivos del contrato 0.2. Seis pruebas nuevas en `test_visor.py`, con resultados de ejemplo del contrato puestos sobre una corrida inventada. Orquestador 191, extracción 177 y normalización 416 pruebas en verde.
+
+Probado a mano de punta a punta sobre una corrida inventada: `orquestar`, después `extraer` con el LLM falso, después `visor`, revisado con capturas de Chrome sin ventana.
+
+Lo que se decidió al escribir y conviene revisar:
+
+1. **Qué resultado se muestra por segmento:** el del TD del segmento en la versión del proceso. Si no hay, el del mismo TD en otra versión, o el primero que haya. Los `.anterior-…` no se muestran.
+2. **El resumen no trae valores:** `/api/corrida` lleva solo estado y conteos (campos, en revisión, motivos, código de error y tokens). Los valores y las citas se piden por segmento, al abrir el documento.
+3. **Sin armar rutas con lo que llega:** `/api/extraccion` busca el archivo entre los resultados encontrados en la corrida, por (segmento, TD, versión). Un `segmento` con `../` da 404.
+4. **Nombre y umbral del campo** salen de `extraccion/fichas/v<N>/<TD>.json` (T08). Sin la ficha, la tabla muestra el `id_tecnico` y dice que falta el umbral. El medidor marca en rojo la confianza bajo el umbral.
+5. **Lo que se ve de cada campo:**
+   - Nombre, `id_tecnico` y si es dato personal.
+   - Valor (un objeto o una lista en JSON) y la observación.
+   - Confianza con su umbral, y `cumple`.
+   - Motivos con nombre legible.
+   - Evidencia: página como enlace, cita y lo visual.
+   - Reglas pendientes con lo que requieren.
+
+   Los campos en revisión llevan fondo y borde de alerta. Arriba de cada tabla van el estado, "requiere revisión", "TD no probado", "repetido", la ejecución (modelo, prompt, tokens, duración, reintentos), el error si lo hay y las alertas.
+6. **En la lista de documentos:** un chip "revisión" y el filtro "Con campos en revisión".
+7. **Una falla en el comando `extraer` ahora se registra con el segmento** (antes salía sin contexto). Lo encontró la corrida a mano, por un TD-01 que el LLM falso no sabía responder.
 

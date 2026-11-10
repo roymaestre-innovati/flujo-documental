@@ -45,7 +45,7 @@ from .llamada import Llamador
 from .llm import ClienteLLM, LLMFalso
 from .llm_azure import ConfiguracionIncompleta, DeploymentNoPermitido, LLMAzureOpenAI
 from .parametros import parametros
-from .registros import configurar, registro
+from .registros import configurar, contexto_de, registro
 from .reloj import Reloj, RelojSistema
 from .resultados import ResultadosEnCarpeta
 from .servicio import Servicio, extraer_segmento
@@ -143,14 +143,15 @@ def correr(solicitudes: list[dict], servicio: Servicio, hilos: int, forzar: bool
     def una(solicitud):
         if forzar and isinstance(solicitud, dict):
             solicitud = {**solicitud, "forzar_reproceso": True}
-        try:
-            return extraer_segmento(solicitud, servicio)
-        except SolicitudInvalida:
-            registro.error("Solicitud que no cumple el contrato")
-            return "invalida"
-        except Exception as error:  # un bug en un segmento no frena los demás
-            registro.error("Falla interna: %s", lugar_de_la_excepcion(error))
-            return "falla"
+        with contexto_de(solicitud if isinstance(solicitud, dict) else {}):
+            try:
+                return extraer_segmento(solicitud, servicio)
+            except SolicitudInvalida:
+                registro.error("Solicitud que no cumple el contrato")
+                return "invalida"
+            except Exception as error:  # un bug en un segmento no frena los demás
+                registro.error("Falla interna: %s", lugar_de_la_excepcion(error))
+                return "falla"
 
     with ThreadPoolExecutor(max_workers=hilos) as grupo:
         for resultado in grupo.map(una, solicitudes):

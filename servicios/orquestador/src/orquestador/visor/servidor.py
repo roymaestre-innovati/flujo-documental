@@ -1,5 +1,7 @@
 """Visor local de las corridas del orquestador: el estado de cada proceso, sus
 documentos, segmentos, tareas y solicitudes, con el PDF normalizado al lado.
+Si la corrida tiene `extraccion/` (comando `extraer`), también los resultados de
+la extracción de cada segmento.
 
     uv run visor --corridas <carpeta>        # abre http://127.0.0.1:8766
 
@@ -28,6 +30,8 @@ AQUI = Path(__file__).resolve().parent
 PUERTO = 8766
 PROFUNDIDAD = 3
 """Hasta cuántas carpetas por debajo de `--corridas` se buscan corridas."""
+EXTRACCION = "extraccion"
+FICHAS = "fichas"
 
 
 def _leer_json(ruta: Path, defecto=None):
@@ -77,6 +81,78 @@ def _datos_de_version(versiones: dict) -> dict:
     return salida
 
 
+def _resultados_de_extraccion(carpeta: Path) -> dict[tuple[str, str, int], Path]:
+    """Los resultados vigentes en `extraccion/<id_proceso>/<entrega>/`, por (segmento, TD, versión).
+
+    El visor lee los archivos del contrato `modulo3-extraccion/0.2`; no importa el
+    servicio de extracción. Los reemplazados (`.anterior-…`) no se muestran.
+    """
+    raiz = carpeta / EXTRACCION
+    encontrados = {}
+    for ruta in sorted(raiz.glob("*/*/*.json")):
+        if ruta.relative_to(raiz).parts[0] == FICHAS or ".anterior-" in ruta.name:
+            continue
+        resultado = _leer_json(ruta)
+        if not isinstance(resultado, dict) or "id_segmento" not in resultado:
+            continue
+        encontrados[(resultado["id_segmento"], resultado["tipo_documental"], resultado["version_modelo"])] = ruta
+    return encontrados
+
+
+def resumen_extraccion(resultado: dict) -> dict:
+    """Lo que muestra la lista de segmentos: estado y conteos, sin valores."""
+    motivos: dict[str, int] = {}
+    for r in resultado.get("resultados", []):
+        for m in r.get("motivos", []):
+            motivos[m] = motivos.get(m, 0) + 1
+    ejecucion = resultado.get("ejecucion", {})
+    return {
+        "id_segmento": resultado["id_segmento"],
+        "tipo_documental": resultado["tipo_documental"],
+        "version_modelo": resultado["version_modelo"],
+        "estado": resultado["estado"],
+        "requiere_revision": resultado.get("requiere_revision", False),
+        "campos": len(resultado.get("resultados", [])),
+        "campos_en_revision": len(resultado.get("campos_en_revision", [])),
+        "motivos": motivos,
+        "codigo_error": (resultado.get("error") or {}).get("codigo"),
+        "tokens_entrada": ejecucion.get("tokens_entrada", 0),
+        "tokens_salida": ejecucion.get("tokens_salida", 0),
+    }
+
+
+def extracciones(carpeta: Path) -> list[dict]:
+    salida = []
+    for ruta in _resultados_de_extraccion(carpeta).values():
+        resultado = _leer_json(ruta)
+        if resultado:
+            salida.append(resumen_extraccion(resultado))
+    return salida
+
+
+def _campos_de_la_ficha(carpeta: Path, version: int, tipo_documental: str) -> dict | None:
+    """Nombre, umbral y obligatoriedad de cada campo, si el comando guardó la ficha."""
+    ficha = _leer_json(carpeta / EXTRACCION / FICHAS / f"v{version}" / f"{tipo_documental}.json")
+    if not isinstance(ficha, dict):
+        return None
+    return {e["id_tecnico"]: {"nombre": e.get("nombre"), "obligatoriedad": e.get("obligatoriedad"),
+                              "umbral": (e.get("atributos") or {}).get("umbral_confianza")}
+            for e in ficha.get("elementos", []) if "id_tecnico" in e}
+
+
+def extraccion(carpeta: Path, id_segmento: str, tipo_documental: str, version: int) -> dict | None:
+    """El resultado completo de un segmento, con los datos de la ficha si están.
+
+    El archivo se busca entre los resultados encontrados, nunca armando la ruta
+    con lo que llega en el pedido.
+    """
+    ruta = _resultados_de_extraccion(carpeta).get((id_segmento, tipo_documental, version))
+    resultado = _leer_json(ruta) if ruta else None
+    if not resultado:
+        return None
+    return {"resultado": resultado, "campos": _campos_de_la_ficha(carpeta, version, tipo_documental)}
+
+
 def corrida(carpeta: Path) -> dict:
     """Todo lo que muestra la página de una corrida."""
     registros = _leer_json(carpeta / "estado.json", [])
@@ -98,6 +174,7 @@ def corrida(carpeta: Path) -> dict:
         "errores": _leer_json(carpeta / "errores.json", []),
         "conteos": _leer_json(carpeta / "conteos.json"),
         "datos": _datos_de_version(proceso.get("versiones", {})),
+        "extracciones": extracciones(carpeta),
     }
 
 
@@ -159,6 +236,13 @@ class Manejador(BaseHTTPRequestHandler):
             return self.json(corrida(carpeta))
         if url.path == "/api/lectura":
             contenido = lectura(carpeta, q.get("documento", ""))
+            return self.json(contenido) if contenido else self.no_existe()
+        if url.path == "/api/extraccion":
+            try:
+                version = int(q.get("version", ""))
+            except ValueError:
+                return self.no_existe()
+            contenido = extraccion(carpeta, q.get("segmento", ""), q.get("td", ""), version)
             return self.json(contenido) if contenido else self.no_existe()
         if url.path == "/pdf":
             documento = _documento(carpeta, q.get("documento", ""))

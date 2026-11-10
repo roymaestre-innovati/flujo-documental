@@ -95,6 +95,18 @@
   a { color: var(--acento); cursor: pointer; }
   .kv { display: grid; grid-template-columns: max-content 1fr; gap: 3px 12px; font-size: 13px; }
   .kv .k { color: var(--suave); }
+  tr.revision td { background: var(--alerta-suave); }
+  tr.revision td:first-child { box-shadow: inset 3px 0 0 var(--alerta); }
+  tr.revision .chip.alerta { border-color: var(--alerta); }
+  .campos { table-layout: fixed; }
+  .campos td { overflow-wrap: anywhere; }
+  .campos col.c-campo { width: 15%; } .campos col.c-valor { width: 27%; } .campos col.c-conf { width: 10%; }
+  .campos col.c-cumple { width: 6%; } .campos col.c-motivos { width: 12%; } .campos col.c-evidencia { width: 15%; }
+  .campo-valor pre { margin: 0; max-height: 220px; overflow: auto; white-space: pre-wrap; }
+  .cita { font-size: 12px; margin-bottom: 4px; }
+  .cita q { color: var(--suave); }
+  .extraccion { margin-top: 10px; }
+  .extraccion + .extraccion { margin-top: 26px; }
   @media (max-width: 900px) { nav { width: 210px; } aside.visible { position: fixed; inset: 50px 0 0 0; width: 100%; z-index: 5; } }
 </style>
 </head>
@@ -135,11 +147,20 @@ const COLOR = {
   pendiente: "ok", sin_extraccion: "",
   // entregas y tareas
   procesando: "ok", recibido: "alerta", abierta: "alerta", resuelta: "ok",
+  // extracción
+  ok: "ok", no_corresponde: "alerta",
 };
 const NOMBRE_ESTADO = {
   clasificado: "clasificado", duplicado: "copia exacta", error_entrada: "error de entrada", error_proceso: "error de proceso",
   normalizado: "normalizado", esperando_clasificacion_humana: "espera a una persona", pendiente: "a extracción",
   sin_extraccion: "sin extracción", procesando: "procesando", recibido: "recibido", abierta: "abierta", resuelta: "resuelta",
+  ok: "extraído", no_corresponde: "no corresponde",
+};
+const NOMBRE_MOTIVO = {
+  CONFIANZA_BAJA: "confianza baja", NO_CUMPLE: "no cumple", OBLIGATORIO_VACIO: "obligatorio vacío",
+  REQUIERE_IMAGEN: "requiere imagen", PLANTILLA_SIN_LLENAR: "plantilla sin llenar", NOTA_ELEMENTO: "nota del elemento",
+  CONTRADICCION: "contradicción", VALIDACION_FALLIDA: "validación fallida", TD_NO_PROBADO: "TD no probado",
+  CLASIFICACION_DUDOSA: "clasificación dudosa",
 };
 const chipEstado = (e) => `<span class="chip ${COLOR[e] ?? ""}">${esc(NOMBRE_ESTADO[e] ?? e)}</span>`;
 
@@ -171,6 +192,11 @@ function indexar(d) {
     d.tareasPorDoc.get(id).push(t);
   }
   d.solPorSeg = new Map(d.solicitudes.map((s) => [s.id_segmento, s]));
+  d.extPorSeg = new Map();
+  for (const x of d.extracciones || []) {
+    if (!d.extPorSeg.has(x.id_segmento)) d.extPorSeg.set(x.id_segmento, []);
+    d.extPorSeg.get(x.id_segmento).push(x);
+  }
   d.entregas = [...new Set([...d.oferentes.map((o) => o.id), ...d.documentos.map((x) => x.entrega)])].sort();
   return d;
 }
@@ -268,6 +294,7 @@ function pintarResumen() {
       ${tarjeta(atascados ?? "—", "atascados", atascados ? "mal" : "")}
       ${tarjeta(c.errores.length, "mensajes en errores", c.errores.length ? "mal" : "")}
     </div>
+    ${resumenExtraccion()}
     <h3>Por entrega</h3>
     <table><thead><tr><th>Entrega</th><th>Estado</th><th class="num">Documentos</th><th class="num">Clasificados</th>
       <th class="num">Copias</th><th class="num">Con error</th><th class="num">Seg. a extracción</th><th class="num">Seg. sin extracción</th>
@@ -287,11 +314,116 @@ function pintarResumen() {
   });
 }
 
+// La extracción del segmento: la del TD y la versión del proceso, o la última que haya.
+function extDe(s) {
+  const lista = c.extPorSeg.get(s.id) || [];
+  const v = c.proceso.versiones?.modelo_extraccion;
+  return lista.find((x) => x.tipo_documental === s.tipo_documental && x.version_modelo === v)
+    || lista.find((x) => x.tipo_documental === s.tipo_documental) || lista[0] || null;
+}
+
+function chipExtraccion(x) {
+  if (!x) return nulo("—");
+  const rev = x.campos_en_revision ? ` <span class="chip alerta">${x.campos_en_revision} de ${x.campos} en revisión</span>` : "";
+  const err = x.codigo_error ? ` <span class="chip mal">${esc(x.codigo_error)}</span>` : "";
+  return `${chipEstado(x.estado)}${rev}${err}`;
+}
+
+function resumenExtraccion() {
+  const ex = c.extracciones || [];
+  if (!ex.length) return "";
+  const tarjeta = (valor, rotulo, clase = "") => `<div class="tarjeta ${clase}"><div class="valor">${valor}</div><div class="rotulo">${rotulo}</div></div>`;
+  const campos = ex.reduce((n, x) => n + x.campos, 0);
+  const enRevision = ex.reduce((n, x) => n + x.campos_en_revision, 0);
+  const errores = ex.filter((x) => x.estado.startsWith("error")).length;
+  const motivos = {};
+  for (const x of ex) for (const [m, n] of Object.entries(x.motivos)) motivos[m] = (motivos[m] || 0) + n;
+  const tokens = ex.reduce((n, x) => n + x.tokens_entrada + x.tokens_salida, 0);
+  return `<h3>Extracción</h3>
+    <div class="tarjetas">
+      ${tarjeta(ex.length, "segmentos con resultado")}
+      ${tarjeta(ex.filter((x) => x.requiere_revision).length, "segmentos a revisión", ex.some((x) => x.requiere_revision) ? "alerta" : "")}
+      ${tarjeta(campos, "campos extraídos")}
+      ${tarjeta(enRevision, "campos en revisión", enRevision ? "alerta" : "")}
+      ${tarjeta(errores, "con error", errores ? "mal" : "")}
+      ${tarjeta(tokens.toLocaleString("es-CO"), "tokens")}
+    </div>
+    <div class="columnas">
+      <div><h3>Campos en revisión por motivo</h3>${barras(motivos, (k) => NOMBRE_MOTIVO[k] ?? k)}</div>
+      <div><h3>Resultados por estado</h3>${barras(contar(ex, (x) => x.estado), (k) => NOMBRE_ESTADO[k] ?? k)}</div>
+    </div>`;
+}
+
+function valorHTML(valor) {
+  if (valor === null || valor === undefined) return nulo();
+  if (typeof valor === "object") return `<pre>${esc(JSON.stringify(valor, null, 2))}</pre>`;
+  return esc(valor);
+}
+
+function confianzaCampo(confianza, umbral) {
+  if (typeof confianza !== "number") return nulo("—");
+  const clase = typeof umbral === "number" && confianza < umbral ? "bajo" : "";
+  return `<div class="conf ${clase}">${confianza.toFixed(2)}</div>
+    <div class="medidor ${clase}"><i style="width:${Math.min(confianza, 1) * 100}%"></i>
+      ${typeof umbral === "number" ? `<b style="left:${umbral * 100}%"></b>` : ""}</div>
+    <div class="umbral">${typeof umbral === "number" ? `umbral ${umbral.toFixed(2)}` : "sin umbral a la vista"}</div>`;
+}
+
+function extraccionHTML(s, e) {
+  const r = e.resultado, campos = e.campos || {};
+  const ej = r.ejecucion || {};
+  const cabecera = `<div class="barra"><b>Páginas ${s.pagina_inicio}–${s.pagina_fin} · ${esc(r.tipo_documental)} v${esc(r.version_modelo)}</b>
+    ${chipEstado(r.estado)}${r.requiere_revision ? '<span class="chip alerta">requiere revisión</span>' : ""}
+    ${r.td_probado === false ? '<span class="chip alerta">TD no probado</span>' : ""}
+    ${ej.desde_cache ? '<span class="chip">repetido</span>' : ""}
+    <span class="meta">${esc([ej.modelo_llm, ej.version_prompt, ej.tokens_entrada != null ? `${ej.tokens_entrada}+${ej.tokens_salida} tokens` : null,
+      ej.duracion_ms != null ? `${(ej.duracion_ms / 1000).toFixed(1)} s` : null, ej.reintentos ? `${ej.reintentos} reintentos` : null].filter(Boolean).join(" · "))}</span></div>`;
+  const error = r.error ? `<div class="error"><b>${esc(r.error.codigo)}</b>\n${esc(r.error.mensaje)}${r.error.reintentable ? "\n(se puede reintentar)" : ""}</div>` : "";
+  const alertas = (r.alertas || []).length ? `<div class="aviso">${r.alertas.map((a) => `<div><b>${esc(a.codigo)}</b>${a.id_tecnico ? ` <span class="id">${esc(a.id_tecnico)}</span>` : ""}: ${esc(a.mensaje)}</div>`).join("")}</div>` : "";
+  const filas = (r.resultados || []).map((x) => {
+    const f = campos[x.id_tecnico] || {};
+    const citas = (x.evidencia || []).map((ev) => `<div class="cita"><a data-pag="${ev.pagina}">p. ${ev.pagina}</a>
+      ${ev.cita ? `<q>${esc(ev.cita)}</q>` : ""}${ev.visual ? ` <span class="umbral">${esc(ev.visual)}</span>` : ""}</div>`).join("") || nulo("sin evidencia");
+    const reglas = (x.reglas_pendientes || []).map((p) => `<div class="cita">${esc(p.texto)}${p.requiere?.length ? ` <span class="umbral">requiere ${esc(p.requiere.join(", "))}</span>` : ""}</div>`).join("");
+    const cumple = x.cumple ? `<span class="chip ${x.cumple === "SI" ? "ok" : x.cumple === "NO" ? "mal" : ""}">${esc(x.cumple)}</span>` : nulo("—");
+    return `<tr class="${x.revision ? "revision" : ""}">
+      <td><b>${esc(f.nombre || x.id_tecnico)}</b><div class="id">${esc(x.id_tecnico)}</div>
+        ${x.datos_personales ? '<span class="chip">dato personal</span>' : ""}</td>
+      <td class="campo-valor">${valorHTML(x.valor)}${x.observacion ? `<div class="umbral">${esc(x.observacion)}</div>` : ""}</td>
+      <td>${confianzaCampo(x.confianza, f.umbral)}</td>
+      <td>${cumple}</td>
+      <td><div class="chips">${(x.motivos || []).map((m) => `<span class="chip alerta" title="${esc(m)}">${esc(NOMBRE_MOTIVO[m] ?? m)}</span>`).join("") || nulo("—")}</div></td>
+      <td>${citas}</td>
+      <td>${reglas || nulo("—")}</td></tr>`;
+  }).join("");
+  const tabla = filas ? `<table class="campos"><colgroup><col class="c-campo"><col class="c-valor"><col class="c-conf"><col class="c-cumple"><col class="c-motivos"><col class="c-evidencia"><col></colgroup>
+    <thead><tr><th>Campo</th><th>Valor</th><th>Confianza</th><th>Cumple</th><th>Motivos</th><th>Evidencia</th><th>Reglas pendientes</th></tr></thead>
+    <tbody>${filas}</tbody></table>
+    ${e.campos ? "" : '<div class="umbral">Sin la ficha en extraccion/fichas/ no se muestran el nombre ni el umbral de los campos.</div>'}` : "";
+  return `<div class="extraccion">${cabecera}${error}${alertas}${tabla}</div>`;
+}
+
+async function pintarExtracciones(d, segs) {
+  const caja = $("#extraccion");
+  const con = segs.map((s) => [s, extDe(s)]).filter(([, x]) => x);
+  if (!caja || !con.length) return;
+  const pedido = d.id;
+  const partes = await Promise.all(con.map(async ([s, x]) => {
+    try {
+      return extraccionHTML(s, await api("/api/extraccion?" + q({ corrida: estado.corrida, segmento: s.id, td: x.tipo_documental, version: x.version_modelo })));
+    } catch (_) { return ""; }
+  }));
+  if (estado.documento !== pedido) return;
+  caja.innerHTML = `<h3>Extracción</h3>${partes.join("")}`;
+  caja.querySelectorAll("[data-pag]").forEach((a) => a.onclick = () => verPagina(Number(a.dataset.pag)));
+}
+
 function pintarFiltros() {
   $("#f-entrega").innerHTML = '<option value="">Todas las entregas</option>' + c.entregas.map((e) => `<option>${esc(e)}</option>`).join("");
   const estados = [...new Set(c.documentos.map((d) => d.estado))].sort();
   $("#f-estado").innerHTML = '<option value="">Todos los estados</option>' +
     '<option value="_tarea">Con tarea abierta</option><option value="_dudosa">Con segmento dudoso</option>' +
+    '<option value="_revision">Con campos en revisión</option>' +
     estados.map((e) => `<option value="${esc(e)}">${esc(NOMBRE_ESTADO[e] ?? e)}</option>`).join("");
   $("#f-entrega").value = estado.entrega; $("#f-estado").value = estado.filtroEstado;
 }
@@ -306,6 +438,7 @@ function docsFiltrados() {
     const segs = c.segPorDoc.get(d.id) || [];
     if (estado.filtroEstado === "_tarea") return (c.tareasPorDoc.get(d.id) || []).some((t) => t.estado === "abierta");
     if (estado.filtroEstado === "_dudosa") return segs.some((s) => s.clasificacion_dudosa);
+    if (estado.filtroEstado === "_revision") return segs.some((s) => extDe(s)?.requiere_revision);
     if (estado.filtroEstado && d.estado !== estado.filtroEstado) return false;
     return true;
   }).sort((a, b) => a.entrega.localeCompare(b.entrega) || nombreDoc(a).localeCompare(nombreDoc(b)));
@@ -324,6 +457,7 @@ function pintarDocs() {
       <div class="nombre">${esc(nombreDoc(d))}</div>
       <div class="chips">${chipEstado(d.estado)}${tds.map((t) => `<span class="chip acento">${esc(t)}</span>`).join("")}
         ${segs.some((s) => s.clasificacion_dudosa) ? '<span class="chip alerta">dudosa</span>' : ""}
+        ${segs.some((s) => extDe(s)?.requiere_revision) ? '<span class="chip alerta">revisión</span>' : ""}
         ${abiertas ? `<span class="chip alerta">${abiertas} tarea${abiertas > 1 ? "s" : ""}</span>` : ""}</div></div>`;
   }
   $("#docs").innerHTML = html;
@@ -384,7 +518,7 @@ async function pintarDocumento() {
     ${tareas.length ? `<h3>Tareas</h3><table><thead><tr><th>Clase</th><th>Motivo</th><th>Detalle</th><th>Estado</th></tr></thead><tbody>
       ${tareas.map((t) => `<tr><td>${esc(t.clase)}</td><td>${esc(t.motivo)}</td><td>${esc(t.detalle ?? "")}
         ${t.resolucion ? `<div class="umbral">resuelta por ${esc(t.resolucion.quien)}</div>` : ""}</td><td>${chipEstado(t.estado)}</td></tr>`).join("")}</tbody></table>` : ""}
-    ${segs.length ? `<h3>Segmentos</h3><table><thead><tr><th>Páginas</th><th>Tipo documental</th><th>Confianza</th><th>Estado</th><th>Solicitud</th></tr></thead><tbody>
+    ${segs.length ? `<h3>Segmentos</h3><table><thead><tr><th>Páginas</th><th>Tipo documental</th><th>Confianza</th><th>Estado</th><th>Extracción</th><th>Solicitud</th></tr></thead><tbody>
       ${segs.map((s) => {
         const sol = c.solPorSeg.get(s.id);
         return `<tr><td><a data-pag="${s.pagina_inicio}">${s.pagina_inicio === s.pagina_fin ? s.pagina_inicio : `${s.pagina_inicio}–${s.pagina_fin}`}</a></td>
@@ -394,8 +528,10 @@ async function pintarDocumento() {
             ${s.asignado_por && s.asignado_por !== "clasificador" ? `<div class="umbral">asignado por ${esc(s.asignado_por)}</div>` : ""}</td>
           <td>${confianzaHTML(s)}</td>
           <td>${chipEstado(s.estado)}${s.clasificacion_dudosa ? ' <span class="chip alerta">dudosa</span>' : ""}</td>
+          <td>${chipExtraccion(extDe(s))}</td>
           <td>${sol ? `<details><summary>ver</summary><pre>${esc(JSON.stringify(sol, null, 2))}</pre></details>` : nulo("—")}</td></tr>`;
       }).join("")}</tbody></table>` : ""}
+    <div id="extraccion"></div>
     <div id="lectura"></div>
     <h3>Historial</h3>
     ${historial.map((h) => `<div class="linea"><span class="hora">${esc(new Date(h.cuando).toLocaleTimeString("es-CO"))}</span>
@@ -410,6 +546,7 @@ async function pintarDocumento() {
   document.querySelectorAll("[data-ir]").forEach((a) => a.onclick = () => abrirDocumento(a.dataset.ir));
   if (estado.pdf && tienePdf) verPagina(estado.pagina || 1);
   else $("#panel-pdf").classList.remove("visible");
+  pintarExtracciones(d, segs);
 
   if (!d.lectura) return;
   const pedido = d.id;

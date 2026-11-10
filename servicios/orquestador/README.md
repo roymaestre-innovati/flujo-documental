@@ -75,6 +75,7 @@ Abre `http://127.0.0.1:8766` con lo que dejó una corrida guardada con `--salida
 
 - **Resumen:** conteos, una fila por entrega (clic para ver sus documentos), solicitudes por tipo documental, tareas por motivo y versiones fijadas.
 - **Documentos:** la lista por entrega, con filtros (texto, entrega, estado, con tarea, dudosa). El detalle muestra los segmentos con su confianza frente al umbral y el piso, las tareas, la lectura página por página, el historial y la solicitud de extracción de cada segmento. "Ver PDF" abre el PDF normalizado al lado; un clic en una página lo lleva a esa página.
+- **Extracción** (si la corrida tiene `extraccion/`, que deja el comando `extraer` del servicio de extracción): en el resumen, segmentos con resultado, campos en revisión por motivo y tokens. En el detalle de un documento, la columna "Extracción" de cada segmento y, debajo, una tabla por segmento con cada campo: valor, confianza frente al umbral de la ficha, `cumple`, motivos, evidencia (un clic en la página abre el PDF ahí) y reglas pendientes. Los campos en revisión van resaltados. El filtro "Con campos en revisión" deja solo esos documentos. El visor lee los archivos del contrato `modulo3-extraccion/0.2`; no importa el servicio de extracción.
 - **Tareas:** todas, abiertas primero; un clic abre el documento.
 - **Errores:** mensajes en las colas de errores y entregas con error.
 

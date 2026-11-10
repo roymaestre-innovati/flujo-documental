@@ -247,3 +247,15 @@ def test_guarda_las_fichas_usadas(proceso, capsys):
     assert td16["version"] == 21
     assert td16["seccion"]["id"] == "TD-16"
     assert all(e["seccion"] == "TD-16" for e in td16["elementos"])
+
+
+def test_la_falla_interna_se_registra_con_el_segmento(proceso, capsys, tmp_path):
+    corrida, jsonl, solicitudes = proceso
+    registros = tmp_path / "registros.jsonl"
+    llm = LLMFalso()  # sin respuestas: falla en cada llamada, como un bug
+    id_segmento = solicitudes[0]["id_segmento"]
+    assert cli.main(_argumentos(corrida, jsonl, "--solo", id_segmento, "--registros", str(registros)), cliente=llm) == 1
+    assert _resumen(capsys)["fallas_internas"] == 1
+    [falla] = [json.loads(l) for l in registros.read_text(encoding="utf-8").splitlines() if "Falla interna" in l]
+    assert falla["id_documento"] == id_segmento
+    assert falla["mensaje"].startswith("Falla interna: AssertionError en ")

@@ -2,7 +2,7 @@
 
 Saca los datos de cada segmento de documento ya clasificado (iniciativa 003, entrega 2). Recibe una solicitud del contrato `modulo3-extraccion/0.2` y devuelve un resultado del mismo contrato. La spec está en `specs/003-validacion-extraccion/spec.md` (sección "Entrega 2 — Extracción"), el plan en `plan-extraccion.md` y las tareas en `tasks-extraccion.md`.
 
-**Estado:** en construcción. T01 a T08 hechas: el servicio corre de punta a punta en local, con el LLM falso o con gpt-5.4, y la ficha de un archivo o del MCP. Faltan el visor (T09) y la medición con los gold (T10).
+**Estado:** en construcción. T01 a T09 hechas: el servicio corre de punta a punta en local, con el LLM falso o con gpt-5.4, y la ficha de un archivo o del MCP. Los resultados se ven en el visor del orquestador (`uv run visor --corridas <carpeta>`). Falta la medición con los gold (T10).
 
 ## Instalar y probar
 
