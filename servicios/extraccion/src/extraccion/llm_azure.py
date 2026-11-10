@@ -6,7 +6,9 @@ Las fallas se traducen a las excepciones de `llm.py`:
 
 - 429: `LimiteDeUso`, con la espera que pidió el servicio si la dijo.
 - Tiempo agotado, error de conexión, 408 y 5xx: `FallaPasajera`.
-- Cualquier otra (401, 404, 400…): se deja pasar. Es un bug o una mala
+- 400 o 413 (pedido muy grande, demasiadas imágenes, filtro de contenido):
+  `PedidoRechazado`, con el código del error. No se reintenta.
+- Cualquier otra (401, 403, 404…): se deja pasar. Es un bug o una mala
   configuración, y no se reintenta.
 
 gpt-5.4-mini no respeta las reglas de evidencia, así que un deployment con
@@ -18,7 +20,7 @@ from collections.abc import Mapping
 import httpx2
 import openai
 
-from .llm import ClienteLLM, FallaPasajera, LimiteDeUso, Respuesta
+from .llm import ClienteLLM, FallaPasajera, LimiteDeUso, PedidoRechazado, Respuesta
 from .parametros import parametros
 
 VARIABLES = ("AZURE_OPENAI_ENDPOINT", "AZURE_OPENAI_API_KEY", "AZURE_OPENAI_DEPLOYMENT")
@@ -95,6 +97,9 @@ class LLMAzureOpenAI(ClienteLLM):
         except openai.APIStatusError as error:
             if error.status_code >= 500 or error.status_code == 408:
                 raise FallaPasajera(f"El LLM respondió {error.status_code}") from None
+            if error.status_code in (400, 413):
+                codigo = getattr(error, "code", None) or (f"http_{error.status_code}" if error.status_code == 413 else None)
+                raise PedidoRechazado(codigo) from None
             raise
         uso = respuesta.usage
         # Sin texto (por ejemplo, cortada por largo o por el filtro de contenido) queda vacía:

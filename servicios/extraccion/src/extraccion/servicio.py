@@ -24,6 +24,7 @@ from .entrada import ERROR_PROCESO, ErrorDeSolicitud, preparar, validar
 from .ficha import FichaNoEncontrada, FuenteModelo
 from .ficha_mcp import FuenteNoDisponible
 from .llamada import LlamadaFallida, Llamador
+from .llm import PedidoRechazado
 from .mensaje import VERSION_PROMPT, mensajes
 from .posvalidacion import sobre, sobre_de_error
 from .preproceso import preparar_contenido
@@ -89,7 +90,12 @@ def _extraer(servicio: Servicio, solicitud: dict, gasto: _Gasto) -> Callable[[di
             ERROR_PROCESO, "MODELO_NO_DISPONIBLE", "El servidor del modelo semántico no respondió.", reintentable=True,
         ) from None
     contenido = preparar_contenido(entrada)
-    llamada = servicio.llamador.llamar(mensajes(entrada, ficha, contenido))
+    try:
+        llamada = servicio.llamador.llamar(mensajes(entrada, ficha, contenido))
+    except PedidoRechazado as rechazo:
+        raise ErrorDeSolicitud(
+            ERROR_PROCESO, "LLM_RECHAZO", f"El modelo de lenguaje rechazó el pedido ({rechazo.codigo}).", reintentable=False,
+        ) from None
     gasto.tokens_entrada, gasto.tokens_salida = llamada.tokens_entrada, llamada.tokens_salida
     gasto.reintentos, gasto.modelo = llamada.reintentos, llamada.modelo
     return lambda ejecucion: sobre(solicitud, ficha, contenido, llamada.respuesta, ejecucion)

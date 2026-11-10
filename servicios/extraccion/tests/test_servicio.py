@@ -10,7 +10,7 @@ from conftest import respuesta_falsa
 from extraccion import CONTRATO, VERSION, contratos
 from extraccion.entrada import SolicitudInvalida
 from extraccion.llamada import Llamador
-from extraccion.llm import FallaPasajera, LLMFalso, Respuesta
+from extraccion.llm import FallaPasajera, LLMFalso, PedidoRechazado, Respuesta
 from extraccion.mensaje import VERSION_PROMPT
 from extraccion.registros import configurar
 from extraccion.reloj import RelojManual
@@ -187,3 +187,14 @@ def test_registros_sin_datos_del_documento(corrida, documento, servicio):
             assert cita["cita"] not in texto
     assert "certificado" not in texto.lower()
     assert "Certificado de aportes" not in texto
+
+
+def test_pedido_rechazado_es_error_de_proceso_no_reintentable(corrida, documento, servicio, llm):
+    llm.programar(PedidoRechazado("too_many_images"))
+    solicitud = corrida.solicitud(documento, 1, 3)
+    resultado = extraer_segmento(solicitud, servicio)
+    assert resultado["estado"] == "error_proceso"
+    assert resultado["error"] == {"codigo": "LLM_RECHAZO", "reintentable": False,
+                                  "mensaje": "El modelo de lenguaje rechazó el pedido (too_many_images)."}
+    assert len(llm.llamadas) == 1, "no se reintenta"
+    assert contratos.errores(contratos.SALIDA, resultado) == []

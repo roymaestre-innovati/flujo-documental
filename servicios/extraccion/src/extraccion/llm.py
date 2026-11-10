@@ -30,6 +30,18 @@ class FallaPasajera(Exception):
     """El LLM no respondió por una causa que puede pasar sola."""
 
 
+class PedidoRechazado(Exception):
+    """El LLM rechazó este pedido (400): muy grande, demasiadas imágenes, filtro de contenido.
+
+    Mandarlo otra vez da lo mismo: no se reintenta. Lleva solo el código del error,
+    nunca su mensaje, que podría citar el contenido.
+    """
+
+    def __init__(self, codigo: str | None) -> None:
+        self.codigo = codigo or "sin_codigo"
+        super().__init__(f"El LLM rechazó el pedido ({self.codigo})")
+
+
 @dataclass(frozen=True)
 class Respuesta:
     texto: str

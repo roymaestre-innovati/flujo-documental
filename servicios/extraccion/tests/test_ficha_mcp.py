@@ -184,3 +184,21 @@ def test_el_cliente_pide_el_modelo_de_la_ficha():
     from extraccion.ficha_mcp import MODELO, PROYECTO
     assert MODELO == MODELO_V21["modelo"] == "tipos_documentales"
     assert PROYECTO == "extraccion_documental"
+
+
+def test_guardar_la_misma_ficha_desde_varios_hilos(tmp_path):
+    from concurrent.futures import ThreadPoolExecutor
+    from extraccion.ficha import FuenteModelo, FuenteQueGuarda
+
+    class Guardada(FuenteModelo):
+        # Como el MCP: la misma ficha (el mismo objeto) para todos los pedidos.
+        ficha_ = FuenteModeloArchivo(FICHA_V21).ficha(21, "TD-29")
+
+        def ficha(self, version, tipo_documental):
+            return self.ficha_
+
+    fuente = FuenteQueGuarda(Guardada(), tmp_path / "fichas")
+    with ThreadPoolExecutor(max_workers=8) as grupo:
+        fichas = list(grupo.map(lambda _: fuente.ficha(21, "TD-29"), range(32)))
+    assert all(f.tipo_documental == "TD-29" for f in fichas)
+    assert [p.name for p in (tmp_path / "fichas" / "v21").iterdir()] == ["TD-29.json"]

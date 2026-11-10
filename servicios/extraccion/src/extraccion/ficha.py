@@ -11,6 +11,8 @@ La versión siempre la trae la solicitud: nunca se usa la vigente (principio 7).
 
 import json
 import os
+import tempfile
+import threading
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 
@@ -104,16 +106,19 @@ class FuenteQueGuarda(FuenteModelo):
     def __init__(self, fuente: FuenteModelo, carpeta: str | os.PathLike[str]) -> None:
         self._fuente = fuente
         self.carpeta = os.fspath(carpeta)
+        # Varios segmentos del mismo TD piden la ficha a la vez: se guarda una sola vez.
+        self._candado = threading.Lock()
 
     def ficha(self, version: int, tipo_documental: str) -> Ficha:
         ficha = self._fuente.ficha(version, tipo_documental)
         ruta = os.path.join(self.carpeta, f"v{version}", f"{tipo_documental}.json")
-        if not os.path.exists(ruta):
-            os.makedirs(os.path.dirname(ruta), exist_ok=True)
-            datos = {"modelo": ficha.modelo, "version": ficha.version, "seccion": ficha.seccion,
-                     "elementos": list(ficha.elementos)}
-            temporal = f"{ruta}.{os.getpid()}.{id(ficha)}.tmp"
-            with open(temporal, "w", encoding="utf-8") as archivo:
-                json.dump(datos, archivo, ensure_ascii=False, indent=1)
-            os.replace(temporal, ruta)
+        with self._candado:
+            if not os.path.exists(ruta):
+                os.makedirs(os.path.dirname(ruta), exist_ok=True)
+                datos = {"modelo": ficha.modelo, "version": ficha.version, "seccion": ficha.seccion,
+                         "elementos": list(ficha.elementos)}
+                descriptor, temporal = tempfile.mkstemp(dir=os.path.dirname(ruta), prefix=".", suffix=".tmp")
+                with os.fdopen(descriptor, "w", encoding="utf-8") as archivo:
+                    json.dump(datos, archivo, ensure_ascii=False, indent=1)
+                os.replace(temporal, ruta)
         return ficha

@@ -6,7 +6,7 @@ import httpx2
 import openai
 import pytest
 
-from extraccion.llm import FallaPasajera, LimiteDeUso
+from extraccion.llm import FallaPasajera, LimiteDeUso, PedidoRechazado
 from extraccion.llm_azure import (
     ConfiguracionIncompleta, DeploymentNoPermitido, LLMAzureOpenAI, _espera_pedida, url_base,
 )
@@ -93,8 +93,20 @@ def test_fallas_pasajeras(salida):
     assert len(servidor.pedidos) == 1
 
 
+@pytest.mark.parametrize("estado, cuerpo, codigo", [
+    (400, {"error": {"code": "too_many_images", "message": "texto que podría citar el contenido"}}, "too_many_images"),
+    (400, {"error": {"message": "sin código"}}, "sin_codigo"),
+    (413, {"error": {"message": "muy grande"}}, "http_413"),
+])
+def test_pedido_rechazado_lleva_solo_el_codigo(estado, cuerpo, codigo):
+    servidor = Servidor(httpx2.Response(estado, json=cuerpo))
+    with pytest.raises(PedidoRechazado) as error:
+        cliente(servidor).responder(MENSAJES)
+    assert error.value.codigo == codigo
+    assert "citar" not in str(error.value)
+
+
 @pytest.mark.parametrize("estado, excepcion", [
-    (400, openai.BadRequestError),
     (401, openai.AuthenticationError),
     (404, openai.NotFoundError),
 ])

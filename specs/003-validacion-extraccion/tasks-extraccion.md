@@ -248,3 +248,11 @@ Lo que se decidió al escribir y conviene revisar:
 7. **Copias exactas** dentro de la carpeta de un TD: se extraen una sola vez (la normalización las marca) y en la comparación cuentan con el resultado del original. Los tokens se suman una vez.
 8. **Nada de valores por pantalla:** a diferencia de `comparar_con_gold.py`, que imprime lo que falló, aquí salen solo conteos por `id_tecnico`, sin nombres de documentos.
 
+### Prueba del flujo con la muestra real (2026-11-10)
+
+Primera corrida del usuario con TD-16 y TD-29 (14 segmentos, gpt-5.4 y la ficha del MCP), autorizada tras la respuesta de habeas data. 12 resultados `ok`; dos fallas internas, ya corregidas:
+
+1. **Id del modelo en el MCP:** es `tipos_documentales`, dentro del proyecto `extraccion_documental` (ver la nota 1 de T08).
+2. **Choque al guardar la ficha:** dos segmentos del mismo TD guardaban la ficha a la vez con el mismo archivo temporal. Ahora se guarda bajo un candado y con un temporal único.
+3. **Azure rechazó un pedido (400):** un TD-29 de 70 páginas armaba 124 imágenes (28 páginas y 96 ampliaciones de firma) y unos 19 MB. Un 400 o 413 ahora es `PedidoRechazado`, que da `error_proceso` `LLM_RECHAZO`, no reintentable, con el código del error de Azure (nunca su mensaje). Queda por decidir qué hacer con los segmentos que no caben en un pedido. En la muestra es 1 de 75 (el siguiente tiene 48 imágenes).
+
