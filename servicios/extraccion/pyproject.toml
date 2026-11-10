@@ -13,10 +13,12 @@ dependencies = [
     "openpyxl>=3.1.5",
     "openai>=3.49.0",
     "python-dotenv>=1.2.4",
+    "mcp>=2.3,<3",
 ]
 
 [project.scripts]
 extraer = "extraccion.cli:main"
+probar-ficha-mcp = "extraccion.ficha_mcp:main"
 
 [tool.uv.sources]
 normalizacion = { path = "../normalizacion", editable = true }

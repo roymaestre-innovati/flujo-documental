@@ -57,6 +57,12 @@ def proceso(tmp_path):
     return corrida, jsonl, solicitudes
 
 
+def _resultados(corrida) -> list:
+    """Los resultados guardados, sin las fichas."""
+    extraccion = corrida.raiz / "extraccion"
+    return sorted(a for a in extraccion.rglob("*.json") if (extraccion / "fichas") not in a.parents)
+
+
 def _argumentos(corrida, jsonl, *extra):
     return [str(jsonl), "--corrida", str(corrida.raiz), "--modelo", f"archivo:{FICHA_V21}", *extra]
 
@@ -77,7 +83,7 @@ def test_punta_a_punta_dos_corridas(proceso, capsys):
     assert primera["repetidos"] == 0
     assert primera["tokens_entrada"] > 0
 
-    archivos = sorted((corrida.raiz / "extraccion").rglob("*.json"))
+    archivos = _resultados(corrida)
     assert len(archivos) == 4
     for archivo in archivos:
         assert contratos.errores(contratos.SALIDA, json.loads(archivo.read_text(encoding="utf-8"))) == []
@@ -89,7 +95,7 @@ def test_punta_a_punta_dos_corridas(proceso, capsys):
     assert segunda["repetidos"] == 4
     assert segunda["tokens_entrada"] == 0
     assert segunda["por_estado"] == primera["por_estado"]
-    assert sorted((corrida.raiz / "extraccion").rglob("*.json")) == archivos
+    assert _resultados(corrida) == archivos
 
 
 def test_segunda_corrida_sin_llamadas_al_llm(proceso, capsys):
@@ -136,7 +142,7 @@ def test_falla_tecnica_sale_con_1_y_no_se_guarda(proceso, capsys):
     resumen = _resumen(capsys)
     assert resumen["por_estado"] == {"error_proceso": 1}
     assert resumen["errores"] == {"LLM_NO_DISPONIBLE": 1}
-    assert not list((corrida.raiz / "extraccion").rglob("*.json"))
+    assert not _resultados(corrida)
 
 
 def test_azure_pregunta_antes_de_mandar(proceso, capsys):
@@ -197,8 +203,7 @@ def test_azure_lee_el_env_y_rechaza_mini(proceso, capsys, monkeypatch, tmp_path)
 
 
 @pytest.mark.parametrize("cambio, mensaje", [
-    (lambda a: a[:3] + ["--modelo", "mcp"], "todavía no"),
-    (lambda a: a[:3] + ["--modelo", "otra:cosa"], "archivo:<ficha.json>"),
+    (lambda a: a[:3] + ["--modelo", "otra:cosa"], "mcp o archivo:<ficha.json>"),
     (lambda a: a[:3] + ["--modelo", "archivo:/no/existe.json"], "No existe"),
     (lambda a: a + ["--concurrencia", "0"], "--concurrencia"),
     (lambda a: a + ["--llm", "falso"], "--respuestas"),
@@ -221,3 +226,24 @@ def test_corrida_dentro_de_un_repositorio(proceso, capsys):
     (corrida.raiz / ".git").mkdir()
     assert cli.main(_argumentos(corrida, jsonl, "--llm", "falso", "--respuestas", str(RESPUESTAS))) == 2
     assert "repositorio" in capsys.readouterr().err
+
+
+def test_mcp_sin_url(proceso, capsys, monkeypatch, tmp_path):
+    corrida, jsonl, _ = proceso
+    monkeypatch.delenv("MCP_URL", raising=False)
+    monkeypatch.chdir(tmp_path)
+    argumentos = [str(jsonl), "--corrida", str(corrida.raiz), "--modelo", "mcp", "--respuestas", str(RESPUESTAS)]
+    assert cli.main(argumentos) == 2
+    assert "MCP_URL" in capsys.readouterr().err
+
+
+def test_guarda_las_fichas_usadas(proceso, capsys):
+    corrida, jsonl, _ = proceso
+    assert cli.main(_argumentos(corrida, jsonl, "--llm", "falso", "--respuestas", str(RESPUESTAS))) == 0
+    capsys.readouterr()
+    fichas = corrida.raiz / "extraccion" / "fichas"
+    assert sorted(a.relative_to(fichas).as_posix() for a in fichas.rglob("*.json")) == ["v21/TD-16.json", "v21/TD-29.json"]
+    td16 = json.loads((fichas / "v21" / "TD-16.json").read_text(encoding="utf-8"))
+    assert td16["version"] == 21
+    assert td16["seccion"]["id"] == "TD-16"
+    assert all(e["seccion"] == "TD-16" for e in td16["elementos"])
