@@ -35,9 +35,10 @@ def test_errores_no_muestran_valores():
 
 
 def test_parametros_tienen_version():
-    assert version_parametros() == "1"
+    assert version_parametros() == "2"
     llamada = parametros()["llamada"]
     assert llamada["concurrencia"] == 3
     assert llamada["reintentos_falla_pasajera"] == len(llamada["esperas_falla_pasajera_s"]) == 3
     assert llamada["reintentos_respuesta_invalida"] == 2
+    assert llamada["tiempo_limite_s"] == 300
     assert parametros()["firma"]["dpi"] == 300

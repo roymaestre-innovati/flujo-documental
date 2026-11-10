@@ -1,5 +1,5 @@
 {
-  "version": "1",
+  "version": "2",
   "pagina": {
     "dpi": 100,
     "calidad_jpeg": 80
@@ -16,6 +16,7 @@
   },
   "llamada": {
     "concurrencia": 3,
+    "tiempo_limite_s": 300,
     "reintentos_falla_pasajera": 3,
     "esperas_falla_pasajera_s": [2, 4, 8],
     "reintentos_respuesta_invalida": 2,
