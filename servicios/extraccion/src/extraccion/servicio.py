@@ -22,6 +22,7 @@ from normalizacion.almacen import Almacen
 from . import VERSION
 from .entrada import ERROR_PROCESO, ErrorDeSolicitud, preparar, validar
 from .ficha import FichaNoEncontrada, FuenteModelo
+from .ficha_mcp import FuenteNoDisponible
 from .llamada import LlamadaFallida, Llamador
 from .mensaje import VERSION_PROMPT, mensajes
 from .posvalidacion import sobre, sobre_de_error
@@ -82,6 +83,10 @@ def _extraer(servicio: Servicio, solicitud: dict, gasto: _Gasto) -> Callable[[di
             ERROR_PROCESO, "FICHA_NO_ENCONTRADA",
             f"El modelo no tiene la versión {solicitud['version_modelo']} o el tipo documental "
             f"{solicitud['tipo_documental']}.", reintentable=False,
+        ) from None
+    except FuenteNoDisponible:
+        raise ErrorDeSolicitud(
+            ERROR_PROCESO, "MODELO_NO_DISPONIBLE", "El servidor del modelo semántico no respondió.", reintentable=True,
         ) from None
     contenido = preparar_contenido(entrada)
     llamada = servicio.llamador.llamar(mensajes(entrada, ficha, contenido))

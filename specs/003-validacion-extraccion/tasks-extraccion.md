@@ -2,7 +2,7 @@
 
 Sale de `plan-extraccion.md`. Cada tarea termina con sus pruebas en verde y un commit propio.
 
-**Estado al 2026-11-09:** spec, plan y tareas aprobados. T01 a T06 fusionadas. T07 hecha, en revisión.
+**Estado al 2026-11-09:** spec, plan y tareas aprobados. T01 a T07 fusionadas. T08 hecha, en revisión.
 
 ## Para quien implemente
 
@@ -24,7 +24,7 @@ Sale de `plan-extraccion.md`. Cada tarea termina con sus pruebas en verde y un c
 - [x] **T05 — Posvalidación.** `posvalidacion.py` y `validadores.py`: forma, `no_corresponde`, alineación con la ficha, citas fuera del segmento, validadores, motivos, `datos_personales` y sobre validado contra el contrato. Con el `LLMFalso`, las solicitudes de ejemplo dan las salidas de ejemplo (criterio A7). Requisitos R37 a R48, R55 y R56.
 - [x] **T06 — Llamada.** `llm_azure.py` (chat completions con `json_object`, traducción de 429, tiempo agotado y 5xx a las excepciones de `llm.py`, y rechazo de un deployment `mini`) y `llamada.py` (reintentos de la tabla del plan y semáforo global). Las pruebas no tocan la red: un cliente HTTP falso para `llm_azure` y el `LLMFalso` con fallas programadas para `llamada`. Requisitos R49 a R52 y R54.
 - [x] **T07 — Servicio, idempotencia y comando.** `servicio.py` (`extraer_segmento`), la clave y el guardado de `resultados.py`, el comando `extraer` con su confirmación antes de mandar documentos, los registros sin datos personales y el README. Prueba de punta a punta (criterio A8): un proceso inventado normalizado, solicitudes armadas con `orquestador.extraer.solicitud` (solo en pruebas), dos corridas. Requisito R53.
-- [ ] **T08 — Ficha desde el MCP.** `ficha_mcp.py`: `describir_modelo` y `obtener_seccion` con la versión fijada, guardadas en memoria por (versión, TD), y `--modelo mcp` en el comando. El comando guarda las fichas usadas en `extraccion/fichas/` para el visor. Prueba con un servidor MCP falso. El usuario la prueba contra el MCP real con un comando que solo pide la ficha de TD-16 v21 y cuenta sus elementos (no manda documentos). Requisito R30.
+- [x] **T08 — Ficha desde el MCP.** `ficha_mcp.py`: `describir_modelo` y `obtener_seccion` con la versión fijada, guardadas en memoria por (versión, TD), y `--modelo mcp` en el comando. El comando guarda las fichas usadas en `extraccion/fichas/` para el visor. Prueba con un servidor MCP falso. El usuario la prueba contra el MCP real con un comando que solo pide la ficha de TD-16 v21 y cuenta sus elementos (no manda documentos). Requisito R30.
 - [ ] **T09 — Visor.** El visor del orquestador muestra los resultados de `extraccion/`: estado por segmento, campos con valor, confianza contra umbral, motivos, reglas pendientes y citas que abren el PDF en su página. Los campos en revisión van resaltados. Pruebas del servidor del visor con una corrida inventada. Requisito R57.
 - [ ] **T10 — Medición con los gold (A9), solo con autorización.** Script `scripts/medir_gold.py`: corre el servicio sobre los documentos de un TD con gold y compara campo a campo con `gold_TD-NN.xlsx`. Imprime solo conteos de aciertos por campo, tokens y tiempo, al lado de los de la última corrida de `lote.py`. Antes de escribirlo se le pregunta al usuario cómo está armado el gold (columnas) y cómo se cuenta un acierto en los campos de tipo objeto o lista. **Lo corre el usuario**, con TD-16 y TD-29, después de autorizar que esos documentos vayan a gpt-5.4.
 
@@ -171,4 +171,27 @@ Lo que se decidió al escribir y conviene revisar:
 8. **Una línea que no es JSON, una solicitud que no cumple el contrato o un bug en un segmento** no frenan los demás. Se cuentan, se registran (sin el mensaje de la excepción) y el comando sale con 1. También sale con 1 si algún segmento dio `error_proceso`.
 9. **Registros:** una línea por segmento, "Segmento extraído" o "Segmento repetido", con `id_segmento`, TD, versión, estado, campos, campos en revisión, motivos contados, tokens, duración, reintentos, `desde_cache` y el código de error si lo hay. El formato es el de la normalización más esos campos (`FormatoExtraccion`). Como en el orquestador, `id_documento` del contexto lleva el `id_segmento`.
 10. **Guardar las fichas usadas en `extraccion/fichas/`** para el visor queda para T08, junto con el MCP.
+
+### T08 — Ficha desde el MCP (2026-11-10)
+
+`ficha_mcp.py` (`FuenteModeloMCP`, el comando `probar-ficha-mcp`), `FuenteQueGuarda` en `ficha.py`, `--modelo mcp` en `extraer` y el error `MODELO_NO_DISPONIBLE`. Dependencia nueva: `mcp` 2.x (MIT), la misma del modelo semántico. 176 pruebas, con un servidor MCP falso en memoria (el cliente de `mcp` se conecta a un `MCPServer` sin red).
+
+**Hallazgo: `describir_modelo` no recibe versión.** En `modelo-semantico/src/modelo_semantico/servidor.py`, `obtener_seccion` acepta `version`, pero `describir_modelo` siempre da la vigente. Un argumento de más se ignora sin error. La guía de interpretación va en el mensaje al LLM, así que tiene que ser la de la versión fijada (principio 7). Qué se hizo:
+
+- Si `describir_modelo` declara `version` en su esquema, se le pasa.
+- Siempre se comprueba que la versión que dio sea la fijada. Si no, `FichaNoEncontrada` ("el servidor solo da la guía de la versión vigente") y el segmento sale con `FICHA_NO_ENCONTRADA`, no reintentable.
+- Mientras la vigente sea la v21, funciona. **Cuando se publique la v22, los procesos fijados en la v21 dejan de extraer con `--modelo mcp`.** Arreglo recomendado, en el modelo semántico: agregar `version: int | None = None` a `describir_modelo` y pasarlo a `_modelo_o_error` (ya lo admite). Son unas pocas líneas y un despliegue. Este servicio ya lo usa sin cambios. Hay que preguntarle al usuario antes de tocar ese repositorio.
+
+Lo que se decidió al escribir y conviene revisar:
+
+1. **Proyecto y modelo:** `X-Proyecto: extraccion_documental` y modelo `extraccion_documental`, como `lote.py`. Fijos en el código. Se pueden volver variables si hace falta.
+2. **Una conexión por ficha nueva**, no una sesión abierta todo el proceso. Son pocas (una por versión y TD) y así no hay sesión que se caiga a la mitad. La descripción se guarda por versión y la ficha por (versión, TD). Un candado evita que dos hilos pidan lo mismo.
+3. **Errores:**
+   - Lo que el servidor dice que no existe (modelo, versión, sección), según su texto ("no existe", "no tiene la versión"): `FichaNoEncontrada`, que da `FICHA_NO_ENCONTRADA`. Depende del texto de `servidor.py`. Si cambia, cae en el caso siguiente.
+   - Otro error de la tool (proyecto no habilitado, falta el header): `ErrorDelMCP`, un error de configuración. Se lanza; en el comando cuenta como falla interna.
+   - No se pudo conectar (caído, tiempo agotado de 60 s, red): `FuenteNoDisponible`, que da `error_proceso` `MODELO_NO_DISPONIBLE`, reintentable y sin guardar. La extracción no reintenta por su cuenta: lo reintenta el orquestador.
+4. **La sección se busca primero en `secciones`** de la descripción. Un TD que no está no gasta la llamada a `obtener_seccion`.
+5. **Fichas guardadas para el visor:** `<corrida>/extraccion/fichas/v<versión>/<TD>.json`, con `modelo`, `version`, `seccion` y `elementos` (sin la guía, que el visor no usa). Se guardan con `--modelo mcp` y con `--modelo archivo:`, la primera vez que se usa cada una. Son metadatos del modelo, sin datos de documentos.
+6. **`probar-ficha-mcp --td TD-16 --version 21`:** pide una ficha e imprime solo conteos (elementos, a extraer, con valores permitidos, `td_probado`, largo de la guía). No manda documentos. Lee `MCP_URL` y `MCP_API_KEY` del entorno o del `.env` de la carpeta actual.
+7. **Sin prueba de las cabeceras HTTP reales** (`X-Proyecto`, `X-Api-Key`): el cliente HTTP se arma dentro de `desde_entorno`. Lo comprueba la corrida del usuario contra el MCP real: sin ellas, el servidor responde 401 o "Falta el header X-Proyecto".
 

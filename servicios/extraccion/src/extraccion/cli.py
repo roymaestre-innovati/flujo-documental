@@ -1,6 +1,6 @@
 """Comando `extraer`: extrae los segmentos de una corrida local del orquestador.
 
-    extraer <solicitudes.jsonl> --corrida <carpeta> --modelo archivo:<ficha.json>
+    extraer <solicitudes.jsonl> --corrida <carpeta> --modelo mcp|archivo:<ficha.json>
             [--llm falso --respuestas <carpeta> | --llm azure] [--solo <id_segmento>]…
             [--concurrencia 3] [--forzar] [--si-mando-documentos] [--registros <archivo>]
 
@@ -9,6 +9,10 @@ resultados van a `<corrida>/extraccion/`, donde los encuentra el visor. Una
 segunda corrida devuelve los resultados guardados sin llamar al LLM, salvo con
 `--forzar`.
 
+- `--modelo mcp` pide la ficha al servidor MCP del modelo semántico, con
+  `MCP_URL` y `MCP_API_KEY` del entorno o del `.env`. El MCP solo recibe la versión
+  y el TD, nunca contenido de los documentos. Las fichas usadas quedan en
+  `<corrida>/extraccion/fichas/v<versión>/<TD>.json`, para el visor.
 - `--llm falso` responde sin red con `<respuestas>/TD-NN.json`, uno por TD.
 - `--llm azure` usa gpt-5.4 con `AZURE_OPENAI_ENDPOINT`, `AZURE_OPENAI_API_KEY` y
   `AZURE_OPENAI_DEPLOYMENT` del entorno o del `.env` de la carpeta actual, sin
@@ -35,7 +39,8 @@ from normalizacion.registros import lugar_de_la_excepcion
 
 from . import VERSION
 from .entrada import SolicitudInvalida
-from .ficha import FuenteModeloArchivo
+from .ficha import FuenteModelo, FuenteModeloArchivo, FuenteQueGuarda
+from .ficha_mcp import FuenteModeloMCP
 from .llamada import Llamador
 from .llm import ClienteLLM, LLMFalso
 from .llm_azure import ConfiguracionIncompleta, DeploymentNoPermitido, LLMAzureOpenAI
@@ -46,6 +51,7 @@ from .resultados import ResultadosEnCarpeta
 from .servicio import Servicio, extraer_segmento
 
 CARPETA_RESULTADOS = "extraccion"
+CARPETA_FICHAS = "fichas"
 PREGUNTA = "Esto manda documentos al modelo de lenguaje en la nube. ¿Seguir? (s/N) "
 
 
@@ -57,7 +63,7 @@ def _argumentos(argv):
     p = argparse.ArgumentParser(prog="extraer", description="Extrae los segmentos de una corrida del orquestador.")
     p.add_argument("solicitudes", type=Path, help="solicitudes-extraccion.jsonl de la corrida")
     p.add_argument("--corrida", type=Path, required=True, help="carpeta de la corrida, con almacen/")
-    p.add_argument("--modelo", required=True, help="archivo:<ficha.json> (el MCP llega en T08)")
+    p.add_argument("--modelo", required=True, help="mcp (MCP_URL y MCP_API_KEY) o archivo:<ficha.json>")
     p.add_argument("--llm", choices=("falso", "azure"), default="falso")
     p.add_argument("--respuestas", type=Path, help="con --llm falso: carpeta con TD-NN.json")
     p.add_argument("--solo", action="append", default=[], metavar="ID_SEGMENTO", help="extrae solo esos segmentos")
@@ -74,12 +80,20 @@ class ErrorDeUso(Exception):
     """Un argumento o la configuración no sirven. Se informa y el comando sale con 2."""
 
 
-def _fuente(modelo: str) -> FuenteModeloArchivo:
+def _entorno() -> dict:
+    """Las variables del entorno, completadas con el `.env` de la carpeta actual."""
+    return {**dotenv_values(Path.cwd() / ".env"), **os.environ}
+
+
+def _fuente(modelo: str) -> FuenteModelo:
+    if modelo == "mcp":
+        try:
+            return FuenteModeloMCP.desde_entorno(_entorno())
+        except ValueError as error:
+            raise ErrorDeUso(str(error)) from None
     tipo, _, ruta = modelo.partition(":")
-    if tipo == "mcp":
-        raise ErrorDeUso("--modelo mcp todavía no está disponible: use archivo:<ficha.json>.")
     if tipo != "archivo" or not ruta:
-        raise ErrorDeUso("--modelo debe ser archivo:<ficha.json>.")
+        raise ErrorDeUso("--modelo debe ser mcp o archivo:<ficha.json>.")
     if not Path(ruta).is_file():
         raise ErrorDeUso("No existe el archivo de la ficha.")
     return FuenteModeloArchivo(ruta)
@@ -92,9 +106,8 @@ def _respuestas_falsas(carpeta: Path | None) -> LLMFalso:
 
 
 def _llm_azure() -> LLMAzureOpenAI:
-    entorno = {**dotenv_values(Path.cwd() / ".env"), **os.environ}
     try:
-        return LLMAzureOpenAI.desde_entorno(entorno)
+        return LLMAzureOpenAI.desde_entorno(_entorno())
     except (ConfiguracionIncompleta, DeploymentNoPermitido) as error:
         raise ErrorDeUso(str(error)) from None
 
@@ -176,8 +189,8 @@ def correr(solicitudes: list[dict], servicio: Servicio, hilos: int, forzar: bool
 
 
 def main(argv: list[str] | None = None, cliente: ClienteLLM | None = None, entrada=input,
-         reloj: Reloj | None = None) -> int:
-    """`cliente`, `entrada` y `reloj` son solo para las pruebas."""
+         reloj: Reloj | None = None, fuente: FuenteModelo | None = None) -> int:
+    """`cliente`, `entrada`, `reloj` y `fuente` son solo para las pruebas."""
     args = _argumentos(argv)
     corrida = args.corrida.resolve()
     try:
@@ -189,7 +202,7 @@ def main(argv: list[str] | None = None, cliente: ClienteLLM | None = None, entra
             raise ErrorDeUso("No existe el archivo de solicitudes.")
         if args.concurrencia < 1:
             raise ErrorDeUso("--concurrencia debe ser 1 o más.")
-        fuente = _fuente(args.modelo)
+        fuente = fuente or _fuente(args.modelo)
         if cliente is None:
             cliente = _llm_azure() if args.llm == "azure" else _respuestas_falsas(args.respuestas)
         if args.llm == "azure" and not args.si_mando_documentos and not _confirmar(entrada):
@@ -212,7 +225,7 @@ def main(argv: list[str] | None = None, cliente: ClienteLLM | None = None, entra
         ajustes = {**parametros()["llamada"], "concurrencia": args.concurrencia}
         servicio = Servicio(
             almacen=AlmacenLocal(corrida / CARPETA_ALMACEN),
-            fuente=fuente,
+            fuente=FuenteQueGuarda(fuente, corrida / CARPETA_RESULTADOS / CARPETA_FICHAS),
             llamador=Llamador(cliente, reloj, ajustes),
             resultados=ResultadosEnCarpeta(corrida / CARPETA_RESULTADOS),
             reloj=reloj,

@@ -92,3 +92,28 @@ class FuenteModeloArchivo(FuenteModelo):
         if modelo is None:
             raise FichaNoEncontrada(f"No existe la versión {version} del modelo")
         return ficha_desde(modelo, tipo_documental)
+
+
+class FuenteQueGuarda(FuenteModelo):
+    """Guarda cada ficha usada en `<carpeta>/v<versión>/<TD>.json`, para el visor.
+
+    Lo guardado son metadatos del modelo (elementos, umbrales, reglas), sin datos
+    de documentos.
+    """
+
+    def __init__(self, fuente: FuenteModelo, carpeta: str | os.PathLike[str]) -> None:
+        self._fuente = fuente
+        self.carpeta = os.fspath(carpeta)
+
+    def ficha(self, version: int, tipo_documental: str) -> Ficha:
+        ficha = self._fuente.ficha(version, tipo_documental)
+        ruta = os.path.join(self.carpeta, f"v{version}", f"{tipo_documental}.json")
+        if not os.path.exists(ruta):
+            os.makedirs(os.path.dirname(ruta), exist_ok=True)
+            datos = {"modelo": ficha.modelo, "version": ficha.version, "seccion": ficha.seccion,
+                     "elementos": list(ficha.elementos)}
+            temporal = f"{ruta}.{os.getpid()}.{id(ficha)}.tmp"
+            with open(temporal, "w", encoding="utf-8") as archivo:
+                json.dump(datos, archivo, ensure_ascii=False, indent=1)
+            os.replace(temporal, ruta)
+        return ficha
