@@ -25,7 +25,8 @@ from .ficha import FichaNoEncontrada, FuenteModelo
 from .ficha_mcp import FuenteNoDisponible
 from .llamada import LlamadaFallida, Llamador
 from .llm import PedidoRechazado
-from .mensaje import VERSION_PROMPT, mensajes
+from .mensaje import VERSION_PROMPT, mensajes, tamano
+from .parametros import parametros
 from .posvalidacion import sobre, sobre_de_error
 from .preproceso import preparar_contenido
 from .registros import contexto_de, registro, resumen
@@ -74,6 +75,19 @@ def _ejecucion(servicio: Servicio, id_ejecucion: str, inicio, comienzo: float, g
     }
 
 
+def _revisar_tamano(pedido: list[dict]) -> None:
+    """Un segmento que no cabe en un pedido no se extrae: va entero a revisión (decisión del usuario, 2026-11-10)."""
+    topes = parametros()["llamada"]
+    imagenes, bytes_ = tamano(pedido)
+    if imagenes > topes["max_imagenes_por_pedido"] or bytes_ > topes["max_bytes_por_pedido"]:
+        raise ErrorDeSolicitud(
+            ERROR_PROCESO, "SEGMENTO_DEMASIADO_GRANDE",
+            f"El segmento necesita {imagenes} imágenes y {bytes_ / 1e6:.1f} MB; el tope por pedido es "
+            f"{topes['max_imagenes_por_pedido']} imágenes y {topes['max_bytes_por_pedido'] / 1e6:.0f} MB.",
+            reintentable=False,
+        )
+
+
 def _extraer(servicio: Servicio, solicitud: dict, gasto: _Gasto) -> Callable[[dict], dict]:
     """Corre los pasos y devuelve cómo armar el resultado con su `ejecucion`."""
     entrada = preparar(solicitud, servicio.almacen)
@@ -90,8 +104,10 @@ def _extraer(servicio: Servicio, solicitud: dict, gasto: _Gasto) -> Callable[[di
             ERROR_PROCESO, "MODELO_NO_DISPONIBLE", "El servidor del modelo semántico no respondió.", reintentable=True,
         ) from None
     contenido = preparar_contenido(entrada)
+    pedido = mensajes(entrada, ficha, contenido)
+    _revisar_tamano(pedido)
     try:
-        llamada = servicio.llamador.llamar(mensajes(entrada, ficha, contenido))
+        llamada = servicio.llamador.llamar(pedido)
     except PedidoRechazado as rechazo:
         raise ErrorDeSolicitud(
             ERROR_PROCESO, "LLM_RECHAZO", f"El modelo de lenguaje rechazó el pedido ({rechazo.codigo}).", reintentable=False,

@@ -53,6 +53,13 @@ def encabezado(entrada: Entrada, ficha: Ficha) -> str:
     ])
 
 
+def tamano(mensajes: list[dict]) -> tuple[int, int]:
+    """Cuántas imágenes lleva el pedido y cuántos bytes pesa en JSON (lo que viaja a Azure)."""
+    imagenes = sum(1 for m in mensajes if isinstance(m.get("content"), list)
+                   for p in m["content"] if p.get("type") == "image_url")
+    return imagenes, len(json.dumps(mensajes, ensure_ascii=False).encode("utf-8"))
+
+
 def mensajes(entrada: Entrada, ficha: Ficha, contenido: Contenido) -> list[dict]:
     """Los mensajes de chat completions para extraer un segmento."""
     sistema = f"{prompt()}\n\n{ficha.guia.strip()}"

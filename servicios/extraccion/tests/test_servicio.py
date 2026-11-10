@@ -198,3 +198,19 @@ def test_pedido_rechazado_es_error_de_proceso_no_reintentable(corrida, documento
                                   "mensaje": "El modelo de lenguaje rechazó el pedido (too_many_images)."}
     assert len(llm.llamadas) == 1, "no se reintenta"
     assert contratos.errores(contratos.SALIDA, resultado) == []
+
+
+def test_segmento_que_no_cabe_en_un_pedido_no_se_extrae(corrida, servicio, llm, monkeypatch):
+    from extraccion import parametros as p
+    from fabrica import pdf_mixto
+    (documento,) = corrida.normalizar({"mixto.pdf": pdf_mixto()}, id_oferente="OF-002")
+    topes = {**p.parametros()["llamada"], "max_imagenes_por_pedido": 2}
+    monkeypatch.setitem(p.parametros(), "llamada", topes)
+    solicitud = corrida.solicitud(documento, 1, 6)
+    resultado = extraer_segmento(solicitud, servicio)
+    assert resultado["estado"] == "error_proceso"
+    assert resultado["error"]["codigo"] == "SEGMENTO_DEMASIADO_GRANDE"
+    assert resultado["error"]["reintentable"] is False
+    assert "tope por pedido es 2 imágenes" in resultado["error"]["mensaje"]
+    assert llm.llamadas == [], "no se manda nada"
+    assert servicio.resultados.buscar(Clave.de(solicitud)) is None
