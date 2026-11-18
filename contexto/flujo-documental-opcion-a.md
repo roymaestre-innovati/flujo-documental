@@ -117,7 +117,7 @@ fase2/<event_id>/
 
 - **No es la forma que espera el orquestador** (`PROCESO/` y una subcarpeta por oferente con su identificador). El reparto se adapta a esta forma (tareas de `specs/005-orquestador/tasks-entrada-onelake.md`).
 - **La carpeta del oferente lleva su nombre, no un identificador.** El identificador está en la tabla `bronce.tbl_evaluacionofertas_oferentes_control` (`sm_vendor_id`, con `folder_adls_path` para ubicar la carpeta).
-- **Llegan comprimidos, contra lo que se había confirmado** (decisión 2). En la muestra hay 25 ZIP o RAR (20 RAR y 5 ZIP), algunos dentro de otros. El módulo 1 los descomprime de forma recursiva en `_contenido/` y deja también el original. Si se procesan los dos, cada documento entra dos veces, y el comprimido sale como `no_soportado` con una tarea de error que no sirve a nadie.
+- **Llegan comprimidos, contra lo que se había confirmado** (decisión 2). En la muestra hay 25 ZIP o RAR (20 RAR y 5 ZIP), algunos dentro de otros. El módulo 1 los descomprime de forma recursiva en `_contenido/` y deja también el original. Si se procesan los dos, cada documento entra dos veces, y el comprimido sale como `no_soportado` con una tarea de error que no sirve a nadie. **Se baja solo lo descomprimido** (decisión 2, cambiada): los ZIP y RAR no se bajan.
 - **Hay archivos JSON del módulo 1** (34 en la muestra, con tres formas de nombre fijas) que no son documentos del oferente. Hay que confirmar qué traen antes de excluirlos.
 - Las tablas Delta del lakehouse (`bronce.*`, `control.*`) traen los metadatos de cada adjunto: `adls_path`, `md5_hex`, `downloaded_bytes`, `file_status`, `is_compressed_archive` y `parent_archive_key`. Sirven para repartir y para saber de qué comprimido sale cada archivo, sin adivinar por nombres.
 
@@ -683,7 +683,7 @@ Precios de referencia de agregadores, sin confirmar en Azure: gpt-5.4 a $2,50 / 
 ## Cambios a decisiones anteriores
 
 - **D18:** además de PDF e imagen, la extracción acepta el Excel nativo como anexo.
-- **Decisión 2 (2026-11-18):** sí llegan ZIP y RAR, pero el módulo 1 ya los descomprime en `_contenido/`. Se procesa lo descomprimido y se deja fuera el comprimido original (propuesta, por confirmar con el usuario: T03 de `specs/005-orquestador/tasks-entrada-onelake.md`).
+- **Decisión 2 (2026-11-18):** sí llegan ZIP y RAR, pero el módulo 1 ya los descomprime en `_contenido/`. Confirmado por el usuario: solo se baja lo descomprimido. Los ZIP y RAR no se bajan nunca, tampoco los que vienen dentro de `_contenido/`. Un comprimido sin contenido descomprimido no se baja, pero se avisa al evaluador para que no se evalúe con documentos de menos (T03 de `specs/005-orquestador/tasks-entrada-onelake.md`).
 - **Decisión 35 (2026-11-18):** los archivos los lee el orquestador (manejador `Normalizar`, con `OrigenOneLake`), no la normalización. Están en ADLS Gen2 del módulo 1 y se leen por un shortcut de OneLake. La prueba de acceso se hizo con el usuario del equipo; falta repetirla con la identidad administrada.
 - **D13:** se agrega el motivo de revisión `CLASIFICACION_DUDOSA`, activado por el campo `clasificacion_dudosa` de la entrada.
 - **O1:** el transporte es cola de Service Bus.

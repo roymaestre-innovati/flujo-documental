@@ -32,7 +32,7 @@ Un servicio aparte solo agregaría una copia de los originales o un salto de red
   - ¿Qué traen los tres tipos de JSON del módulo 1? Solo las llaves, sin valores.
   - ¿Cómo se pasa de `event_id` al identificador del proceso (SR…)? Ver `tbl_evaluacionofertas_eventos_listados`.
 
-  Las tablas se leen con `deltalake` o con `pyarrow` aplicando el log de Delta. Leer las parquet directo cuenta también las versiones viejas. **Alto: con las respuestas, el usuario decide las reglas de T03.**
+  Las tablas se leen con `deltalake` o con `pyarrow` aplicando el log de Delta. Leer las parquet directo cuenta también las versiones viejas. **Alto: con las respuestas, el usuario decide cómo se identifica al oferente y qué se hace con los JSON en T03.**
 
 - [ ] **T02 — `OrigenOneLake`.** En `servicios/orquestador/src/orquestador/origen.py`, con `azure-identity` y `azure-storage-file-datalake` como dependencias.
   - Se configura con workspace, lakehouse y `DefaultAzureCredential`.
@@ -46,7 +46,9 @@ Un servicio aparte solo agregaría una copia de los originales o un salto de red
   - `Documentos del proceso/` pasa a `PROCESO`.
   - `Oferentes/<carpeta>/` pasa al identificador del oferente, según T01.
   - Lo que esté fuera de esas dos carpetas rechaza el aviso, como hoy un archivo suelto.
-  - Reglas propuestas, por confirmar tras T01: se deja fuera el comprimido original cuando su contenido está en `_contenido/`, y un comprimido sin contenido entra y sale como `no_soportado` con su tarea de error. Los JSON del módulo 1 también se dejan fuera.
+  - **Comprimidos (decidido por el usuario, 2026-11-18):** solo se baja lo descomprimido. Ningún ZIP ni RAR entra en una entrega, tampoco los que vienen dentro de `_contenido/`. El tipo se reconoce por los primeros bytes o por los metadatos del módulo 1 (`is_compressed_archive`), no solo por la extensión.
+  - Un comprimido cuyo contenido no está (el módulo 1 no lo pudo descomprimir) no se baja, pero no se calla: queda registrado en la entrega y genera una tarea `documento_con_error` con motivo `comprimido_sin_contenido`, para que no se evalúe a nadie con documentos de menos. Cómo se sabe que falta el contenido sale de T01 (`parent_archive_key` o la carpeta `_contenido/`).
+  - Los JSON del módulo 1 también se dejan fuera, si T01 confirma que no son documentos.
   - Lo excluido se cuenta en el registro de la apertura, por motivo.
   - Pruebas con un proceso inventado: dos oferentes, un RAR con su `_contenido/`, un ZIP dentro de otro, un RAR sin descomprimir y un JSON del módulo 1.
 
@@ -61,7 +63,7 @@ Un servicio aparte solo agregaría una copia de los originales o un salto de red
   - Debe imprimir solo conteos: archivos listados, excluidos por motivo, bajados, MB y tiempo de descarga.
   - Debe imprimir también los documentos normalizados, copias exactas y errores por tipo, y compararlos con los `file_status` de `adjuntos_metadata` de ese evento.
   - La salida va fuera del repositorio y se borra al terminar.
-  - Criterio: ningún archivo de documentos queda sin entrega y no se bajan comprimidos que ya tienen contenido.
+  - Criterio: ningún archivo de documentos queda sin entrega, no se baja ningún ZIP ni RAR y cada comprimido sin contenido tiene su tarea.
 
 - [ ] **T07 — Cierre.** Notas de lo encontrado aquí. Actualizar el paso 0 y A-1 del diseño, la tabla de interfaces de `plan.md` ("Lo que cambió al implementar") y el README del repo.
 
