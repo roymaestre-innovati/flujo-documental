@@ -26,44 +26,42 @@ Un servicio aparte solo agregaría una copia de los originales o un salto de red
 
 ## Tareas
 
-- [ ] **T01 — Metadatos del módulo 1.** Script de solo lectura (en `servicios/prueba-onelake/`) que, por evento, cruce el listado de OneLake con las tablas `bronce.tbl_evaluacionofertas_adjuntos_metadata` y `bronce.tbl_evaluacionofertas_oferentes_control`, e imprima solo conteos. Debe responder cuatro preguntas:
-  - ¿Cada carpeta de oferente tiene un `sm_vendor_id` en `oferentes_control`?
-  - ¿Los archivos de `_contenido/` se ligan a su comprimido con `parent_archive_key`?
-  - ¿Qué traen los tres tipos de JSON del módulo 1? Solo las llaves, sin valores.
-  - ¿Cómo se pasa de `event_id` al identificador del proceso (SR…)? Ver `tbl_evaluacionofertas_eventos_listados`.
-
-  Las tablas se leen con `deltalake` o con `pyarrow` aplicando el log de Delta. Leer las parquet directo cuenta también las versiones viejas. **Alto: con las respuestas, el usuario decide cómo se identifica al oferente y qué se hace con los JSON en T03.**
+- [ ] **T01 — Metadatos del módulo 1.** Casi resuelta en la revisión del 2026-11-18 (ver la nota de T01): **el reparto sale de las tablas del módulo 1, no de listar carpetas** (decidido por el usuario). Es provisional: el módulo 1 prometió una vista con lo que necesitamos, y la definimos más adelante con lo que se use aquí (sección "Lo que usamos de las tablas"). Falta:
+  - Cómo se pasa de `event_id` al identificador del proceso (SR…). Ver `tbl_evaluacionofertas_eventos_listados`.
+  - Qué traen los JSON del módulo 1. Ya no entran, porque no están en la tabla, pero pueden servir para la vista.
+  - Preguntarle al módulo 1 por los 134 archivos huérfanos y por los oferentes con `has_bid = False`.
 
 - [ ] **T02 — `OrigenOneLake`.** En `servicios/orquestador/src/orquestador/origen.py`, con `azure-identity` y `azure-storage-file-datalake` como dependencias.
   - Se configura con workspace, lakehouse y `DefaultAzureCredential`.
   - Las rutas son relativas a `Files/`.
-  - `listar` es recursivo, devuelve solo archivos, en orden y relativos a la carpeta.
-  - `bajar` escribe al disco por partes, no carga el archivo entero en memoria (hay RAR de 78 MB), y revisa que el tamaño coincida con el listado.
+  - `listar` es recursivo, devuelve solo archivos, en orden y relativos a la carpeta. Con el reparto por tabla ya no lo usa la apertura, pero sirve para la revisión de T06.
+  - `bajar` escribe al disco por partes, no carga el archivo entero en memoria (hay RAR de 78 MB). Si recibe el tamaño y el MD5 esperados (de la tabla), los revisa; si no coinciden, es un error de proceso, no del documento.
   - Errores: 404 es `ErrorOrigen`; 429, 5xx y timeouts son `ErrorTransitorio`; 401 y 403 son una falla de configuración que va a operación sin reintentos.
-  - Pruebas con el cliente falso, incluidas una ruta con `..` y un tamaño que no coincide.
+  - Pruebas con el cliente falso, incluidas una ruta con `..` y un MD5 que no coincide.
 
-- [ ] **T03 — Reparto con las carpetas del módulo 1.** Variante de `repartir` en `apertura.py`, elegida por configuración, que traduce la forma del módulo 1 a entregas:
-  - `Documentos del proceso/` pasa a `PROCESO`.
-  - `Oferentes/<carpeta>/` pasa al identificador del oferente, según T01.
-  - Lo que esté fuera de esas dos carpetas rechaza el aviso, como hoy un archivo suelto.
-  - **Comprimidos (decidido por el usuario, 2026-11-18):** solo se baja lo descomprimido. Ningún ZIP ni RAR entra en una entrega, tampoco los que vienen dentro de `_contenido/`. El tipo se reconoce por los primeros bytes o por los metadatos del módulo 1 (`is_compressed_archive`), no solo por la extensión.
-  - Un comprimido cuyo contenido no está (el módulo 1 no lo pudo descomprimir) no se baja, pero no se calla: queda registrado en la entrega y genera una tarea `documento_con_error` con motivo `comprimido_sin_contenido`, para que no se evalúe a nadie con documentos de menos. Cómo se sabe que falta el contenido sale de T01 (`parent_archive_key` o la carpeta `_contenido/`).
-  - Los JSON del módulo 1 también se dejan fuera, si T01 confirma que no son documentos.
+- [ ] **T03 — Reparto con las tablas del módulo 1.** Un módulo nuevo del orquestador (`entrada_modulo1.py`) lee las dos tablas Delta por OneLake (`deltalake`, versión vigente) y arma, para un `event_id`, la lista `archivos` del aviso (`ruta` e `id_oferente`) que ya define el contrato `proceso-listo`. La apertura no cambia: reparte con esa lista, como hoy. Cuando llegue la vista, solo cambia este módulo.
+  - `doc_category = DOCUMENTOS_PROCESO`: documento del proceso (`id_oferente` vacío).
+  - `doc_category = OFERENTE`: el `id_oferente` es el `sm_vendor_id` de `oferentes_control`, cruzando por `event_id` e `invitation_id`. Una fila de oferente que no cruza rechaza el aviso: no se reparte a ciegas.
+  - Cualquier otro valor de `doc_category` rechaza el aviso.
+  - Las rutas (`adls_path`) son relativas a la carpeta del shortcut (`informacion-adjuntos/`). Las repetidas cuentan una vez.
+  - **Comprimidos (decidido por el usuario, 2026-11-18):** solo se baja lo descomprimido. Las filas con `is_compressed_archive = True` no entran en ninguna entrega, tampoco las que vienen dentro de `_contenido/`.
+  - Un comprimido sin filas hijas (ninguna con su `idempotency_key` como `parent_archive_key`) no se baja, pero no se calla: genera una tarea `documento_con_error` con motivo `comprimido_sin_contenido`, en la entrega a la que pertenece, para que no se evalúe a nadie con documentos de menos. En la muestra hay 6.
+  - Lo que no está en la tabla (los JSON del módulo 1 y los archivos huérfanos) no entra. El MD5 y el tamaño de cada fila se pasan a `bajar` (T02).
   - Lo excluido se cuenta en el registro de la apertura, por motivo.
-  - Pruebas con un proceso inventado: dos oferentes, un RAR con su `_contenido/`, un ZIP dentro de otro, un RAR sin descomprimir y un JSON del módulo 1.
+  - Pruebas con tablas inventadas (filas en memoria, sin Delta): proceso y dos oferentes, un RAR con hijos, un ZIP dentro de otro, un RAR sin hijos, una ruta repetida, un oferente que no cruza y una categoría desconocida.
 
 - [ ] **T04 — Bajar en paralelo.** `Normalizar` baja hoy los archivos de uno en uno. A ~1,5 MB/s por archivo, un oferente de 200 MB tarda más de 2 minutos solo en bajar.
   - Se baja con varios hilos (`paralelo_bajar`, 4 por defecto) a la misma carpeta temporal.
   - Si un archivo falla, falla la entrega, como hoy.
   - Se mide en T06 y se ajusta el valor.
 
-- [ ] **T05 — Comando.** `orquestar` acepta `--onelake-workspace`, `--onelake-lakehouse` y `--ruta` (por ejemplo `informacion-adjuntos/fase2/<event_id>`) en lugar de `--origen`, y arma el aviso con el identificador del proceso que salga de T01. Sin `--clasificacion` sigue saliendo todo TD-99. Prueba de punta a punta con el cliente falso. README del orquestador actualizado.
+- [ ] **T05 — Comando.** `orquestar` acepta `--onelake-workspace`, `--onelake-lakehouse` y `--evento <event_id>` en lugar de `--origen`, y arma el aviso con la lista de T03 y el identificador del proceso que salga de T01. Sin `--clasificacion` sigue saliendo todo TD-99. Prueba de punta a punta con el cliente falso. README del orquestador actualizado.
 
 - [ ] **T06 — Corrida con un evento real.** La corre el usuario en su máquina, con `az login`, sobre el evento más chico de `fase2/` (39 archivos del proceso y 6 oferentes, o 21 y 9).
-  - Debe imprimir solo conteos: archivos listados, excluidos por motivo, bajados, MB y tiempo de descarga.
+  - Debe imprimir solo conteos: filas de la tabla, archivos excluidos por motivo, bajados, MB y tiempo de descarga. También, para revisar la tabla: cuántos archivos hay en la carpeta del evento que no están en la tabla (sin contar los JSON).
   - Debe imprimir también los documentos normalizados, copias exactas y errores por tipo, y compararlos con los `file_status` de `adjuntos_metadata` de ese evento.
   - La salida va fuera del repositorio y se borra al terminar.
-  - Criterio: ningún archivo de documentos queda sin entrega, no se baja ningún ZIP ni RAR y cada comprimido sin contenido tiene su tarea.
+  - Criterio: cada fila de documento de la tabla queda en una entrega, no se baja ningún ZIP ni RAR y cada comprimido sin contenido tiene su tarea.
 
 - [ ] **T07 — Cierre.** Notas de lo encontrado aquí. Actualizar el paso 0 y A-1 del diseño, la tabla de interfaces de `plan.md` ("Lo que cambió al implementar") y el README del repo.
 
@@ -71,8 +69,37 @@ Un servicio aparte solo agregaría una copia de los originales o un salto de red
 
 - La identidad administrada del job y el acceso en producción. Se pide al módulo 1 (A-1) y se prueba al desplegar en Container Apps.
 - El aviso real por Service Bus. Aquí el aviso lo arma el comando.
-- Leer las tablas Delta en cada corrida. Si T01 muestra que hacen falta para repartir, se propone primero que el módulo 1 mande la lista de archivos en el aviso (`archivos` del contrato `proceso-listo`).
+- La vista del módulo 1. Se define después con la sección siguiente; mientras tanto se leen sus tablas internas, que pueden cambiar sin aviso.
+
+## Lo que usamos de las tablas
+
+Es el borrador de lo que le pediremos al módulo 1 en la vista. Se actualiza en cada tarea si se usa algo más.
+
+| Tabla | Columna | Para qué |
+|---|---|---|
+| `bronce.tbl_evaluacionofertas_adjuntos_metadata` | `event_id` | Filtrar el proceso |
+| | `doc_category` | Proceso u oferente |
+| | `invitation_id` | Cruzar con el oferente |
+| | `adls_path` | Ruta del archivo |
+| | `downloaded_bytes`, `md5_hex` | Revisar lo bajado |
+| | `is_compressed_archive`, `idempotency_key`, `parent_archive_key` | Excluir comprimidos y detectar los que no tienen contenido |
+| `bronce.tbl_evaluacionofertas_oferentes_control` | `event_id`, `invitation_id` | Cruce |
+| | `sm_vendor_id` | Identificador del oferente |
+| `bronce.tbl_evaluacionofertas_eventos_listados` | por definir en T01 | Identificador del proceso (SR…) |
+
+Lo ideal en la vista: una fila por documento descargado, con el proceso, el identificador del oferente (vacío en los del proceso), la ruta, el tamaño, el MD5 y la marca de comprimido sin contenido, sin los comprimidos y sin restos de corridas viejas. Así sobraría todo el cruce de T03.
 
 ## Notas de implementación
 
-(vacío)
+### T01 — Revisión de las tablas (2026-11-18)
+
+Versión vigente de las tablas, leída con `deltalake` (5 s cada una). Solo conteos.
+
+- `adjuntos_metadata`: versión 8, 310 filas, 4 eventos. `doc_category`: 172 `DOCUMENTOS_PROCESO` y 138 `OFERENTE`. `file_status`: 108 `EXITOSO` y 202 `YA_EXISTIA_IDENTICO`.
+- Las 310 filas existen en la carpeta y el tamaño coincide con `downloaded_bytes` en todas. Hay 10 rutas repetidas.
+- Comprimidos: 18 filas con `is_compressed_archive`. Las 136 filas que salen de un comprimido encuentran su padre por `parent_archive_key`. Hay 6 comprimidos sin ninguna fila hija.
+- `oferentes_control`: versión 7, 20 oferentes, todos con `sm_vendor_id`. 10 con `has_bid = False`: falta saber si se evalúan.
+- El cruce por `event_id` e `invitation_id` funciona para las 138 filas de oferente. Las filas del proceso también traen `invitation_id`, pero no cruzan, como se espera.
+- En la carpeta hay 168 archivos que no están en la tabla:
+  - 34 son los JSON del módulo 1.
+  - 134 están dentro de `_contenido/`, en carpetas sin ninguna fila en la tabla. Todos se escribieron entre las 21:04 y las 21:05 del 2026-10-21, con la misma profundidad que los registrados. Parecen una descompresión de una corrida vieja que quedó huérfana. Listando carpetas habrían entrado dos veces: es la razón principal para repartir con la tabla.
