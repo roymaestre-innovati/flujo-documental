@@ -9,9 +9,9 @@ import pytest
 from orquestador import CONTRATO, CONTRATO_EXTRACCION, contratos
 
 EJEMPLOS = {
-    contratos.PROCESO_LISTO: "modulo5-orquestador/v0/ejemplos/proceso-listo_*.json",
-    contratos.CLASIFICACION_SOLICITUD: "modulo5-orquestador/v0/ejemplos/clasificacion-solicitud_*.json",
-    contratos.CLASIFICACION_RESPUESTA: "modulo5-orquestador/v0/ejemplos/clasificacion-respuesta_*.json",
+    contratos.PROCESO_LISTO: "modulo5-orquestador/v0.2/ejemplos/proceso-listo_*.json",
+    contratos.CLASIFICACION_SOLICITUD: "modulo5-orquestador/v0.2/ejemplos/clasificacion-solicitud_*.json",
+    contratos.CLASIFICACION_RESPUESTA: "modulo5-orquestador/v0.2/ejemplos/clasificacion-respuesta_*.json",
     contratos.EXTRACCION_ENTRADA: "modulo3-extraccion/v0.2/ejemplos/entrada_*.json",
 }
 
@@ -79,3 +79,30 @@ def test_los_errores_no_traen_valores_del_mensaje():
     encontrados = contratos.errores(contratos.PROCESO_LISTO, aviso)
     assert encontrados == ["fecha: no cumple 'format'"]
     assert "Juan" not in str(contratos.MensajeInvalido(contratos.PROCESO_LISTO, encontrados))
+
+
+def _aviso_modulo1():
+    ruta = contratos.carpeta_contratos() / "modulo5-orquestador/v0.2/ejemplos/proceso-listo_modulo1.json"
+    return _cargar(ruta)
+
+
+@pytest.mark.parametrize("cambio", [
+    {"md5": "no-es-un-md5"},
+    {"md5": "0f343b0931126a20f133d67c2b018a3"},
+    {"tamano": -1},
+    {"tamano": "1024"},
+    {"otro": 1},
+])
+def test_proceso_listo_02_rechaza_archivos_mal_descritos(cambio):
+    aviso = _aviso_modulo1()
+    aviso["archivos"][0].update(cambio)
+    with pytest.raises(contratos.MensajeInvalido):
+        contratos.validar(contratos.PROCESO_LISTO, aviso)
+
+
+def test_proceso_listo_02_acepta_un_aviso_01_con_solo_cambiar_la_version():
+    ruta = contratos.carpeta_contratos() / "modulo5-orquestador/v0/ejemplos/proceso-listo_con_archivos.json"
+    aviso = {**_cargar(ruta), "contrato": CONTRATO}
+    contratos.validar(contratos.PROCESO_LISTO, aviso)
+    with pytest.raises(contratos.MensajeInvalido):
+        contratos.validar(contratos.PROCESO_LISTO, {**aviso, "comprimidos_sin_contenido": []})

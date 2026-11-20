@@ -18,7 +18,7 @@ RUTA = "procesos/SR0000000001"
 
 
 def _aviso(**extra):
-    return {"contrato": "modulo5-orquestador/0.1", "id_proceso": P, "ruta": RUTA,
+    return {"contrato": "modulo5-orquestador/0.2", "id_proceso": P, "ruta": RUTA,
             "fecha": "2026-11-06T09:00:00-05:00", **extra}
 
 
@@ -116,9 +116,9 @@ def test_aviso_repetido_con_otros_datos_se_ignora(mundo):
 
 
 @pytest.mark.parametrize("aviso,motivo", [
-    ({"contrato": "modulo5-orquestador/0.1", "id_proceso": P, "fecha": "2026-11-06T09:00:00Z"},
-     "Rechazado: No cumple modulo5-orquestador/v0/proceso-listo: (raíz): no cumple 'required'"),
-    (_aviso(contrato="otro/9"), "Rechazado: No cumple modulo5-orquestador/v0/proceso-listo: contrato: no cumple 'const'"),
+    ({"contrato": "modulo5-orquestador/0.2", "id_proceso": P, "fecha": "2026-11-06T09:00:00Z"},
+     "Rechazado: No cumple modulo5-orquestador/v0.2/proceso-listo: (raíz): no cumple 'required'"),
+    (_aviso(contrato="otro/9"), "Rechazado: No cumple modulo5-orquestador/v0.2/proceso-listo: contrato: no cumple 'const'"),
     (_aviso(ruta="no/existe"), "Rechazado: La carpeta del proceso no existe en el origen o no es válida"),
     (_aviso(archivos=[{"ruta": "a.pdf", "id_oferente": "PROCESO"}]),
      "Rechazado: 'PROCESO' no puede ser el identificador de un oferente"),

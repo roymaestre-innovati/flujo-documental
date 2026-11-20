@@ -7,5 +7,5 @@ en esta entrega solo existen sus versiones locales.
 """
 
 VERSION = "0.1.0"
-CONTRATO = "modulo5-orquestador/0.1"
+CONTRATO = "modulo5-orquestador/0.2"
 CONTRATO_EXTRACCION = "modulo3-extraccion/0.2"

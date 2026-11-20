@@ -41,7 +41,7 @@ Cada pieza externa queda detrás de una interfaz pequeña, como `Almacen` en la 
 |---|---|---|---|
 | `Cola` | `publicar(cola, mensaje, demora=0)`, `recibir(cola)`, `completar`, `a_errores(mensaje, motivo)` | `ColaEnMemoria`: listas por cola, con demora simulada por un reloj inyectable | Service Bus |
 | `Estado` | `leer`, `crear_si_no_existe`, `cambiar(id, de_estado, a_estado, motivo)` condicional, `consultar(id_proceso)` | `EstadoEnMemoria`, que puede guardarse en un JSON al terminar | Cosmos, con `id_proceso` como partición |
-| `Origen` | `listar(ruta)` y `bajar(ruta, destino)` | `OrigenLocal`: una carpeta | OneLake |
+| `Origen` | `listar(ruta)` y `bajar(ruta, destino, esperado)` | `OrigenLocal`: una carpeta | `OrigenOneLake` (hecho, `tasks-entrada-onelake.md`) |
 | `Clasificador` | `clasificar(documento) → segmentos` | `ClasificadorFalso`: lee un CSV | El clasificador del otro equipo (C1 a C3) |
 | `Almacen` | Lo que producimos | `AlmacenLocal` de la normalización | Blob Storage |
 
@@ -51,7 +51,7 @@ El reloj también es inyectable (`ahora()`), para probar las esperas y las 24 ho
 
 Se escriben y se revisan antes del código (T01).
 
-**`contracts/modulo5-orquestador/v0/`**, versión `modulo5-orquestador/0.1`, con las dos fronteras externas que toca esta entrega:
+**`contracts/modulo5-orquestador/v0/`**, versión `modulo5-orquestador/0.1`, con las dos fronteras externas que toca esta entrega. Lo reemplazó la 0.2 (`v0.2/`, 2026-11-20), que extiende el aviso para la entrada desde OneLake: ver "Lo que cambió al implementar".
 
 | Archivo | Frontera | Contenido |
 |---|---|---|
@@ -250,4 +250,13 @@ El detalle y el porqué de cada punto están en las notas de `tasks.md`.
 - **Los conteos de una corrida suman "atascados"** (T10): lo que quedó en un estado intermedio sin una tarea que lo explique. A4 pide que sea 0.
 - **La cola y el estado en memoria tienen un candado** (T10), porque la corrida local normaliza en hilos. Con la muestra real, los hilos casi no aceleran (T11); en producción cada entrega corre en su propio contenedor.
 - **Para la entrega 2:** dos trabajadores pueden normalizar la misma entrega a la vez si el `normalizar` llega repetido. En local da el mismo resultado; con Blob hay que confirmar que escribir lo mismo a la vez sea seguro, o tomar un lease por entrega (T10). Las pruebas de mensajes repetidos y de cambio condicional se repiten contra Cosmos.
+
+### Entrada desde OneLake (2026-11-20, entrega 2 en curso)
+
+Se trabaja con `tasks-entrada-onelake.md`.
+
+- **Contrato 0.2** (`contracts/modulo5-orquestador/v0.2/`), aprobado por el usuario. El aviso de proceso listo suma campos opcionales: `id_proyecto`, `tamano` y `md5` en cada archivo, y `comprimidos_sin_contenido`. `archivos` ya no lleva ZIP ni RAR. `id_proceso` es el evento de Ariba (`Doc…`). Clasificación no cambia, salvo el número de versión. La 0.1 queda en `v0/`.
+- **El aviso lo arma el orquestador** con las tablas del módulo 1 (`entrada_modulo1.py`) mientras el módulo 1 no lo publique ni exista su vista. La apertura no cambia: reparte con `archivos`.
+- **`Origen.bajar` recibe un `esperado`** (tamaño y MD5), y hay una versión de OneLake (`origen_onelake.py`).
+- **Clase de error nueva, `ErrorDeConfiguracion`:** permisos, credenciales u opciones del entorno. Va a errores sin reintento, con el motivo "Configuración: …".
 

@@ -4,7 +4,7 @@ Es la primera pieza de la entrega 2 del orquestador: la interfaz `Origen` deja d
 
 **Meta:** correr `orquestar` en la máquina del equipo sobre un evento real de `workspace-evaluacionofertas-dev`, leyendo directo de OneLake, sin copiar los originales, y llegar a los mismos conteos que reporta el módulo 1 en sus tablas.
 
-**Estado al 2026-11-18:** por empezar. La prueba de acceso está hecha (`servicios/prueba-onelake/`, paso 0 del diseño).
+**Estado al 2026-11-20:** T01 a T03 hechas, y el contrato del orquestador pasó a la 0.2 (aprobado por el usuario). Lo siguiente es T03b: conectar los campos nuevos del aviso a la apertura y a `Normalizar`. La prueba de acceso está en `servicios/prueba-onelake/`.
 
 ## Dónde va
 
@@ -50,6 +50,14 @@ Un servicio aparte solo agregaría una copia de los originales o un salto de red
   - Ojo: con `deltalake` la lectura termina en segundos, pero el proceso se quedó colgado al salir en dos de tres corridas (2026-11-20). Reproducirlo y, si sigue, leer el log de Delta con `pyarrow` o cerrar sus hilos. Un job que no termina no se puede usar.
   - Pruebas con tablas inventadas (filas en memoria, sin Delta): proceso y dos oferentes, un RAR con hijos, un ZIP dentro de otro, un RAR sin hijos, una ruta repetida, un oferente que no cruza y una categoría desconocida.
 
+- [ ] **T03b — Conectar el aviso 0.2.** El contrato `modulo5-orquestador/0.2` (`contracts/modulo5-orquestador/v0.2/`) ya está, y `armar_entrada` ya llena sus campos nuevos. Falta que el orquestador los use:
+  - La apertura guarda `id_proyecto` en el proceso, y el `tamano` y el `md5` de cada archivo en la entrega, junto a su ruta.
+  - `Normalizar` le pasa a `bajar` el `Esperado` de cada archivo, sacado del estado. Así la revisión funciona en Azure sin `OrigenRevisado` y sin volver a leer las tablas. Si no coincide, se reintenta como cualquier descarga fallida (`ArchivoDistinto`).
+  - La apertura crea la tarea `documento_con_error` con motivo `COMPRIMIDO_SIN_CONTENIDO` por cada entrada de `comprimidos_sin_contenido`, en la entrega de su `id_oferente`. Esto reemplaza a `crear_tareas_sin_contenido` y deja de hacer falta un paso aparte en el comando. Si el comprimido es de un oferente que no tiene otros archivos, la entrega se crea igual, para que la tarea tenga dónde quedar.
+  - Un aviso repetido no duplica nada (R2), y los avisos sin los campos nuevos siguen funcionando.
+  - Pruebas: un aviso con tamaño y MD5 que no coinciden con lo bajado, uno con un comprimido sin contenido y uno sin los campos nuevos.
+  - Al cerrar: quitar `OrigenRevisado` y `crear_tareas_sin_contenido` si ya no los usa nadie.
+
 - [ ] **T04 — Bajar en paralelo.** `Normalizar` baja hoy los archivos de uno en uno. A ~1,5 MB/s por archivo, un oferente de 200 MB tarda más de 2 minutos solo en bajar.
   - Se baja con varios hilos (`paralelo_bajar`, 8 por defecto) a la misma carpeta temporal. Cada archivo cuesta ~1,8 s de latencia aunque sea chico (nota de T02): la entrega más grande, con 57 archivos, tarda ~100 s en serie y ~15 s con 8 hilos.
   - Tamaños de la muestra sin comprimidos (2026-11-20): la entrega más grande pesa 106 MB (57 archivos), la mediana 7 MB y el archivo más grande 11 MB. El disco efímero de una réplica de 0,5 vCPU basta.
@@ -78,18 +86,19 @@ Es el borrador de lo que le pediremos al módulo 1 en la vista. Se actualiza en 
 
 | Tabla | Columna | Para qué |
 |---|---|---|
-| `bronce.tbl_evaluacionofertas_adjuntos_metadata` | `event_id` | Filtrar el proceso |
+| `bronce.tbl_evaluacionofertas_adjuntos_metadata` | `event_id` | Filtrar el proceso (`id_proceso` del aviso) |
 | | `doc_category` | Proceso u oferente |
 | | `invitation_id` | Cruzar con el oferente |
 | | `adls_path` | Ruta del archivo |
-| | `downloaded_bytes`, `md5_hex` | Revisar lo bajado |
+| | `downloaded_bytes`, `md5_hex` | `tamano` y `md5` de cada archivo del aviso |
 | | `is_compressed_archive`, `idempotency_key`, `parent_archive_key` | Excluir comprimidos y detectar los que no tienen contenido |
 | `bronce.tbl_evaluacionofertas_oferentes_control` | `event_id`, `invitation_id` | Cruce |
-| | `sm_vendor_id` | Identificador del oferente |
-| `control.tbl_evaluacionofertas_eventos_control` | `event_id`, `parent_project_id` | Identificador del proceso y del proyecto de Ariba |
+| | `sm_vendor_id` | `id_oferente` del aviso |
+| `control.tbl_evaluacionofertas_eventos_control` | `event_id`, `parent_project_id` | `id_proceso` e `id_proyecto` del aviso |
+| | `updated_at_epoch_ms` | `fecha` del aviso |
 | | `control_status`, `total_files_failed` | Saber que el evento terminó de descargarse (`DESCARGADO`, sin fallidos): es lo que dispararía el aviso |
 
-Lo ideal en la vista: una fila por documento descargado de un evento en `DESCARGADO`, con el evento, el proyecto, el SR si existe, el identificador del oferente (vacío en los del proceso), la ruta, el tamaño, el MD5 y la marca de comprimido sin contenido, sin los comprimidos y sin restos de corridas viejas. Así sobraría todo el cruce de T03.
+Lo ideal en la vista, o directamente en el aviso que publique el módulo 1: lo que pide el contrato 0.2. Es decir, una fila por documento descargado de un evento en `DESCARGADO`, con el evento, el proyecto, el SR si existe, el identificador del oferente (vacío en los del proceso), la ruta, el tamaño, el MD5 y la marca de comprimido sin contenido, sin los comprimidos y sin restos de corridas viejas. Así sobraría todo el cruce de T03.
 
 ## Notas de implementación
 
@@ -169,7 +178,7 @@ Revisión de la historia de las tablas Delta, todas sus versiones (desde octubre
   - Sirve porque las tres tablas usan el protocolo 1 de Delta, sin particiones. Si eso cambia, se rechaza con `ErrorDeConfiguracion` en lugar de leer mal.
   - Si a un parquet viejo le falta una columna, llega como None.
 - **Tareas.** `crear_tareas_sin_contenido` crea una tarea `documento_con_error` con motivo `COMPRIMIDO_SIN_CONTENIDO` por cada comprimido sin hijos. Va después de la apertura. El identificador sale de un hash de la ruta, así que repetirla no duplica.
-- **Revisión de lo bajado.** `OrigenRevisado` envuelve el origen y le pasa a `bajar` el tamaño y el MD5 de cada archivo. En local lo conecta el comando (T05). **En Azure falta decidir cómo le llegan a `Normalizar`.** El contrato `proceso-listo` no deja agregar campos a cada archivo (`additionalProperties: false`). Opciones: agregar `tamano` y `md5` opcionales en una versión 0.2 del contrato, o volver a leer la tabla al normalizar. Se le pregunta al usuario.
+- **Revisión de lo bajado.** `OrigenRevisado` envuelve el origen y le pasa a `bajar` el tamaño y el MD5 de cada archivo. En Azure no sirve, porque el trabajador que normaliza no tiene la entrada en memoria. **Resuelto con el contrato 0.2** (decisión del usuario, 2026-11-20): `tamano` y `md5` opcionales en cada archivo del aviso, más `id_proyecto` y `comprimidos_sin_contenido`. `armar_entrada` ya los llena; conectarlos es T03b.
 - **Pruebas.** 24 nuevas (`tests/test_entrada_modulo1.py`), con tablas inventadas y, para Delta, un log y unos parquet falsos. Incluye una prueba con la apertura de verdad: las entregas quedan `PROCESO`, `S100` y `S200`, sin ningún ZIP ni RAR. La suite completa pasa: 237 pruebas.
 - **Humo con las tablas reales** (solo conteos):
 

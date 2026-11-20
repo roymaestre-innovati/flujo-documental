@@ -1,0 +1,45 @@
+{
+  "contrato": "modulo5-orquestador/0.2",
+  "id_proceso": "Doc0000000001",
+  "id_proyecto": "WS0000000001",
+  "ruta": "informacion-adjuntos/fase2/Doc0000000001",
+  "fecha": "2026-11-11T20:34:00Z",
+  "archivos": [
+    {
+      "ruta": "Documentos del proceso/CPC.pdf",
+      "id_oferente": null,
+      "tamano": 1843200,
+      "md5": "0f343b0931126a20f133d67c2b018a3b"
+    },
+    {
+      "ruta": "Documentos del proceso/_contenido/Anexos/Anexo 1 Especificaciones.pdf",
+      "id_oferente": null,
+      "tamano": 412300,
+      "md5": "5d41402abc4b2a76b9719d911017c592"
+    },
+    {
+      "ruta": "Oferentes/Empresa Ficticia Uno SAS/Carta de presentacion.pdf",
+      "id_oferente": "S0000001",
+      "tamano": 254980,
+      "md5": "7d793037a0760186574b0282f2f435e7"
+    },
+    {
+      "ruta": "Oferentes/Empresa Ficticia Uno SAS/_contenido/Financieros/Estados financieros 2025.xlsx",
+      "id_oferente": "S0000001",
+      "tamano": 38912,
+      "md5": "e4d909c290d0fb1ca068ffaddf22cbd0"
+    },
+    {
+      "ruta": "Oferentes/Empresa Ficticia Dos SA/Oferta economica.xlsx",
+      "id_oferente": "S0000002",
+      "tamano": 20480,
+      "md5": "9e107d9d372bb6826bd81d3542a419d6"
+    }
+  ],
+  "comprimidos_sin_contenido": [
+    {
+      "ruta": "Oferentes/Empresa Ficticia Dos SA/Experiencia.rar",
+      "id_oferente": "S0000002"
+    }
+  ]
+}

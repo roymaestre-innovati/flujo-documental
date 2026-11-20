@@ -84,13 +84,16 @@ Muestra: proceso SR5658940621, 6 oferentes.
 2. **El aviso llega a una cola de Service Bus, `procesos-listos`.** Es una cola más del mismo Service Bus del paso 4. Si el normalizador está caído, el mensaje espera, y no tenemos que publicar ni proteger una API. Si la herramienta del módulo 1 no puede publicar en Service Bus, el plan B es un endpoint mínimo que solo deja el mensaje en esa misma cola; el resto del flujo no cambia.
 3. **Un aviso por proceso, no por oferente.** Como el proceso llega completo, la apertura arma la ficha con la CPC y las adendas a la mano, y todos los oferentes arrancan juntos.
 
-**Mensaje propuesto** (por confirmar con el módulo 1):
+**Mensaje:** contrato `modulo5-orquestador/0.2` (`contracts/modulo5-orquestador/v0.2/`, 2026-11-20). Mientras el módulo 1 no lo publique, lo arma el orquestador con sus tablas.
 
 | Campo | Contenido |
 |---|---|
-| `id_proceso` | Identificador del proceso (por ejemplo, el de Ariba) |
-| `ruta` | Carpeta del proceso en OneLake |
-| `archivos` | Opcional: lista de archivos con su oferente, o la marca de documento del proceso |
+| `id_proceso` | El evento de Ariba (`event_id`, `Doc…`) |
+| `id_proyecto` | Opcional: el proyecto de Ariba (`WS…`) |
+| `ruta` | Carpeta del proceso en OneLake: `informacion-adjuntos/fase2/<event_id>` |
+| `fecha` | Cuándo quedó completo el proceso |
+| `archivos` | Opcional: lista de archivos con su oferente (`sm_vendor_id`, o vacío si es del proceso), tamaño y MD5. Sin ZIP ni RAR |
+| `comprimidos_sin_contenido` | Opcional: los ZIP o RAR que el módulo 1 no pudo descomprimir. No se bajan; cada uno genera una tarea para el evaluador |
 
 ### Cómo leemos los archivos de Fabric
 
@@ -686,6 +689,7 @@ Precios de referencia de agregadores, sin confirmar en Azure: gpt-5.4 a $2,50 / 
 
 - **D18:** además de PDF e imagen, la extracción acepta el Excel nativo como anexo.
 - **Decisión 2 (2026-11-18):** sí llegan ZIP y RAR, pero el módulo 1 ya los descomprime en `_contenido/`. Confirmado por el usuario: solo se baja lo descomprimido. Los ZIP y RAR no se bajan nunca, tampoco los que vienen dentro de `_contenido/`. Un comprimido sin contenido descomprimido no se baja, pero se avisa al evaluador para que no se evalúe con documentos de menos (T03 de `specs/005-orquestador/tasks-entrada-onelake.md`).
+- **A-1, forma del mensaje (2026-11-20):** contrato 0.2 del orquestador, con el evento como `id_proceso`, el `sm_vendor_id` como oferente, tamaño y MD5 por archivo, proyecto y comprimidos sin contenido. Aprobado por el usuario.
 - **Decisión 35 (2026-11-18):** los archivos los lee el orquestador (manejador `Normalizar`, con `OrigenOneLake`), no la normalización. Están en ADLS Gen2 del módulo 1 y se leen por un shortcut de OneLake. La prueba de acceso se hizo con el usuario del equipo; falta repetirla con la identidad administrada.
 - **D13:** se agrega el motivo de revisión `CLASIFICACION_DUDOSA`, activado por el campo `clasificacion_dudosa` de la entrada.
 - **O1:** el transporte es cola de Service Bus.

@@ -75,16 +75,19 @@ def _tablas():
 
 def test_arma_el_aviso_con_las_tablas():
     entrada = armar_entrada(EVENTO, TablasEnMemoria(_tablas()))
+    x = {"tamano": 1, "md5": hashlib.md5(b"x").hexdigest()}
+    carta_md5 = {"tamano": 5, "md5": hashlib.md5(b"carta").hexdigest()}
     assert entrada.aviso == {
-        "contrato": "modulo5-orquestador/0.1", "id_proceso": EVENTO, "ruta": f"informacion-adjuntos/{CARPETA}",
-        "fecha": "2025-11-13T02:13:20Z",
+        "contrato": "modulo5-orquestador/0.2", "id_proceso": EVENTO, "id_proyecto": "WS0000000001",
+        "ruta": f"informacion-adjuntos/{CARPETA}", "fecha": "2025-11-13T02:13:20Z",
         "archivos": [
-            {"ruta": "Documentos del proceso/_contenido/anexos/_contenido/b/c.xlsx", "id_oferente": None},
-            {"ruta": "Documentos del proceso/_contenido/anexos/a.pdf", "id_oferente": None},
-            {"ruta": "Documentos del proceso/cpc.pdf", "id_oferente": None},
-            {"ruta": "Oferentes/Empresa A/carta.pdf", "id_oferente": "S100"},
-            {"ruta": "Oferentes/Empresa B/oferta.xlsx", "id_oferente": "S200"},
-        ]}
+            {"ruta": "Documentos del proceso/_contenido/anexos/_contenido/b/c.xlsx", "id_oferente": None, **x},
+            {"ruta": "Documentos del proceso/_contenido/anexos/a.pdf", "id_oferente": None, **x},
+            {"ruta": "Documentos del proceso/cpc.pdf", "id_oferente": None, **x},
+            {"ruta": "Oferentes/Empresa A/carta.pdf", "id_oferente": "S100", **carta_md5},
+            {"ruta": "Oferentes/Empresa B/oferta.xlsx", "id_oferente": "S200", **x},
+        ],
+        "comprimidos_sin_contenido": [{"ruta": "Oferentes/Empresa A/roto.rar", "id_oferente": "S100"}]}
     assert entrada.proyecto == "WS0000000001"
     assert entrada.excluidos == {"comprimido": 3}
     assert entrada.sin_contenido == {"S100": ["Oferentes/Empresa A/roto.rar"]}

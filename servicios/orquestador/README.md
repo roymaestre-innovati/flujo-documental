@@ -1,8 +1,8 @@
 # Orquestador
 
-Lleva cada proceso de selección desde el aviso del módulo 1 hasta las solicitudes de extracción (iniciativa 005, entrega 1). La spec, el plan y las tareas están en `specs/005-orquestador/`; los contratos, en `contracts/modulo5-orquestador/v0/` y `contracts/modulo3-extraccion/v0.2/`.
+Lleva cada proceso de selección desde el aviso del módulo 1 hasta las solicitudes de extracción (iniciativa 005, entrega 1). La spec, el plan y las tareas están en `specs/005-orquestador/`; los contratos, en `contracts/modulo5-orquestador/v0.2/` y `contracts/modulo3-extraccion/v0.2/`.
 
-**Estado:** entrega 1 cerrada (T01 a T11), en local. El resultado con la muestra real está en la nota de T11 de `tasks.md`. Azure (Service Bus, Cosmos, OneLake, Container Apps) va en la entrega 2.
+**Estado:** entrega 1 cerrada (T01 a T11), en local. El resultado con la muestra real está en la nota de T11 de `tasks.md`. De la entrega 2 está en curso la entrada desde OneLake (`tasks-entrada-onelake.md`): ya leen los originales de OneLake (`origen_onelake.py`) y el aviso se arma con las tablas del módulo 1 (`entrada_modulo1.py`). Falta conectarlos al comando. Service Bus, Cosmos, Blob y Container Apps siguen pendientes.
 
 ## Cómo funciona
 
@@ -88,8 +88,10 @@ Las corridas traen datos personales: el servidor solo escucha en 127.0.0.1 y sol
 | `cola.py` | Colas (`procesos-listos`, `normalizar`, `clasificar`, `extraer`) y `ColaEnMemoria`, que imita Service Bus: bloqueo, reentrega, demora y cola de errores |
 | `estado.py` | Almacén del estado y `EstadoEnMemoria`, con creación idempotente y escritura condicional, como Cosmos |
 | `estados.py` | Las cinco entidades (proceso, oferente, documento, segmento y tarea), sus transiciones, el historial y `consultar` |
-| `errores.py` | Clases de error y el bucle común: reintentos, esperas, cola de errores y alertas |
-| `origen.py` | Dónde están los originales: `OrigenLocal`, una carpeta (OneLake en la entrega 2) |
+| `errores.py` | Clases de error y el bucle común: reintentos, esperas, cola de errores y alertas. `ErrorDeConfiguracion` va a errores sin reintento, con motivo propio |
+| `origen.py` | Dónde están los originales: la interfaz `Origen` y `OrigenLocal`, una carpeta. `bajar` revisa el tamaño y el MD5 si se los dan |
+| `origen_onelake.py` | `OrigenOneLake`: los originales en `Files/` de un lakehouse, con `DefaultAzureCredential`. Traduce las fallas de OneLake a las clases de error |
+| `entrada_modulo1.py` | Arma el aviso de un evento con las tablas Delta del módulo 1 (provisional, hasta que exista su vista) y crea las tareas de los comprimidos sin contenido |
 | `clasificador.py` | `ClasificadorFalso`, que lee un CSV (el real es de otro equipo) |
 | `contratos.py` | Valida mensajes contra los esquemas de `contracts/` |
 | `datos.py` y `datos/` | Versiones vigentes, umbrales y tipos documentales, con un archivo por versión |

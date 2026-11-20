@@ -1,5 +1,7 @@
 # Contrato del módulo 5 — orquestador (v0, versión 0.1)
 
+> **Reemplazado por la 0.2** (`../v0.2/`, 2026-11-20). Esta versión queda como estaba, para la historia. Los cambios están al principio del README de la 0.2.
+
 Las dos fronteras externas del orquestador en su entrega 1: el aviso que publica el módulo 1 cuando un proceso está listo, y la clasificación de cada documento con el clasificador del otro equipo. Sale de `specs/005-orquestador/spec.md` y `plan.md`; el diseño está en `contexto/flujo-documental-opcion-a.md`, pasos 0, 3 y 4.
 
 Es una propuesta para revisar antes de escribir el código (principio 5) y para llevar al módulo 1 (A-1) y a clasificación (C1 a C3). La frontera con la extracción es otro contrato: `contracts/modulo3-extraccion/v0.2/`.

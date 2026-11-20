@@ -183,8 +183,9 @@ class TablasOneLake:
 @dataclass
 class EntradaDelEvento:
     aviso: dict
-    """Cumple `proceso-listo`: `ruta` es la carpeta del evento bajo `Files/` y
-    cada archivo es relativo a ella."""
+    """Cumple `proceso-listo` 0.2: `ruta` es la carpeta del evento bajo `Files/`,
+    cada archivo es relativo a ella y trae su tamaño y su MD5, y el aviso trae el
+    proyecto y los comprimidos sin contenido."""
     proyecto: str | None
     esperados: dict[str, Esperado] = field(default_factory=dict)
     """Tamaño y MD5 de cada archivo, por su ruta completa bajo `Files/`."""
@@ -268,13 +269,24 @@ def armar_entrada(id_evento: str, tablas: Tablas) -> EntradaDelEvento:
             if fila["idempotency_key"] not in padres:
                 entrada.sin_contenido.setdefault(id_oferente or ENTREGA_DEL_PROCESO, []).append(relativa)
             continue
-        archivos.append({"ruta": relativa, "id_oferente": id_oferente})
+        archivo = {"ruta": relativa, "id_oferente": id_oferente}
+        if isinstance(fila["downloaded_bytes"], int):
+            archivo["tamano"] = fila["downloaded_bytes"]
+        if fila["md5_hex"]:
+            archivo["md5"] = fila["md5_hex"]
+        archivos.append(archivo)
         entrada.esperados[f"{ruta_evento}/{relativa}"] = Esperado(fila["downloaded_bytes"], fila["md5_hex"])
 
     if not archivos:
         raise EventoRechazado("El evento no tiene ningún archivo que no sea comprimido")
     entrada.aviso = {"contrato": CONTRATO, "id_proceso": id_evento, "ruta": ruta_evento,
                      "fecha": _fecha(evento["updated_at_epoch_ms"]), "archivos": archivos}
+    if evento["parent_project_id"]:
+        entrada.aviso["id_proyecto"] = evento["parent_project_id"]
+    sin_contenido = [{"ruta": ruta, "id_oferente": None if entrega == ENTREGA_DEL_PROCESO else entrega}
+                     for entrega, rutas in sorted(entrada.sin_contenido.items()) for ruta in rutas]
+    if sin_contenido:
+        entrada.aviso["comprimidos_sin_contenido"] = sin_contenido
     contratos.validar(contratos.PROCESO_LISTO, entrada.aviso)
     registro.info("Aviso armado con las tablas del módulo 1: %s archivos, %s entregas, excluidos %s, "
                   "comprimidos sin contenido %s", len(archivos),

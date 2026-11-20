@@ -1,6 +1,6 @@
 # Handoff: implementación del flujo documental (opción A)
 
-Estado al 2026-11-10. Cerradas la entrega 1 de la iniciativa 003 (normalización y lectura) y la entrega 1 de la 005 (orquestador, del aviso a la cola de extracción), las dos en local. **La extracción (entrega 2 de la 003) está construida** en `servicios/extraccion/`; le falta la medición con los gold (A9), que corre el usuario. Estado y pendientes al principio de `contexto/HANDOFF-extraccion.md`.
+Estado al 2026-11-10, con una actualización el 2026-11-20: está en curso la entrada desde OneLake (entrega 2 del orquestador, `specs/005-orquestador/tasks-entrada-onelake.md`), con el contrato del orquestador en la 0.2. Cerradas la entrega 1 de la iniciativa 003 (normalización y lectura) y la entrega 1 de la 005 (orquestador, del aviso a la cola de extracción), las dos en local. **La extracción (entrega 2 de la 003) está construida** en `servicios/extraccion/`; le falta la medición con los gold (A9), que corre el usuario. Estado y pendientes al principio de `contexto/HANDOFF-extraccion.md`.
 
 Las rutas relativas son de este repositorio (`~/GEB/flujo-documental-repo`, en GitHub `roymaestre-innovati/flujo-documental`); lo que está en otros repos va con ruta completa. `contexto/flujo-documental-opcion-a.md` sigue siendo la fuente de verdad del diseño. Este archivo no repite el diseño: dice qué existe, qué falta, qué está abierto y cómo trabaja el usuario.
 
@@ -30,7 +30,7 @@ Las rutas relativas son de este repositorio (`~/GEB/flujo-documental-repo`, en G
 3. `contexto/constitucion.md`: los siete principios.
 4. `contexto/flujo-documental-opcion-a.md`, **paso 0 (Entrada)**: cómo llegan los procesos (OneLake de Fabric, cola `procesos-listos`, un aviso por proceso completo) y las decisiones 32 a 35. Después el **paso 4 (Orquestación)**: estado que guarda (cinco entidades: proceso, oferente, archivo, segmento y tarea humana), tecnología (Service Bus + workers en Container Apps + estado en Cosmos), manejo de errores por clases, versión del modelo por proceso, subsanación y reprocesamiento, apertura del proceso, cola y volumen. También las decisiones 15 y 16 y las preguntas abiertas A-1 a A-11.
 5. `contexto/refinamiento-grill-me-2.md` (D1 a D24): de ahí salen D7 (versión del modelo), D22 (reintentos) y otras que usa el paso 4.
-6. Los contratos: `contracts/modulo5-orquestador/v0/` (aviso del módulo 1 y clasificador), `contracts/modulo3-extraccion/v0.2/` (solicitudes de extracción) y `contracts/modulo3-normalizacion/v0/` (lo que produce la normalización).
+6. Los contratos: `contracts/modulo5-orquestador/v0.2/` (aviso del módulo 1 y clasificador; la 0.1 queda en `v0/`), `contracts/modulo3-extraccion/v0.2/` (solicitudes de extracción) y `contracts/modulo3-normalizacion/v0/` (lo que produce la normalización).
 7. `servicios/orquestador/README.md` y `servicios/normalizacion/README.md`: cómo se instala, corre y prueba cada uno.
 
 ### Por qué en este mismo repositorio
@@ -40,7 +40,7 @@ Se decidió el 2026-11-06. El repo ya está armado para varias piezas (`servicio
 ### Lo que el orquestador necesita saber de la normalización
 
 - **Cómo llega el trabajo (paso 0, decisiones 32 a 35):** el módulo 1 deja el proceso completo (CPC, adendas y todos los oferentes) en su datalake de Fabric (OneLake) y publica **un mensaje por proceso** en la cola de Service Bus `procesos-listos`, con `id_proceso`, `ruta` y, opcional, la lista de archivos (forma por confirmar, A-1). Por ahora no llegan documentos tardíos. Si no pueden publicar en Service Bus, el plan B es un endpoint mínimo que deja el mensaje en esa misma cola.
-- **Los originales no se copian:** el normalizador los lee de OneLake con `azure-storage-file-datalake` y la identidad administrada del job, los baja a disco temporal, normaliza y lee, y escribe solo lo que produce en nuestro almacenamiento. Ningún otro paso vuelve a tocar Fabric. Hoy `normalizar_entrega` recibe una carpeta local: falta la pieza que lista y baja los archivos de la `ruta` del mensaje y los reparte entre el proceso y cada oferente.
+- **Los originales no se copian:** el manejador `Normalizar` del orquestador los lee de OneLake (`origen_onelake.py`) con la identidad del job, los baja a disco temporal, llama a la normalización y escribe solo lo que produce en nuestro almacenamiento. Ningún otro paso vuelve a tocar Fabric. Los archivos del módulo 1 están en su cuenta de ADLS y llegan por el shortcut `Files/informacion-adjuntos` del lakehouse `lkh_evaluacionofertas_bronce`. El aviso se arma con sus tablas (`entrada_modulo1.py`). Estado y pendientes en `specs/005-orquestador/tasks-entrada-onelake.md`.
 - **Entrada:** la carpeta de una entrega (un oferente, o el proceso: condiciones, adendas, anexos), `id_proceso` y `id_oferente` (sin oferente es una entrega del proceso).
 - **Como función:** `normalizacion.entrega.normalizar_entrega(carpeta, id_proceso, id_oferente, almacen, forzar=False)` devuelve un `Resultado` con el `manifiesto` (un dict según el contrato). **Por línea de comandos:** `normalizar <carpeta> --proceso SR… --oferente OF-… --salida <carpeta>`.
 - **Salida:** en el almacén, bajo `<proceso>/<oferente o PROCESO>/`: `manifiesto.json`, `pdf/`, `anexos/`, `lectura/` y `palabras/`.
@@ -63,7 +63,7 @@ El usuario es dueño de todo el flujo menos tres piezas de otros equipos: la ent
 | **Orquestador** | `servicios/orquestador/` | Entrega 1 cerrada (T01 a T11). Versión 0.1.0. Manejadores de `procesos-listos`, `normalizar` y `clasificar`, solicitudes de extracción 0.2, tareas, escalamiento, comando `orquestar` y script de la muestra |
 | **Extracción** | `servicios/extraccion/` | Entrega 2 de la 003 construida (T01 a T10). Versión 0.1.0. `extraer_segmento`, comandos `extraer`, `probar-ficha-mcp` y `medir-gold` |
 | Visor de corridas | `servicios/orquestador/src/orquestador/visor/` (comando `visor`) | Página local (127.0.0.1) para revisar una corrida guardada con `--salida`: resumen, documentos con su PDF, tareas, errores y los resultados de la extracción. Hecho a imagen de `~/GEB/Extraccion/visor` |
-| **Contrato del orquestador** | `contracts/modulo5-orquestador/v0/` | Versión 0.1: aviso de proceso listo (módulo 1) y solicitud y respuesta del clasificador. Propuesta para A-1 y C1 a C3 |
+| **Contrato del orquestador** | `contracts/modulo5-orquestador/v0.2/` | Versión 0.2 (2026-11-20): aviso de proceso listo (módulo 1), con tamaño, MD5, proyecto y comprimidos sin contenido, y solicitud y respuesta del clasificador. Propuesta para A-1 y C1 a C3. La 0.1 queda en `v0/` |
 | Contrato de extracción | `contracts/modulo3-extraccion/v0.2/` | Versión 0.2, con los ocho cambios del paso 5 del diseño más `id_segmento`. La 0.1 queda en `v0/`, sin cambios |
 | Resultados de la muestra real | `specs/003-validacion-extraccion/resultados-muestra.md` | Dos mediciones (2026-11-05). Solo conteos |
 | Checklist de habeas data | `specs/003-validacion-extraccion/checklist-habeas-data.md` | Borrador para cumplimiento |
@@ -115,7 +115,7 @@ Si se cambia un parámetro, sube `version_parametros`: ya hubo corridas reales.
 ### No hecho en la entrega 1
 
 - Almacén en Blob Storage para lo que producimos.
-- Lectura de los originales desde OneLake. Antes de construirla, **prueba de acceso** (decisión 35): que el job lea una carpeta de prueba de OneLake con su identidad administrada. La configuración del tenant y los roles del paso 0 se escribieron sin verificar en la documentación de Microsoft; la prueba los confirma.
+- Lectura de los originales desde OneLake: **en curso** en `specs/005-orquestador/tasks-entrada-onelake.md` (T01 a T03 hechas el 2026-11-20). La prueba de acceso se hizo con el usuario del equipo; falta repetirla con la identidad administrada del job.
 - Análisis de vulnerabilidades de la imagen y publicación en un registro de Azure.
 - Experimento de OCR propio (decisión 9).
 
@@ -129,7 +129,7 @@ Si se cambia un parámetro, sube `version_parametros`: ya hubo corridas reales.
 
 ## Lo que viene después
 
-- **Entrega 2 del orquestador:** resultados de la extracción, ficha del proceso, menor precio, tareas en la Power App, `reprocesar` y las piezas en Azure (Service Bus, Cosmos, OneLake, Blob, alertas). Antes de OneLake, la prueba de acceso (decisión 35).
+- **Entrega 2 del orquestador:** resultados de la extracción, ficha del proceso, menor precio, tareas en la Power App, `reprocesar` y las piezas en Azure (Service Bus, Cosmos, OneLake, Blob, alertas). La entrada desde OneLake va primero y está en curso (`tasks-entrada-onelake.md`).
 - **Entrega 2 de la iniciativa 003: extracción.** Es lo siguiente, elegido el 2026-11-09. El contrato 0.2 ya está (T01 de la 005), así que empieza por el servicio. Depende de S2 (enviar datos a eastus). Todo lo que hace falta para empezar está en `contexto/HANDOFF-extraccion.md`.
 - **Módulo 4: reglas e informe**, con la hoja Reglas de la matriz (decisión 28).
 
