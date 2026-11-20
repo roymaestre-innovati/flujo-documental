@@ -27,8 +27,8 @@ Un servicio aparte solo agregaría una copia de los originales o un salto de red
 ## Tareas
 
 - [x] **T01 — Metadatos del módulo 1.** Hecha el 2026-11-20 con `servicios/prueba-onelake/revisar_metadatos.py` (ver la nota de T01). **El reparto sale de las tablas del módulo 1, no de listar carpetas** (decidido por el usuario). Es provisional: el módulo 1 prometió una vista con lo que necesitamos, y la definimos más adelante con lo que se use aquí (sección "Lo que usamos de las tablas"). Queda abierto:
-  - **Identificador del proceso:** las tablas no traen el SR. Se propone usar el `event_id` (`Doc…`) como `id_proceso` y guardar el proyecto (`WS…`) en el proceso. Por confirmar con el usuario.
-  - **Para el módulo 1:** si se pueden borrar los archivos huérfanos de `_contenido/` (134 en tres eventos), y cómo se pasa del evento al SR, si el negocio lo necesita.
+  - **Identificador del proceso (decidido por el usuario, 2026-11-20):** el `event_id` (`Doc…`) es el `id_proceso`, y el proyecto (`WS…`) se guarda en el proceso. El `event_id` no cambia con las versiones del evento en Ariba ni de proyecto (nota de T01).
+  - **Para el módulo 1:** ¿un proyecto puede llegar con más de un evento a evaluar (RFI y RFP, o una segunda ronda)? ¿Un evento en `DESCARGADO` puede recibir adjuntos nuevos? ¿Se pueden borrar los archivos huérfanos de `_contenido/` (134 en tres eventos)? ¿Cómo se pasa del evento al SR, si el negocio lo necesita?
 
 - [ ] **T02 — `OrigenOneLake`.** En `servicios/orquestador/src/orquestador/origen.py`, con `azure-identity` y `azure-storage-file-datalake` como dependencias.
   - Se configura con workspace, lakehouse y `DefaultAzureCredential`.
@@ -125,3 +125,12 @@ Corrida de `revisar_metadatos.py` (versiones: `adjuntos_metadata` 8, `oferentes_
   - Contenido del evento (14, en dos formas): `payload` con los ítems del evento, su `title` y sus `terms`, que son las preguntas y condiciones del evento en Ariba.
 
   Los `terms` pueden servir más adelante para la ficha del proceso (módulo 4); por ahora no entran.
+
+### T01 — ¿El `event_id` es estable? (2026-11-20)
+
+Revisión de la historia de las tablas Delta, todas sus versiones (desde octubre de 2026):
+
+- El `event_id` se mantiene con las versiones del evento en Ariba. `document_version` llega hasta 17, y 14 eventos cambiaron de versión durante el seguimiento con el mismo `event_id`.
+- Ningún evento cambió de proyecto, y ningún proyecto tiene más de un evento en estos datos.
+- En toda la historia de `adjuntos_metadata` hay 444 claves de archivo, y ninguna cambió de ruta ni de MD5: un archivo que cambia entra como uno nuevo. La versión vigente tiene 310 claves. Las 134 que faltan son justo los archivos huérfanos: el módulo 1 borró esas filas en una corrida y dejó los archivos.
+- Sin ver todavía: un proyecto con varios eventos, y adjuntos nuevos en un evento ya `DESCARGADO`. Con el versionado por MD5, esos adjuntos llegarían como filas nuevas del mismo evento, es decir, como documentos tardíos (A-10, sin diseñar).
