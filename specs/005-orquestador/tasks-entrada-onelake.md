@@ -48,10 +48,12 @@ Un servicio aparte solo agregaría una copia de los originales o un salto de red
   - Un comprimido sin filas hijas (ninguna con su `idempotency_key` como `parent_archive_key`) no se baja, pero no se calla: genera una tarea `documento_con_error` con motivo `comprimido_sin_contenido`, en la entrega a la que pertenece, para que no se evalúe a nadie con documentos de menos. En la muestra hay 6.
   - Lo que no está en la tabla (los JSON del módulo 1 y los archivos huérfanos) no entra. El MD5 y el tamaño de cada fila se pasan a `bajar` (T02).
   - Lo excluido se cuenta en el registro de la apertura, por motivo.
+  - Ojo: con `deltalake` la lectura termina en segundos, pero el proceso se quedó colgado al salir en dos de tres corridas (2026-11-20). Reproducirlo y, si sigue, leer el log de Delta con `pyarrow` o cerrar sus hilos. Un job que no termina no se puede usar.
   - Pruebas con tablas inventadas (filas en memoria, sin Delta): proceso y dos oferentes, un RAR con hijos, un ZIP dentro de otro, un RAR sin hijos, una ruta repetida, un oferente que no cruza y una categoría desconocida.
 
 - [ ] **T04 — Bajar en paralelo.** `Normalizar` baja hoy los archivos de uno en uno. A ~1,5 MB/s por archivo, un oferente de 200 MB tarda más de 2 minutos solo en bajar.
   - Se baja con varios hilos (`paralelo_bajar`, 4 por defecto) a la misma carpeta temporal.
+  - Tamaños de la muestra sin comprimidos (2026-11-20): la entrega más grande pesa 106 MB (57 archivos), la mediana 7 MB y el archivo más grande 11 MB. El disco efímero de una réplica de 0,5 vCPU basta.
   - Si un archivo falla, falla la entrega, como hoy.
   - Se mide en T06 y se ajusta el valor.
 
