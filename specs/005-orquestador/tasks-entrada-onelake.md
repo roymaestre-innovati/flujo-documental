@@ -30,7 +30,7 @@ Un servicio aparte solo agregaría una copia de los originales o un salto de red
   - **Identificador del proceso (decidido por el usuario, 2026-11-20):** el `event_id` (`Doc…`) es el `id_proceso`, y el proyecto (`WS…`) se guarda en el proceso. El `event_id` no cambia con las versiones del evento en Ariba ni de proyecto (nota de T01).
   - **Para el módulo 1:** ¿un proyecto puede llegar con más de un evento a evaluar (RFI y RFP, o una segunda ronda)? ¿Un evento en `DESCARGADO` puede recibir adjuntos nuevos? ¿Se pueden borrar los archivos huérfanos de `_contenido/` (134 en tres eventos)? ¿Cómo se pasa del evento al SR, si el negocio lo necesita?
 
-- [ ] **T02 — `OrigenOneLake`.** En `servicios/orquestador/src/orquestador/origen.py`, con `azure-identity` y `azure-storage-file-datalake` como dependencias.
+- [x] **T02 — `OrigenOneLake`.** En `servicios/orquestador/src/orquestador/origen_onelake.py` (ver la nota de T02), con `azure-identity` y `azure-storage-file-datalake` como dependencias.
   - Se configura con workspace, lakehouse y `DefaultAzureCredential`.
   - Las rutas son relativas a `Files/`.
   - `listar` es recursivo, devuelve solo archivos, en orden y relativos a la carpeta. Con el reparto por tabla ya no lo usa la apertura, pero sirve para la revisión de T06.
@@ -51,7 +51,7 @@ Un servicio aparte solo agregaría una copia de los originales o un salto de red
   - Pruebas con tablas inventadas (filas en memoria, sin Delta): proceso y dos oferentes, un RAR con hijos, un ZIP dentro de otro, un RAR sin hijos, una ruta repetida, un oferente que no cruza y una categoría desconocida.
 
 - [ ] **T04 — Bajar en paralelo.** `Normalizar` baja hoy los archivos de uno en uno. A ~1,5 MB/s por archivo, un oferente de 200 MB tarda más de 2 minutos solo en bajar.
-  - Se baja con varios hilos (`paralelo_bajar`, 4 por defecto) a la misma carpeta temporal.
+  - Se baja con varios hilos (`paralelo_bajar`, 8 por defecto) a la misma carpeta temporal. Cada archivo cuesta ~1,8 s de latencia aunque sea chico (nota de T02): la entrega más grande, con 57 archivos, tarda ~100 s en serie y ~15 s con 8 hilos.
   - Tamaños de la muestra sin comprimidos (2026-11-20): la entrega más grande pesa 106 MB (57 archivos), la mediana 7 MB y el archivo más grande 11 MB. El disco efímero de una réplica de 0,5 vCPU basta.
   - Si un archivo falla, falla la entrega, como hoy.
   - Se mide en T06 y se ajusta el valor.
@@ -134,3 +134,16 @@ Revisión de la historia de las tablas Delta, todas sus versiones (desde octubre
 - Ningún evento cambió de proyecto, y ningún proyecto tiene más de un evento en estos datos.
 - En toda la historia de `adjuntos_metadata` hay 444 claves de archivo, y ninguna cambió de ruta ni de MD5: un archivo que cambia entra como uno nuevo. La versión vigente tiene 310 claves. Las 134 que faltan son justo los archivos huérfanos: el módulo 1 borró esas filas en una corrida y dejó los archivos.
 - Sin ver todavía: un proyecto con varios eventos, y adjuntos nuevos en un evento ya `DESCARGADO`. Con el versionado por MD5, esos adjuntos llegarían como filas nuevas del mismo evento, es decir, como documentos tardíos (A-10, sin diseñar).
+
+### T02 — `OrigenOneLake` (2026-11-20)
+
+- **Módulo aparte:** `origen_onelake.py`, no `origen.py`. Así `OrigenLocal` y las pruebas que no tocan OneLake no importan el SDK de Azure.
+- **`bajar` recibe un `esperado` opcional** (`Esperado(tamano, md5)`) en la interfaz `Origen`, y lo revisan las dos versiones. Si no coincide, borra lo bajado y lanza `ArchivoDistinto`, que es un `ErrorOrigen`: en `Normalizar` se reintenta como una descarga fallida. Por ahora nadie le pasa `esperado`; lo conecta T03.
+- **Un 401, un 403 o una identidad que falta** (por ejemplo, `az login` vencido) lanzan `ErrorDeAcceso`. No es un `ErrorOrigen`, para que `Normalizar` no lo reintente: va a errores como clase 4, y el motivo dice "Bug" con el lugar de la excepción. Lo anoto por si el usuario prefiere una clase propia de "configuración" en `errores.py`.
+- **408, 429 y 5xx, y las fallas de red,** son `ErrorTransitorio`, con `Retry-After` como espera cuando viene. Otro código sale tal cual, como bug.
+- **Pruebas:** 21 nuevas con un cliente falso (`tests/test_origen_onelake.py`). La suite completa pasa: 212 pruebas.
+- **Humo contra OneLake real** (usuario del equipo, `az login`; solo conteos):
+  - `listar` de `fase2/` y de un evento de 81 archivos: 6,2 s.
+  - Bajar 5 PDF (3,9 MB): 9,2 s con 1 parte por archivo y 8,5 s con 4, unos 1,8 s por archivo.
+  - El SDK solo parte los archivos de más de 32 MB, así que la concurrencia por archivo casi no cambia nada. La latencia por archivo es lo que pesa, y se ataca en T04 bajando varios archivos a la vez.
+  - Una carpeta que no existe da `ErrorOrigen`.
