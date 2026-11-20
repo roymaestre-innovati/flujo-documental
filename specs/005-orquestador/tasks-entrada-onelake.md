@@ -26,10 +26,9 @@ Un servicio aparte solo agregaría una copia de los originales o un salto de red
 
 ## Tareas
 
-- [ ] **T01 — Metadatos del módulo 1.** Casi resuelta en la revisión del 2026-11-18 (ver la nota de T01): **el reparto sale de las tablas del módulo 1, no de listar carpetas** (decidido por el usuario). Es provisional: el módulo 1 prometió una vista con lo que necesitamos, y la definimos más adelante con lo que se use aquí (sección "Lo que usamos de las tablas"). Falta:
-  - Cómo se pasa de `event_id` al identificador del proceso (SR…). Ver `tbl_evaluacionofertas_eventos_listados`.
-  - Qué traen los JSON del módulo 1. Ya no entran, porque no están en la tabla, pero pueden servir para la vista.
-  - Preguntarle al módulo 1 por los 134 archivos huérfanos y por los oferentes con `has_bid = False`.
+- [x] **T01 — Metadatos del módulo 1.** Hecha el 2026-11-20 con `servicios/prueba-onelake/revisar_metadatos.py` (ver la nota de T01). **El reparto sale de las tablas del módulo 1, no de listar carpetas** (decidido por el usuario). Es provisional: el módulo 1 prometió una vista con lo que necesitamos, y la definimos más adelante con lo que se use aquí (sección "Lo que usamos de las tablas"). Queda abierto:
+  - **Identificador del proceso:** las tablas no traen el SR. Se propone usar el `event_id` (`Doc…`) como `id_proceso` y guardar el proyecto (`WS…`) en el proceso. Por confirmar con el usuario.
+  - **Para el módulo 1:** si se pueden borrar los archivos huérfanos de `_contenido/` (134 en tres eventos), y cómo se pasa del evento al SR, si el negocio lo necesita.
 
 - [ ] **T02 — `OrigenOneLake`.** En `servicios/orquestador/src/orquestador/origen.py`, con `azure-identity` y `azure-storage-file-datalake` como dependencias.
   - Se configura con workspace, lakehouse y `DefaultAzureCredential`.
@@ -87,9 +86,10 @@ Es el borrador de lo que le pediremos al módulo 1 en la vista. Se actualiza en 
 | | `is_compressed_archive`, `idempotency_key`, `parent_archive_key` | Excluir comprimidos y detectar los que no tienen contenido |
 | `bronce.tbl_evaluacionofertas_oferentes_control` | `event_id`, `invitation_id` | Cruce |
 | | `sm_vendor_id` | Identificador del oferente |
-| `bronce.tbl_evaluacionofertas_eventos_listados` | por definir en T01 | Identificador del proceso (SR…) |
+| `control.tbl_evaluacionofertas_eventos_control` | `event_id`, `parent_project_id` | Identificador del proceso y del proyecto de Ariba |
+| | `control_status`, `total_files_failed` | Saber que el evento terminó de descargarse (`DESCARGADO`, sin fallidos): es lo que dispararía el aviso |
 
-Lo ideal en la vista: una fila por documento descargado, con el proceso, el identificador del oferente (vacío en los del proceso), la ruta, el tamaño, el MD5 y la marca de comprimido sin contenido, sin los comprimidos y sin restos de corridas viejas. Así sobraría todo el cruce de T03.
+Lo ideal en la vista: una fila por documento descargado de un evento en `DESCARGADO`, con el evento, el proyecto, el SR si existe, el identificador del oferente (vacío en los del proceso), la ruta, el tamaño, el MD5 y la marca de comprimido sin contenido, sin los comprimidos y sin restos de corridas viejas. Así sobraría todo el cruce de T03.
 
 ## Notas de implementación
 
@@ -105,3 +105,23 @@ Versión vigente de las tablas, leída con `deltalake` (5 s cada una). Solo cont
 - En la carpeta hay 168 archivos que no están en la tabla:
   - 34 son los JSON del módulo 1.
   - 134 están dentro de `_contenido/`, en carpetas sin ninguna fila en la tabla. Todos se escribieron entre las 21:04 y las 21:05 del 2026-10-21, con la misma profundidad que los registrados. Parecen una descompresión de una corrida vieja que quedó huérfana. Listando carpetas habrían entrado dos veces: es la razón principal para repartir con la tabla.
+
+### T01 — Cierre (2026-11-20)
+
+Corrida de `revisar_metadatos.py` (versiones: `adjuntos_metadata` 8, `oferentes_control` 7, `eventos_control` 15).
+
+- **Eventos:** `eventos_control` tiene 118 eventos de Ariba (102 RFP, 15 RFI y 1 subasta). Solo 4 están en `DESCARGADO`, y son los 4 que tienen adjuntos, todos sin archivos fallidos. Los demás: 51 `NO_ELEGIBLE_TIPO`, 37 `ELEGIBLE` y 26 `EN_SEGUIMIENTO`.
+- **Identificadores:** el `event_id` tiene la forma `Doc` y 10 dígitos, y es el nombre de la carpeta bajo `fase2/`. Cada evento tiene un solo proyecto, `parent_project_id`, con la forma `WS` y 10 dígitos. Ninguna tabla trae el SR (`eventos_listados` solo trae evento, proyecto y fechas).
+- **Tabla contra carpeta, por evento:**
+  - Todas las filas existen y coinciden en tamaño.
+  - El evento 4 trae 10 rutas repetidas.
+  - Los archivos huérfanos están en los eventos 1, 2 y 3 (53, 53 y 28). El evento 4, que no tiene comprimidos, no tiene huérfanos.
+- **Oferentes:** todas las filas de oferente cruzan con `oferentes_control`. Los 10 oferentes con `has_bid = False` no tienen ningún archivo, así que no llegan al reparto. Ya no hace falta preguntarlo.
+- **Comprimidos:** 18 en total. Sin filas hijas: 3 en el evento 1, 2 en el 2, 1 en el 3 y ninguno en el 4. Son los que generan la tarea `comprimido_sin_contenido`.
+- **Fuera de `fase2/`:** hay 55 archivos en otras dos carpetas del shortcut (una con nombre de evento y `mvp`), de corridas anteriores. No están en la tabla y no entran.
+- **JSON del módulo 1:** cuatro formas, ninguna es un documento del oferente.
+  - Ficha del oferente (20): `event_id`, `invitation_id`, `sm_vendor_id`, `participation_status`, `has_bid` y el nombre. Es lo mismo que `oferentes_control`.
+  - Ofertas por ítem (10): `payload` con `eventId`, `itemId`, `invitationId`, `bidStatus`, `submissionDate` y el ítem.
+  - Contenido del evento (14, en dos formas): `payload` con los ítems del evento, su `title` y sus `terms`, que son las preguntas y condiciones del evento en Ariba.
+
+  Los `terms` pueden servir más adelante para la ficha del proceso (módulo 4); por ahora no entran.

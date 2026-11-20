@@ -137,7 +137,8 @@ Ningún otro paso vuelve a tocar Fabric: desde ahí todo trabaja con el PDF norm
 - Acceso de lectura en el workspace para la identidad administrada del job (en desarrollo y, después, en producción).
 - Si el tenant permite que las identidades administradas y los service principals usen las APIs de Fabric. Con el usuario del equipo no hizo falta; con la identidad del job, sin verificar.
 - El workspace y el lakehouse de producción.
-- Qué es `event_id` frente al identificador del proceso (SR…) y qué traen los archivos JSON.
+- Cómo se pasa del evento al SR, si el negocio lo necesita. Las tablas traen el evento (`Doc…`) y el proyecto (`WS…`), no el SR; mientras tanto se propone usar el evento como identificador del proceso.
+- Si se pueden borrar los archivos huérfanos de corridas viejas dentro de `_contenido/`.
 
 Las lecturas consumen capacidad de Fabric del módulo 1; hay que avisarles el volumen (unos 1,4 GB por proceso en la muestra).
 
@@ -694,7 +695,7 @@ Precios de referencia de agregadores, sin confirmar en Azure: gpt-5.4 a $2,50 / 
 
 | # | Para | Pregunta |
 |---|---|---|
-| A-1 | Módulo 1 | Respondida en parte (paso 0). Ya se sabe: workspace y lakehouse de desarrollo, estructura de carpetas y acceso por shortcut. Falta: ¿pueden publicar en Service Bus? ¿Qué trae el mensaje (proponemos `id_proceso`, `ruta` y la lista de archivos)? ¿`event_id` es el identificador del proceso o hay que cruzarlo con el SR? ¿Qué traen los JSON que dejan junto a los documentos? ¿Los archivos quedan quietos después del aviso? ¿Qué proporción llega escaneada, con contraseña o firmada (M2)? ¿Dan acceso a la identidad administrada del job, y cuáles son el workspace y el lakehouse de producción? |
+| A-1 | Módulo 1 | Respondida en parte (paso 0). Ya se sabe: workspace y lakehouse de desarrollo, estructura de carpetas y acceso por shortcut. Falta: ¿pueden publicar en Service Bus? ¿Qué trae el mensaje (proponemos `id_proceso`, `ruta` y la lista de archivos)? ¿Cómo se pasa del evento (`Doc…`) al SR, si hace falta? ¿Se pueden borrar los archivos huérfanos de `_contenido/`? ¿Los archivos quedan quietos después del aviso? ¿Qué proporción llega escaneada, con contraseña o firmada (M2)? ¿Dan acceso a la identidad administrada del job, y cuáles son el workspace y el lakehouse de producción? |
 | A-2 | Power App | ¿Dónde escribimos las tareas de revisión y con qué forma? Proponemos una tarea por oferente y área, con puntos que se confirman, corrigen o marcan no cumple. ¿Cómo leemos las correcciones? |
 | A-3 | Negocio | ¿Un PDF modificado después de firmarse digitalmente debe alertar al evaluador? |
 | A-4 | Negocio (N-A) | ¿Una firma digital del oferente cuenta como "Firmado"? ¿Hay que validar la confianza del certificado? |
