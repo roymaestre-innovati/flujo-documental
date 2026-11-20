@@ -14,7 +14,8 @@ Cómo se traducen las fallas a las clases de error del orquestador:
 |-----------------------------------------------|--------------------|------------------------------|
 | 404: no existe                                | `ErrorOrigen`      | Como en `OrigenLocal`        |
 | Bajado de otro tamaño o con otro MD5          | `ArchivoDistinto`  | Como en `OrigenLocal`        |
-| 401, 403 o sin identidad                      | `ErrorDeAcceso`    | Sin reintento, a operación   |
+| 401, 403 o sin identidad                      | `ErrorDeAcceso`    | Configuración: sin reintento, |
+|                                               |                    | a operación                  |
 | 408, 429, 5xx, sin conexión o sin respuesta   | `ErrorTransitorio` | Reintento; con `Retry-After`, |
 |                                               |                    | espera sin contar intento    |
 | Cualquier otra respuesta                      | la del SDK         | Un bug: sin reintento        |
@@ -27,12 +28,13 @@ Los mensajes de error no llevan rutas ni nombres, solo la operación y el códig
 """
 
 import logging
+import re
 from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path, PurePosixPath
 from typing import Any
 
-from .errores import ErrorTransitorio
+from .errores import ErrorDeConfiguracion, ErrorTransitorio
 from .origen import ArchivoDistinto, ErrorOrigen, Esperado, Origen, _ruta_segura, revisar_bajado
 
 registro = logging.getLogger("orquestador.origen")
@@ -47,11 +49,26 @@ TIMEOUT_S = 120
 CODIGOS_TRANSITORIOS = {408, 429, 500, 502, 503, 504}
 
 
-class ErrorDeAcceso(Exception):
+class ErrorDeAcceso(ErrorDeConfiguracion):
     """OneLake no deja entrar a la identidad del job (401 o 403), o no hay
-    identidad. Repetir no cambia nada: es configuración (permisos en el
-    workspace, opciones del tenant o `az login` vencido), y la revisa operación.
-    El bucle la trata como clase 4: sin reintento, a la cola de errores."""
+    identidad. Causas típicas: `az login` vencido en local, la identidad
+    administrada sin acceso al workspace, la conexión del shortcut del módulo 1
+    rota (por ejemplo, tras rotar la llave de su cuenta), un permiso o una opción
+    del tenant que cambió, o Conditional Access. Lo revisa operación."""
+
+
+_CODIGOS = re.compile(r"\b(AADSTS\d+)\b")
+
+
+def _codigos(error: Any) -> str:
+    """Los códigos del servicio que traiga el error, sin el resto del texto (que
+    puede traer rutas o nombres de usuario)."""
+    codigos = []
+    codigo_servicio = getattr(error, "error_code", None)
+    if codigo_servicio:
+        codigos.append(str(codigo_servicio))
+    codigos += sorted(set(_CODIGOS.findall(str(error))))
+    return f" [{', '.join(codigos)}]" if codigos else ""
 
 
 def _espera_pedida(error: Any) -> float | None:
@@ -79,13 +96,14 @@ def _traducir(operacion: str) -> Iterator[None]:
         raise ErrorOrigen(f"No existe en OneLake ({operacion})") from None
     except ClientAuthenticationError as error:
         raise ErrorDeAcceso(f"OneLake no dejó {operacion}: sin identidad o sin permiso "
-                            f"({getattr(error, 'status_code', None) or type(error).__name__})") from None
+                            f"({getattr(error, 'status_code', None) or type(error).__name__})"
+                            f"{_codigos(error)}") from None
     except HttpResponseError as error:
         codigo = error.status_code
         if codigo == 404:
             raise ErrorOrigen(f"No existe en OneLake ({operacion})") from None
         if codigo in (401, 403):
-            raise ErrorDeAcceso(f"OneLake no dejó {operacion}: HTTP {codigo}") from None
+            raise ErrorDeAcceso(f"OneLake no dejó {operacion}: HTTP {codigo}{_codigos(error)}") from None
         if codigo in CODIGOS_TRANSITORIOS:
             raise ErrorTransitorio(f"OneLake respondió HTTP {codigo} al {operacion}",
                                    espera_s=_espera_pedida(error)) from None

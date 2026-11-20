@@ -12,7 +12,7 @@ from azure.core.exceptions import (
 )
 
 from orquestador.cola import ColaEnMemoria
-from orquestador.errores import ErrorTransitorio, procesar_uno
+from orquestador.errores import ErrorDeConfiguracion, ErrorTransitorio, procesar_uno
 from orquestador.origen import ArchivoDistinto, ErrorOrigen, Esperado, OrigenLocal
 from orquestador.origen_onelake import ErrorDeAcceso, OrigenOneLake
 from orquestador.reloj import RelojManual
@@ -168,6 +168,23 @@ def test_sin_permiso_es_error_de_acceso(origen, cliente, falla):
     with pytest.raises(ErrorDeAcceso) as error:
         origen.listar("informacion-adjuntos")
     assert "informacion" not in str(error.value)
+    assert isinstance(error.value, ErrorDeConfiguracion)
+
+
+def test_el_error_de_acceso_trae_los_codigos_y_no_el_texto(origen, cliente):
+    falla = _http(403)
+    falla.error_code = "AuthorizationPermissionMismatch"
+    cliente.fallas["listar"] = falla
+    with pytest.raises(ErrorDeAcceso) as error:
+        origen.listar("informacion-adjuntos")
+    assert str(error.value).endswith("HTTP 403 [AuthorizationPermissionMismatch]")
+
+    cliente.fallas["listar"] = ClientAuthenticationError(
+        "AzureCliCredential: ERROR: AADSTS50078: MFA vencida para usuario@empresa.com")
+    with pytest.raises(ErrorDeAcceso) as error:
+        origen.listar("informacion-adjuntos")
+    assert "[AADSTS50078]" in str(error.value)
+    assert "usuario" not in str(error.value)
 
 
 @pytest.mark.parametrize("falla, espera", [
@@ -208,6 +225,7 @@ def test_el_bucle_no_reintenta_un_error_de_acceso():
     manejador = Manejador()
     resultado = procesar_uno(cola, manejador)
     assert resultado.desenlace == "a_errores"
+    assert resultado.motivo == "Configuración: OneLake no dejó bajar: HTTP 403"
     assert len(manejador.fallas) == 1
     assert cola.recibir("normalizar") is None
 

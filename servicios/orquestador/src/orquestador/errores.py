@@ -13,6 +13,9 @@ lanza una de estas excepciones y el bucle decide qué hacer:
 | RespuestaInvalida      | 3     | Reintenta 2 veces enseguida                                |
 | MensajeRechazado       | 4     | El mensaje mismo está mal (por ejemplo, un aviso que no    |
 |                        |       | cumple su contrato): sin reintento, a operación            |
+| ErrorDeConfiguracion   | 4     | Falta un permiso, una credencial o una opción del entorno  |
+|                        |       | (por ejemplo, OneLake responde 403): sin reintento, a      |
+|                        |       | operación, con un motivo que dice qué revisar              |
 | cualquier otra         | 4     | Un bug: sin reintento                                      |
 
 Cuando se agotan los reintentos, o con un bug, el bucle llama a `al_fallar` del
@@ -59,6 +62,17 @@ class MensajeRechazado(Exception):
 
     El texto de la excepción va al motivo y a los registros, así que no debe
     llevar rutas ni valores del mensaje: solo campos, conteos y códigos.
+    """
+
+
+class ErrorDeConfiguracion(Exception):
+    """Clase 4: el entorno no deja hacer el trabajo (una identidad sin permiso, una
+    credencial vencida, una opción del tenant apagada). Repetir no cambia nada
+    hasta que alguien corrija la configuración; el mensaje no tiene la culpa y no
+    es un bug del código. Se puede reenviar desde errores cuando esté corregida.
+
+    El texto va al motivo y a los registros: solo la operación y los códigos del
+    servicio (`AADSTS…`, `AuthorizationPermissionMismatch`), nunca rutas.
     """
 
 
@@ -130,6 +144,8 @@ def procesar_uno(cola: Cola, manejador: Manejador, parametros: Parametros = PARA
             return _fallar(cola, manejador, mensaje, f"Respuesta inválida tras {intento} intentos: {motivo}")
         except MensajeRechazado as error:
             return _fallar(cola, manejador, mensaje, f"Rechazado: {error}")
+        except ErrorDeConfiguracion as error:
+            return _fallar(cola, manejador, mensaje, f"Configuración: {error}")
         except Exception as error:  # noqa: BLE001 - clase 4: cualquier otra cosa es un bug
             return _fallar(cola, manejador, mensaje, f"Bug: {lugar_de_la_excepcion(error)}")
     cola.completar(mensaje)
