@@ -39,3 +39,11 @@ Por pantalla salen solo conteos, extensiones y tamaños, nunca nombres (principi
 
 Las opciones del tenant y los roles que nombran las pistas se tomaron de memoria y la
 prueba los confirma: hay que corregir este README con lo que se encuentre.
+
+## Revisar los metadatos del módulo 1
+
+```bash
+uv run servicios/prueba-onelake/revisar_metadatos.py
+```
+
+Cruza las tablas `adjuntos_metadata`, `oferentes_control` y `eventos_control` con la carpeta de cada evento: si las filas existen y coinciden en tamaño, qué archivos sobran, si los oferentes cruzan, qué comprimidos no tienen contenido y qué forma tienen los JSON del módulo 1 (solo llaves y tipos). Toma unos 15 s. Resultados en la nota de T01 de `specs/005-orquestador/tasks-entrada-onelake.md`.
