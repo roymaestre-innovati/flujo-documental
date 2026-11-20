@@ -81,7 +81,7 @@ def _espera_pedida(error: Any) -> float | None:
 
 
 @contextmanager
-def _traducir(operacion: str) -> Iterator[None]:
+def traducir_fallas(operacion: str) -> Iterator[None]:
     from azure.core.exceptions import (
         ClientAuthenticationError,
         HttpResponseError,
@@ -149,7 +149,7 @@ class OrigenOneLake(Origen):
 
     def listar(self, carpeta: str) -> list[str]:
         base = self._ruta(carpeta)
-        with _traducir("listar"):
+        with traducir_fallas("listar"):
             nombres = [p.name for p in self._cliente.get_paths(path=base, recursive=True) if not p.is_directory]
         prefijo = base + "/"
         relativas = []
@@ -163,7 +163,7 @@ class OrigenOneLake(Origen):
         ruta = self._ruta(archivo)
         destino.parent.mkdir(parents=True, exist_ok=True)
         try:
-            with _traducir("bajar"):
+            with traducir_fallas("bajar"):
                 descarga = self._cliente.get_file_client(ruta).download_file(max_concurrency=self._concurrencia)
                 with open(destino, "wb") as salida:
                     escritos = descarga.readinto(salida)

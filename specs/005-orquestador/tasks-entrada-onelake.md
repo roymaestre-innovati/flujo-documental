@@ -38,7 +38,7 @@ Un servicio aparte solo agregaría una copia de los originales o un salto de red
   - Errores: 404 es `ErrorOrigen`; 429, 5xx y timeouts son `ErrorTransitorio`; 401 y 403 son una falla de configuración que va a operación sin reintentos.
   - Pruebas con el cliente falso, incluidas una ruta con `..` y un MD5 que no coincide.
 
-- [ ] **T03 — Reparto con las tablas del módulo 1.** Un módulo nuevo del orquestador (`entrada_modulo1.py`) lee las dos tablas Delta por OneLake (`deltalake`, versión vigente) y arma, para un `event_id`, la lista `archivos` del aviso (`ruta` e `id_oferente`) que ya define el contrato `proceso-listo`. La apertura no cambia: reparte con esa lista, como hoy. Cuando llegue la vista, solo cambia este módulo.
+- [x] **T03 — Reparto con las tablas del módulo 1.** (Ver la nota de T03.) Un módulo nuevo del orquestador (`entrada_modulo1.py`) lee las dos tablas Delta por OneLake (`deltalake`, versión vigente) y arma, para un `event_id`, la lista `archivos` del aviso (`ruta` e `id_oferente`) que ya define el contrato `proceso-listo`. La apertura no cambia: reparte con esa lista, como hoy. Cuando llegue la vista, solo cambia este módulo.
   - `doc_category = DOCUMENTOS_PROCESO`: documento del proceso (`id_oferente` vacío).
   - `doc_category = OFERENTE`: el `id_oferente` es el `sm_vendor_id` de `oferentes_control`, cruzando por `event_id` e `invitation_id`. Una fila de oferente que no cruza rechaza el aviso: no se reparte a ciegas.
   - Cualquier otro valor de `doc_category` rechaza el aviso.
@@ -147,3 +147,38 @@ Revisión de la historia de las tablas Delta, todas sus versiones (desde octubre
   - Bajar 5 PDF (3,9 MB): 9,2 s con 1 parte por archivo y 8,5 s con 4, unos 1,8 s por archivo.
   - El SDK solo parte los archivos de más de 32 MB, así que la concurrencia por archivo casi no cambia nada. La latencia por archivo es lo que pesa, y se ataca en T04 bajando varios archivos a la vez.
   - Una carpeta que no existe da `ErrorOrigen`.
+
+### T03 — Reparto con las tablas (2026-11-20)
+
+- **`entrada_modulo1.py`.** `armar_entrada(id_evento, tablas)` devuelve un `EntradaDelEvento` con:
+  - el aviso, validado contra `proceso-listo`: `ruta` es `informacion-adjuntos/fase2/<event_id>` y cada archivo es relativo a ella;
+  - el proyecto `WS…`;
+  - el tamaño y el MD5 esperados de cada archivo;
+  - los comprimidos sin contenido, por entrega;
+  - los excluidos, por motivo.
+
+  La fecha del aviso es `updated_at_epoch_ms` del evento en `eventos_control`. Así un aviso repetido trae la misma fecha y la apertura lo reconoce.
+- **Qué rechaza.** Lo que no cuadra lanza `EventoRechazado`, que es un `AvisoRechazado`:
+  - un evento que no está en `DESCARGADO` o que tiene archivos fallidos;
+  - una `doc_category` o un `file_status` desconocidos;
+  - un oferente que no cruza con un único `sm_vendor_id`;
+  - una ruta repetida con datos distintos;
+  - una ruta fuera de la carpeta del evento o con `..`.
+- **Lectura de Delta (`TablasOneLake`).** `deltalake` solo abre el log y da los parquet vigentes. Los parquet se bajan con el SDK y se leen con `pyarrow`.
+  - El cuelgue se reproduce siempre que `deltalake` lee los datos (con `to_pyarrow_table` o `to_pyarrow_dataset`). Abrir la tabla o pedir `file_uris()` termina bien.
+  - Sirve porque las tres tablas usan el protocolo 1 de Delta, sin particiones. Si eso cambia, se rechaza con `ErrorDeConfiguracion` en lugar de leer mal.
+  - Si a un parquet viejo le falta una columna, llega como None.
+- **Tareas.** `crear_tareas_sin_contenido` crea una tarea `documento_con_error` con motivo `COMPRIMIDO_SIN_CONTENIDO` por cada comprimido sin hijos. Va después de la apertura. El identificador sale de un hash de la ruta, así que repetirla no duplica.
+- **Revisión de lo bajado.** `OrigenRevisado` envuelve el origen y le pasa a `bajar` el tamaño y el MD5 de cada archivo. En local lo conecta el comando (T05). **En Azure falta decidir cómo le llegan a `Normalizar`.** El contrato `proceso-listo` no deja agregar campos a cada archivo (`additionalProperties: false`). Opciones: agregar `tamano` y `md5` opcionales en una versión 0.2 del contrato, o volver a leer la tabla al normalizar. Se le pregunta al usuario.
+- **Pruebas.** 24 nuevas (`tests/test_entrada_modulo1.py`), con tablas inventadas y, para Delta, un log y unos parquet falsos. Incluye una prueba con la apertura de verdad: las entregas quedan `PROCESO`, `S100` y `S200`, sin ningún ZIP ni RAR. La suite completa pasa: 237 pruebas.
+- **Humo con las tablas reales** (solo conteos):
+
+  | Evento | Archivos | Proceso | Oferentes | Entregas | Comprimidos excluidos | Sin contenido |
+  |---|---|---|---|---|---|---|
+  | 1 | 81 | 57 | 24 | 4 | 7 | 3 |
+  | 2 | 74 | 57 | 17 | 3 | 7 | 2 |
+  | 3 | 59 | 24 | 35 | 2 | 4 | 1 |
+  | 4 | 67 | 20 | 47 | 5 | 0 | 0 |
+
+  Los conteos cuadran con T01 (por ejemplo, el evento 4 tiene 78 filas, 10 de ellas repetidas). La entrega más chica (8 archivos, 3,6 MB) bajó completa con tamaño y MD5 revisados en 10 s.
+- **Tiempo.** Armar un aviso toma ~23 s, porque lee las tres tablas enteras y baja sus ~60 parquet de uno en uno. Para la primera versión alcanza. Si molesta, se bajan en paralelo (como en T04) o se leen las tablas una vez para varios eventos.
