@@ -157,19 +157,22 @@ def test_caida_a_la_mitad_se_completa_al_reenviar(mundo):
         return publicar(cola, cuerpo, demora_s, propiedades)
 
     mundo.cola.publicar = publicar_y_caer
-    mundo.cola.publicar(c.PROCESOS_LISTOS, _aviso())
-    assert procesar_uno(mundo.cola, mundo.apertura).desenlace == "a_errores"
+    aviso = _aviso(comprimidos_sin_contenido=[{"ruta": "OF-001/roto.rar", "id_oferente": "OF-001"}])
+    assert mundo.avisar(aviso).desenlace == "a_errores"
     assert mundo.estado.leer(P, estados.PROCESO, P).datos["entregas_publicadas"] is False
+    [tarea] = mundo.estado.listar(P, estados.TAREA)
+    assert tarea.datos["motivo"] == "COMPRIMIDO_SIN_CONTENIDO"
 
     assert reenviar_errores(mundo.cola, c.PROCESOS_LISTOS) == 1
     assert procesar_uno(mundo.cola, mundo.apertura).desenlace == "ok"
+    assert mundo.estado.listar(P, estados.TAREA) == [tarea]
     publicadas = [m["entrega"] for m in mundo.normalizar()]
     # La primera entrega sale dos veces: la normalización lo absorbe (T06).
     assert sorted(set(publicadas)) == ["OF-001", "OF-002", "PROCESO"]
     assert publicadas.count("OF-001") == 2
     assert mundo.estado.leer(P, estados.PROCESO, P).datos["entregas_publicadas"] is True
     # Y ahora un aviso repetido ya no hace nada.
-    mundo.avisar(_aviso())
+    mundo.avisar(aviso)
     assert mundo.normalizar() == []
 
 

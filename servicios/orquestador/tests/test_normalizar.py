@@ -2,7 +2,7 @@
 
 import pytest
 
-from fabrica import P, RUTA, escribir, pdf, pdf_con_contrasena
+from fabrica import AVISO, P, RUTA, escribir, pdf, pdf_con_contrasena
 from fabrica import Mundo as MundoBase
 from orquestador import cola as c
 from orquestador import estados
@@ -174,6 +174,59 @@ def test_archivo_que_falta_en_el_origen_es_transitorio(mundo, tmp_path):
     desenlaces = [r.desenlace for r in mundo.correr()]
     assert desenlaces.count("reintento") == 1
     assert mundo.estado.leer(P, estados.OFERENTE, "OF-002").datos["estado"] == estados.RECIBIDO
+
+
+@pytest.mark.parametrize("esperado", [
+    {"tamano": 0, "md5": "0" * 32},
+    {"tamano": 0},
+    {"md5": "0" * 32},
+], ids=["ambos", "tamano", "md5"])
+def test_archivo_distinto_se_reintenta_y_luego_va_a_errores(tmp_path, esperado):
+    ruta = "OF-001/carta.pdf"
+    escribir(tmp_path, ruta, pdf(1, "Carta"))
+    mundo = Mundo(tmp_path)
+    mundo.abrir({**AVISO, "archivos": [{"ruta": ruta, "id_oferente": "OF-001", **esperado}]})
+
+    for demora in (120, 240, 480):
+        assert [r.desenlace for r in mundo.correr()] == ["reintento"]
+        assert mundo.estado.leer(P, estados.OFERENTE, "OF-001").datos["estado"] == estados.RECIBIDO
+        mundo.reloj.adelantar(demora)
+
+    assert [r.desenlace for r in mundo.correr()] == ["a_errores"]
+    [error] = mundo.cola.errores(c.NORMALIZAR)
+    assert error.mensaje.propiedades["intento"] == 4
+    assert mundo.estado.leer(P, estados.OFERENTE, "OF-001").datos["estado"] == estados.ERROR_PROCESO
+    assert mundo.documentos("OF-001") == {}
+    assert mundo.estado.listar(P, estados.TAREA) == []
+    assert mundo.clasificar() == []
+
+
+@pytest.mark.parametrize("version", ["0.1", "0.2"])
+def test_aviso_sin_los_campos_nuevos_se_normaliza(tmp_path, version):
+    ruta = "OF-001/carta.pdf"
+    escribir(tmp_path, ruta, pdf(1, "Carta"))
+    mundo = Mundo(tmp_path)
+    mundo.abrir({**AVISO, "contrato": f"modulo5-orquestador/{version}",
+                 "archivos": [{"ruta": ruta, "id_oferente": "OF-001"}]})
+
+    assert "id_proyecto" not in mundo.estado.leer(P, estados.PROCESO, P).datos
+    assert "esperados" not in mundo.estado.leer(P, estados.OFERENTE, "OF-001").datos
+    assert [r.desenlace for r in mundo.correr()] == ["ok"]
+    [documento] = mundo.documentos("OF-001").values()
+    assert documento["estado"] == estados.NORMALIZADO
+
+
+def test_normaliza_entrega_con_solo_un_comprimido_anunciado(tmp_path):
+    ruta = "OF-001/roto.zip"
+    escribir(tmp_path, ruta, b"comprimido ilegible")
+    mundo = Mundo(tmp_path)
+    mundo.abrir({**AVISO, "comprimidos_sin_contenido": [{"ruta": ruta, "id_oferente": "OF-001"}]})
+
+    assert [r.desenlace for r in mundo.correr()] == ["ok"]
+    oferente = mundo.estado.leer(P, estados.OFERENTE, "OF-001").datos
+    assert (oferente["archivos"], oferente["documentos"], oferente["estado"]) == ([], 0, estados.PROCESANDO)
+    [tarea] = mundo.estado.listar(P, estados.TAREA)
+    assert (tarea.datos["entrega"], tarea.datos["motivo"]) == ("OF-001", "COMPRIMIDO_SIN_CONTENIDO")
 
 
 def test_version_distinta_del_normalizador_no_normaliza(mundo):

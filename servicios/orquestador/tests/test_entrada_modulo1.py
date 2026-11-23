@@ -17,15 +17,13 @@ from orquestador.entrada_modulo1 import (
     EVENTOS,
     OFERENTES,
     EventoRechazado,
-    OrigenRevisado,
     TablasEnMemoria,
     TablasOneLake,
     armar_entrada,
-    crear_tareas_sin_contenido,
 )
 from orquestador.errores import ErrorDeConfiguracion, ErrorTransitorio, procesar_uno
 from orquestador.estado import EstadoEnMemoria
-from orquestador.origen import ArchivoDistinto, Esperado, OrigenLocal
+from orquestador.origen import OrigenLocal
 from orquestador.origen_onelake import ErrorDeAcceso
 from orquestador.reloj import RelojManual
 from orquestador.tareas import DOCUMENTO_CON_ERROR
@@ -91,9 +89,6 @@ def test_arma_el_aviso_con_las_tablas():
     assert entrada.proyecto == "WS0000000001"
     assert entrada.excluidos == {"comprimido": 3}
     assert entrada.sin_contenido == {"S100": ["Oferentes/Empresa A/roto.rar"]}
-    carta = f"informacion-adjuntos/{CARPETA}/Oferentes/Empresa A/carta.pdf"
-    assert entrada.esperados[carta] == Esperado(5, hashlib.md5(b"carta").hexdigest())
-    assert len(entrada.esperados) == 5
 
 
 def _cambiar(tablas, tabla, indice, **cambios):
@@ -138,35 +133,41 @@ def test_la_apertura_reparte_con_el_aviso_y_se_crean_las_tareas(tmp_path):
     reloj = RelojManual()
     cola = c.ColaEnMemoria(reloj)
     estado = EstadoEnMemoria()
-    entrada = armar_entrada(EVENTO, TablasEnMemoria(_tablas()))
+    tablas = _tablas()
+    tablas[OFERENTES].append({"event_id": EVENTO, "invitation_id": "inv-c", "sm_vendor_id": "S300"})
+    tablas[ADJUNTOS].extend([
+        _adjunto("Oferentes/Empresa C/roto.zip", "OFERENTE", "inv-c", comprimido=True),
+        _adjunto("Documentos del proceso/roto.zip", "DOCUMENTOS_PROCESO", comprimido=True),
+    ])
+    entrada = armar_entrada(EVENTO, TablasEnMemoria(tablas))
+    apertura = Apertura(cola, estado, OrigenLocal(tmp_path), reloj)
     cola.publicar(c.PROCESOS_LISTOS, entrada.aviso)
-    assert procesar_uno(cola, Apertura(cola, estado, OrigenLocal(tmp_path), reloj)).desenlace == "ok"
+    assert procesar_uno(cola, apertura).desenlace == "ok"
 
-    entregas = {r.id: r.datos["archivos"] for r in estado.listar(EVENTO, estados.OFERENTE)}
-    assert sorted(entregas) == ["PROCESO", "S100", "S200"]
-    assert entregas["S100"] == ["Oferentes/Empresa A/carta.pdf"]
-    assert not any(r.endswith((".rar", ".zip")) for rutas in entregas.values() for r in rutas)
-
-    assert crear_tareas_sin_contenido(estado, reloj, entrada) == 1
-    crear_tareas_sin_contenido(estado, reloj, entrada)
+    proceso = estado.leer(EVENTO, estados.PROCESO, EVENTO).datos
+    assert proceso["id_proyecto"] == "WS0000000001"
+    entregas = {r.id: r.datos for r in estado.listar(EVENTO, estados.OFERENTE)}
+    assert sorted(entregas) == proceso["entregas"] == ["PROCESO", "S100", "S200", "S300"]
+    carta = "Oferentes/Empresa A/carta.pdf"
+    assert entregas["S100"]["archivos"] == [carta]
+    assert entregas["S100"]["esperados"] == {carta: {"tamano": 5, "md5": hashlib.md5(b"carta").hexdigest()}}
+    assert entregas["S300"]["archivos"] == []
+    assert not any(r.endswith((".rar", ".zip")) for entrega in entregas.values() for r in entrega["archivos"])
     tareas = estado.listar(EVENTO, estados.TAREA)
-    assert len(tareas) == 1
-    tarea = tareas[0]
-    assert tarea.datos["clase"] == DOCUMENTO_CON_ERROR
-    assert tarea.datos["motivo"] == "COMPRIMIDO_SIN_CONTENIDO"
-    assert tarea.datos["entrega"] == "S100"
-    assert tarea.datos["ruta_origen"] == "Oferentes/Empresa A/roto.rar"
+    assert len(tareas) == 3
+    assert all(t.datos["clase"] == DOCUMENTO_CON_ERROR and t.datos["estado"] == estados.ABIERTA
+               and t.datos["motivo"] == "COMPRIMIDO_SIN_CONTENIDO" for t in tareas)
+    assert {t.datos["entrega"]: t.datos["ruta_origen"] for t in tareas} == {
+        "PROCESO": "Documentos del proceso/roto.zip",
+        "S100": "Oferentes/Empresa A/roto.rar",
+        "S300": "Oferentes/Empresa C/roto.zip",
+    }
 
-
-def test_origen_revisado_aplica_lo_esperado(tmp_path):
-    (tmp_path / "o/x").mkdir(parents=True)
-    (tmp_path / "o/x/a.pdf").write_bytes(b"abc")
-    origen = OrigenRevisado(OrigenLocal(tmp_path / "o"), {"x/a.pdf": Esperado(tamano=4)})
-    with pytest.raises(ArchivoDistinto):
-        origen.bajar("x/a.pdf", tmp_path / "d/a.pdf")
-    origen = OrigenRevisado(OrigenLocal(tmp_path / "o"), {})
-    origen.bajar("x/a.pdf", tmp_path / "d/a.pdf")
-    assert origen.listar("x") == ["a.pdf"]
+    antes = estado.listar(EVENTO)
+    cola.publicar(c.PROCESOS_LISTOS, entrada.aviso)
+    assert procesar_uno(cola, apertura).desenlace == "ok"
+    assert estado.listar(EVENTO) == antes
+    assert cola.pendientes(c.NORMALIZAR) == 4
 
 
 # --- Lectura de Delta por OneLake, con un log y unos parquet falsos ---

@@ -7,8 +7,8 @@ Por cada aviso del módulo 1:
    con la lista del aviso o, si no la trae, listando la carpeta en el origen.
 3. Abre el proceso con las versiones vigentes, que quedan fijas (R5). Si ya
    estaba abierto, se queda con las suyas (R2).
-4. Registra cada entrega con sus archivos y publica un mensaje `normalizar` por
-   entrega.
+4. Registra cada entrega con sus archivos y las tareas por comprimidos sin
+   contenido. Publica un mensaje `normalizar` por entrega.
 5. Anota en el proceso que ya publicó las entregas.
 
 Si el trabajador se cae entre 3 y 5, el aviso se vuelve a entregar y, como el
@@ -20,9 +20,12 @@ Los originales no se copian (R3): aquí solo se listan. Los baja la
 normalización, uno por uno, a una carpeta temporal.
 """
 
+import hashlib
+import json
 import logging
 from collections import defaultdict
 from collections.abc import Callable
+from dataclasses import dataclass, field
 from pathlib import PurePosixPath
 
 import normalizacion
@@ -35,17 +38,31 @@ from .errores import MensajeRechazado
 from .estado import Estado
 from .origen import ErrorOrigen, Origen
 from .reloj import Reloj
+from .tareas import DOCUMENTO_CON_ERROR, crear_tarea
 
 registro = logging.getLogger("orquestador.apertura")
+COMPRIMIDO_SIN_CONTENIDO = "COMPRIMIDO_SIN_CONTENIDO"
 
 
 class AvisoRechazado(MensajeRechazado):
     """El aviso cumple su contrato, pero lo que dice no se puede procesar."""
 
 
-def repartir(aviso: dict, origen: Origen) -> dict[str, list[str]]:
-    """Las entregas del proceso: `PROCESO` o `id_oferente` → archivos, como rutas
-    relativas a la carpeta del proceso y ordenadas.
+@dataclass
+class Entrega:
+    archivos: dict[str, dict] = field(default_factory=dict)
+    comprimidos: set[str] = field(default_factory=set)
+
+
+def _id_entrega(archivo: dict) -> str:
+    id_oferente = archivo["id_oferente"]
+    if id_oferente == ENTREGA_DEL_PROCESO:
+        raise AvisoRechazado(f"'{ENTREGA_DEL_PROCESO}' no puede ser el identificador de un oferente")
+    return id_oferente or ENTREGA_DEL_PROCESO
+
+
+def repartir(aviso: dict, origen: Origen) -> dict[str, Entrega]:
+    """Las entregas, por `PROCESO` o `id_oferente`, con rutas relativas al proceso.
 
     Es lo único que cambia cuando el módulo 1 responda A-1 (plan, "Entregas del
     proceso"). Mientras tanto:
@@ -55,13 +72,19 @@ def repartir(aviso: dict, origen: Origen) -> dict[str, list[str]]:
       con su identificador. Un archivo suelto en la raíz rechaza el aviso: podría
       ser de un oferente, y no se evalúa a nadie con documentos de menos.
     """
-    entregas: dict[str, list[str]] = defaultdict(list)
+    entregas: dict[str, Entrega] = defaultdict(Entrega)
+    comprimidos = aviso.get("comprimidos_sin_contenido", [])
+    rutas_comprimidas = {archivo["ruta"] for archivo in comprimidos}
+    for archivo in comprimidos:
+        entregas[_id_entrega(archivo)].comprimidos.add(archivo["ruta"])
+
     if "archivos" in aviso:
         for archivo in aviso["archivos"]:
-            id_oferente = archivo["id_oferente"]
-            if id_oferente == ENTREGA_DEL_PROCESO:
-                raise AvisoRechazado(f"'{ENTREGA_DEL_PROCESO}' no puede ser el identificador de un oferente")
-            entregas[id_oferente or ENTREGA_DEL_PROCESO].append(archivo["ruta"])
+            entrega = _id_entrega(archivo)
+            ruta = archivo["ruta"]
+            if ruta not in rutas_comprimidas:
+                esperados = {campo: archivo[campo] for campo in ("tamano", "md5") if campo in archivo}
+                entregas[entrega].archivos.setdefault(ruta, {}).update(esperados)
     else:
         try:
             archivos = origen.listar(aviso["ruta"])
@@ -69,18 +92,20 @@ def repartir(aviso: dict, origen: Origen) -> dict[str, list[str]]:
             raise AvisoRechazado("La carpeta del proceso no existe en el origen o no es válida") from None
         sueltos = 0
         for ruta in archivos:
+            if ruta in rutas_comprimidas:
+                continue
             partes = PurePosixPath(ruta).parts
             if len(partes) < 2:
                 sueltos += 1
                 continue
-            entregas[partes[0]].append(ruta)
+            entregas[partes[0]].archivos[ruta] = {}
         if sueltos:
             raise AvisoRechazado(f"{sueltos} archivo(s) sueltos en la raíz de la carpeta del proceso, fuera de una entrega")
     if not entregas:
         raise AvisoRechazado("El proceso no trae ningún archivo")
     if len(entregas) == 1 and ENTREGA_DEL_PROCESO in entregas:
         raise AvisoRechazado("El proceso no trae ningún oferente")
-    return {entrega: sorted(set(rutas)) for entrega, rutas in sorted(entregas.items())}
+    return dict(sorted(entregas.items()))
 
 
 def versiones_del_proceso(vigentes: datos.Versiones) -> dict:
@@ -110,7 +135,7 @@ class Apertura:
         self._vigentes = vigentes
 
     def procesar(self, aviso: dict) -> None:
-        contratos.validar(contratos.PROCESO_LISTO, aviso)
+        contratos.validar_aviso(aviso)
         id_proceso = aviso["id_proceso"]
 
         anterior = self._estado.leer(id_proceso, estados.PROCESO, id_proceso)
@@ -123,10 +148,14 @@ class Apertura:
 
         entregas = repartir(aviso, self._origen)
 
+        datos_proceso = {"ruta": aviso["ruta"], "fecha_aviso": aviso["fecha"],
+                         "versiones": versiones_del_proceso(self._vigentes()),
+                         "entregas": list(entregas), "entregas_publicadas": False}
+        if "id_proyecto" in aviso:
+            datos_proceso["id_proyecto"] = aviso["id_proyecto"]
         proceso = estados.crear(
             self._estado, self._reloj, id_proceso, estados.PROCESO, id_proceso, estados.ABIERTO, "aviso del módulo 1",
-            {"ruta": aviso["ruta"], "fecha_aviso": aviso["fecha"], "versiones": versiones_del_proceso(self._vigentes()),
-             "entregas": list(entregas), "entregas_publicadas": False},
+            datos_proceso,
         ).registro
         # Si el proceso ya existía, el trabajador anterior se cayó a la mitad. Los
         # archivos no cambian después del aviso (contrato), así que el reparto
@@ -135,9 +164,21 @@ class Apertura:
         if proceso.datos["entregas"] != list(entregas):
             registro.warning("El reparto cambió desde la primera apertura")
 
-        for entrega, archivos in entregas.items():
+        for entrega, contenido in entregas.items():
+            datos_entrega = {"archivos": sorted(contenido.archivos)}
+            esperados = {ruta: campos for ruta, campos in contenido.archivos.items() if campos}
+            if esperados:
+                datos_entrega["esperados"] = esperados
             estados.crear(self._estado, self._reloj, id_proceso, estados.OFERENTE, entrega, estados.RECIBIDO,
-                          "aviso del módulo 1", {"archivos": archivos}, entrega=entrega)
+                          "aviso del módulo 1", datos_entrega, entrega=entrega)
+            for ruta in sorted(contenido.comprimidos):
+                clave = json.dumps([id_proceso, entrega, ruta], ensure_ascii=False).encode()
+                referencia = "comprimido-" + hashlib.sha256(clave).hexdigest()[:16]
+                crear_tarea(self._estado, self._reloj, id_proceso, entrega, DOCUMENTO_CON_ERROR, referencia,
+                            COMPRIMIDO_SIN_CONTENIDO,
+                            {"ruta_origen": ruta,
+                             "detalle": "Un archivo comprimido de la entrega no se pudo descomprimir en el origen, "
+                                        "así que su contenido no se revisó. Pídaselo al módulo 1 o revíselo a mano."})
             self._cola.publicar(NORMALIZAR, {"id_proceso": id_proceso, "entrega": entrega})
 
         estados.anotar(self._estado, id_proceso, estados.PROCESO, id_proceso, {"entregas_publicadas": True})

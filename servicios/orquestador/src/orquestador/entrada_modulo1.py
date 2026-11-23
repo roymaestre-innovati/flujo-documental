@@ -25,14 +25,12 @@ conteos y nombres de columnas, nunca rutas ni nombres de oferentes.
 """
 
 import datetime
-import hashlib
 import io
 import logging
 import re
 from collections import Counter, defaultdict
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from pathlib import Path
 from typing import Any, Protocol
 
 from normalizacion.inventario import ENTREGA_DEL_PROCESO
@@ -40,11 +38,8 @@ from normalizacion.inventario import ENTREGA_DEL_PROCESO
 from . import CONTRATO, contratos
 from .apertura import AvisoRechazado
 from .errores import ErrorDeConfiguracion, ErrorTransitorio
-from .estado import Estado
-from .origen import ErrorOrigen, Esperado, Origen, _ruta_segura
+from .origen import ErrorOrigen, _ruta_segura
 from .origen_onelake import ENDPOINT, ErrorDeAcceso, traducir_fallas
-from .reloj import Reloj
-from .tareas import DOCUMENTO_CON_ERROR, crear_tarea
 
 registro = logging.getLogger("orquestador.entrada_modulo1")
 
@@ -61,7 +56,6 @@ DESCARGADO = "DESCARGADO"
 DEL_PROCESO = "DOCUMENTOS_PROCESO"
 DE_OFERENTE = "OFERENTE"
 ESTADOS_BAJADOS = {"EXITOSO", "YA_EXISTIA_IDENTICO"}
-COMPRIMIDO_SIN_CONTENIDO = "COMPRIMIDO_SIN_CONTENIDO"
 
 COLUMNAS_ADJUNTOS = ["event_id", "doc_category", "invitation_id", "adls_path", "downloaded_bytes", "md5_hex",
                      "is_compressed_archive", "idempotency_key", "parent_archive_key", "file_status"]
@@ -187,8 +181,6 @@ class EntradaDelEvento:
     cada archivo es relativo a ella y trae su tamaño y su MD5, y el aviso trae el
     proyecto y los comprimidos sin contenido."""
     proyecto: str | None
-    esperados: dict[str, Esperado] = field(default_factory=dict)
-    """Tamaño y MD5 de cada archivo, por su ruta completa bajo `Files/`."""
     sin_contenido: dict[str, list[str]] = field(default_factory=dict)
     """Entrega → comprimidos sin ninguna fila hija, relativos a `ruta`."""
     excluidos: Counter = field(default_factory=Counter)
@@ -275,7 +267,6 @@ def armar_entrada(id_evento: str, tablas: Tablas) -> EntradaDelEvento:
         if fila["md5_hex"]:
             archivo["md5"] = fila["md5_hex"]
         archivos.append(archivo)
-        entrada.esperados[f"{ruta_evento}/{relativa}"] = Esperado(fila["downloaded_bytes"], fila["md5_hex"])
 
     if not archivos:
         raise EventoRechazado("El evento no tiene ningún archivo que no sea comprimido")
@@ -293,35 +284,3 @@ def armar_entrada(id_evento: str, tablas: Tablas) -> EntradaDelEvento:
                   len({a["id_oferente"] for a in archivos}), dict(entrada.excluidos),
                   sum(len(v) for v in entrada.sin_contenido.values()))
     return entrada
-
-
-def crear_tareas_sin_contenido(estado: Estado, reloj: Reloj, entrada: EntradaDelEvento) -> int:
-    """Una tarea `documento_con_error` por cada comprimido sin contenido. Va después
-    de la apertura, con el proceso ya abierto. Repetirla no duplica nada."""
-    id_proceso = entrada.aviso["id_proceso"]
-    creadas = 0
-    for entrega, rutas in sorted(entrada.sin_contenido.items()):
-        for ruta in rutas:
-            referencia = "comprimido-" + hashlib.sha256(f"{id_proceso}/{ruta}".encode()).hexdigest()[:16]
-            crear_tarea(estado, reloj, id_proceso, entrega, DOCUMENTO_CON_ERROR, referencia,
-                        COMPRIMIDO_SIN_CONTENIDO,
-                        {"ruta_origen": ruta,
-                         "detalle": "Un archivo comprimido de la entrega no se pudo descomprimir en el origen, "
-                                    "así que su contenido no se revisó. Pídaselo al módulo 1 o revíselo a mano."})
-            creadas += 1
-    return creadas
-
-
-class OrigenRevisado(Origen):
-    """Envuelve un origen para que `bajar` revise el tamaño y el MD5 que registró
-    el módulo 1. Los archivos que no están en `esperados` se bajan sin revisar."""
-
-    def __init__(self, origen: Origen, esperados: dict[str, Esperado]) -> None:
-        self._origen = origen
-        self._esperados = esperados
-
-    def listar(self, carpeta: str) -> list[str]:
-        return self._origen.listar(carpeta)
-
-    def bajar(self, archivo: str, destino: Path, esperado: Esperado | None = None) -> None:
-        self._origen.bajar(archivo, destino, esperado or self._esperados.get(archivo))

@@ -60,8 +60,8 @@ class Mundo:
         self.apertura = Apertura(self.cola, self.estado, self.origen, self.reloj)
         self.normalizar = Normalizar(self.cola, self.estado, self.origen, self.almacen, self.reloj)
 
-    def abrir(self):
-        self.cola.publicar(c.PROCESOS_LISTOS, AVISO)
+    def abrir(self, aviso=AVISO):
+        self.cola.publicar(c.PROCESOS_LISTOS, aviso)
         assert procesar_uno(self.cola, self.apertura).desenlace == "ok"
 
     def correr(self, manejador):

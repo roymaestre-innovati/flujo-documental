@@ -4,7 +4,7 @@ Es la primera pieza de la entrega 2 del orquestador: la interfaz `Origen` deja d
 
 **Meta:** correr `orquestar` en la máquina del equipo sobre un evento real de `workspace-evaluacionofertas-dev`, leyendo directo de OneLake, sin copiar los originales, y llegar a los mismos conteos que reporta el módulo 1 en sus tablas.
 
-**Estado al 2026-11-20:** T01 a T03 hechas, y el contrato del orquestador pasó a la 0.2 (aprobado por el usuario). Lo siguiente es T03b: conectar los campos nuevos del aviso a la apertura y a `Normalizar`. La prueba de acceso está en `servicios/prueba-onelake/`.
+**Estado al 2026-11-23:** T01 a T03b hechas. La apertura y `Normalizar` usan los campos del aviso 0.2. Sigue T04, descarga en paralelo. La prueba de acceso está en `servicios/prueba-onelake/`.
 
 ## Dónde va
 
@@ -50,7 +50,7 @@ Un servicio aparte solo agregaría una copia de los originales o un salto de red
   - Ojo: con `deltalake` la lectura termina en segundos, pero el proceso se quedó colgado al salir en dos de tres corridas (2026-11-20). Reproducirlo y, si sigue, leer el log de Delta con `pyarrow` o cerrar sus hilos. Un job que no termina no se puede usar.
   - Pruebas con tablas inventadas (filas en memoria, sin Delta): proceso y dos oferentes, un RAR con hijos, un ZIP dentro de otro, un RAR sin hijos, una ruta repetida, un oferente que no cruza y una categoría desconocida.
 
-- [ ] **T03b — Conectar el aviso 0.2.** El contrato `modulo5-orquestador/0.2` (`contracts/modulo5-orquestador/v0.2/`) ya está, y `armar_entrada` ya llena sus campos nuevos. Falta que el orquestador los use:
+- [x] **T03b — Conectar el aviso 0.2.** Hecha el 2026-11-23 (ver la nota de T03b). El orquestador usa los campos que `armar_entrada` llena en el aviso `modulo5-orquestador/0.2` (`contracts/modulo5-orquestador/v0.2/`).
   - La apertura guarda `id_proyecto` en el proceso, y el `tamano` y el `md5` de cada archivo en la entrega, junto a su ruta.
   - `Normalizar` le pasa a `bajar` el `Esperado` de cada archivo, sacado del estado. Así la revisión funciona en Azure sin `OrigenRevisado` y sin volver a leer las tablas. Si no coincide, se reintenta como cualquier descarga fallida (`ArchivoDistinto`).
   - La apertura crea la tarea `documento_con_error` con motivo `COMPRIMIDO_SIN_CONTENIDO` por cada entrada de `comprimidos_sin_contenido`, en la entrega de su `id_oferente`. Esto reemplaza a `crear_tareas_sin_contenido` y deja de hacer falta un paso aparte en el comando. Si el comprimido es de un oferente que no tiene otros archivos, la entrega se crea igual, para que la tarea tenga dónde quedar.
@@ -191,3 +191,11 @@ Revisión de la historia de las tablas Delta, todas sus versiones (desde octubre
 
   Los conteos cuadran con T01 (por ejemplo, el evento 4 tiene 78 filas, 10 de ellas repetidas). La entrega más chica (8 archivos, 3,6 MB) bajó completa con tamaño y MD5 revisados en 10 s.
 - **Tiempo.** Armar un aviso toma ~23 s, porque lee las tres tablas enteras y baja sus ~60 parquet de uno en uno. Para la primera versión alcanza. Si molesta, se bajan en paralelo (como en T04) o se leen las tablas una vez para varios eventos.
+
+### T03b — Conectar el aviso 0.2 (2026-11-23)
+
+- `apertura.py` guarda `id_proyecto` en el proceso y `esperados` por ruta relativa en cada entrega. `normalizar.py` reconstruye `Esperado` desde ese estado y reintenta si la descarga difiere. `contratos.py` valida los avisos 0.1 con su esquema.
+- La apertura registra una tarea `documento_con_error` con motivo `COMPRIMIDO_SIN_CONTENIDO` en la entrega correspondiente, incluso si la entrega solo trae comprimidos. La referencia usa un hash del proceso, la entrega y la ruta para que el reenvío conserve la misma tarea.
+- Se retiraron `OrigenRevisado` y `crear_tareas_sin_contenido` de `entrada_modulo1.py` y de sus pruebas.
+- Una entrega que solo trae comprimidos sin contenido queda con cero archivos y pasa a `procesando` con cero documentos. Su tarea es lo único que la persona revisa.
+- Pruebas nuevas: un tamaño o MD5 que no coincide se reintenta y luego va a errores; un aviso 0.1 o 0.2 sin los campos nuevos; una entrega con solo un comprimido; un aviso repetido no duplica las tareas. La suite completa pasa: 248 pruebas.
