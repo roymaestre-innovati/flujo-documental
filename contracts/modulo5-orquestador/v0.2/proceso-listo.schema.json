@@ -1,0 +1,105 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "modulo5-orquestador/v0.2/proceso-listo.schema.json",
+  "title": "Aviso de proceso listo",
+  "description": "Dice que todos los documentos de un proceso quedaron en el datalake: los del proceso y los de todos los oferentes (paso 0, decisiones 33 y 34). Un aviso por proceso. Lo publicará el módulo 1 en la cola procesos-listos; mientras tanto lo arma el orquestador con las tablas del módulo 1 (entrada_modulo1.py).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contrato",
+    "id_proceso",
+    "ruta",
+    "fecha"
+  ],
+  "properties": {
+    "contrato": {
+      "const": "modulo5-orquestador/0.2"
+    },
+    "id_proceso": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Identificador del proceso de selección: el evento de Ariba (event_id, de la forma Doc y 10 dígitos). No cambia con las versiones del evento."
+    },
+    "id_proyecto": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Opcional. El proyecto de Ariba del evento (parent_project_id, de la forma WS y 10 dígitos). Se guarda en el proceso."
+    },
+    "ruta": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Carpeta del proceso dentro de la sección Files del lakehouse en OneLake, sin barra inicial. Con el módulo 1: informacion-adjuntos/fase2/<event_id>."
+    },
+    "fecha": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Cuándo quedó completo el proceso en el datalake. Un aviso repetido trae la misma."
+    },
+    "archivos": {
+      "type": "array",
+      "minItems": 1,
+      "description": "Opcional. Si llega, el orquestador reparte con esta lista y no lista la carpeta. Si no llega, la carpeta trae PROCESO/ y una subcarpeta por oferente, nombrada con su identificador. No incluye ZIP ni RAR: van sus archivos descomprimidos, cada uno con su propia entrada.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "ruta",
+          "id_oferente"
+        ],
+        "properties": {
+          "ruta": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Ruta del archivo, relativa a la ruta del proceso."
+          },
+          "id_oferente": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "minLength": 1,
+            "description": "null en un documento del proceso (condiciones, adendas, anexos). Con el módulo 1, el sm_vendor_id del oferente."
+          },
+          "tamano": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Opcional. Tamaño en bytes. Si llega, el orquestador revisa que lo bajado mida eso."
+          },
+          "md5": {
+            "type": "string",
+            "pattern": "^[0-9a-fA-F]{32}$",
+            "description": "Opcional. MD5 en hexadecimal. Si llega, el orquestador revisa que lo bajado lo tenga."
+          }
+        }
+      }
+    },
+    "comprimidos_sin_contenido": {
+      "type": "array",
+      "minItems": 1,
+      "description": "Opcional. ZIP o RAR que el módulo 1 no pudo descomprimir. No se bajan; el orquestador crea una tarea documento_con_error por cada uno, para que no se evalúe a nadie con documentos de menos.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "ruta",
+          "id_oferente"
+        ],
+        "properties": {
+          "ruta": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Ruta del comprimido, relativa a la ruta del proceso."
+          },
+          "id_oferente": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "minLength": 1,
+            "description": "null si es un documento del proceso."
+          }
+        }
+      }
+    }
+  }
+}

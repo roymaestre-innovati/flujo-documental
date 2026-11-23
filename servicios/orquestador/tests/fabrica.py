@@ -19,7 +19,7 @@ from orquestador.reloj import RelojManual
 
 P = "SR0000000001"
 RUTA = "procesos/SR0000000001"
-AVISO = {"contrato": "modulo5-orquestador/0.1", "id_proceso": P, "ruta": RUTA, "fecha": "2026-11-06T09:00:00-05:00"}
+AVISO = {"contrato": "modulo5-orquestador/0.2", "id_proceso": P, "ruta": RUTA, "fecha": "2026-11-06T09:00:00-05:00"}
 
 
 def pdf(paginas: int, texto: str) -> bytes:
@@ -60,8 +60,8 @@ class Mundo:
         self.apertura = Apertura(self.cola, self.estado, self.origen, self.reloj)
         self.normalizar = Normalizar(self.cola, self.estado, self.origen, self.almacen, self.reloj)
 
-    def abrir(self):
-        self.cola.publicar(c.PROCESOS_LISTOS, AVISO)
+    def abrir(self, aviso=AVISO):
+        self.cola.publicar(c.PROCESOS_LISTOS, aviso)
         assert procesar_uno(self.cola, self.apertura).desenlace == "ok"
 
     def correr(self, manejador):

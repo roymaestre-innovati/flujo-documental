@@ -15,9 +15,10 @@ from jsonschema.exceptions import ValidationError
 
 from .errores import MensajeRechazado
 
-PROCESO_LISTO = "modulo5-orquestador/v0/proceso-listo"
-CLASIFICACION_SOLICITUD = "modulo5-orquestador/v0/clasificacion-solicitud"
-CLASIFICACION_RESPUESTA = "modulo5-orquestador/v0/clasificacion-respuesta"
+PROCESO_LISTO = "modulo5-orquestador/v0.2/proceso-listo"
+PROCESO_LISTO_01 = "modulo5-orquestador/v0/proceso-listo"
+CLASIFICACION_SOLICITUD = "modulo5-orquestador/v0.2/clasificacion-solicitud"
+CLASIFICACION_RESPUESTA = "modulo5-orquestador/v0.2/clasificacion-respuesta"
 EXTRACCION_ENTRADA = "modulo3-extraccion/v0.2/entrada"
 ESQUEMAS = (PROCESO_LISTO, CLASIFICACION_SOLICITUD, CLASIFICACION_RESPUESTA, EXTRACCION_ENTRADA)
 
@@ -60,3 +61,10 @@ def errores(esquema: str, mensaje: dict) -> list[str]:
 def validar(esquema: str, mensaje: dict) -> None:
     if encontrados := errores(esquema, mensaje):
         raise MensajeInvalido(esquema, encontrados)
+
+
+def validar_aviso(aviso: dict) -> None:
+    esquema = PROCESO_LISTO
+    if isinstance(aviso, dict) and aviso.get("contrato") == "modulo5-orquestador/0.1":
+        esquema = PROCESO_LISTO_01
+    validar(esquema, aviso)

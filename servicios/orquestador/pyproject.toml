@@ -8,6 +8,10 @@ dependencies = [
     "jsonschema>=4.23",
     "rfc3987>=1.3.8",
     "rfc3339-validator>=0.1.4",
+    "azure-identity>=1.19",
+    "azure-storage-file-datalake>=12.18",
+    "deltalake>=1.6",
+    "pyarrow>=18",
 ]
 
 [project.scripts]

@@ -6,6 +6,7 @@ import json
 import shutil
 import threading
 import time
+from unittest.mock import Mock
 
 import pytest
 from normalizacion.almacen import AlmacenLocal
@@ -14,12 +15,16 @@ from fabrica import AVISO, P, RUTA, escribir, pdf, pdf_con_contrasena
 from orquestador import cli, contratos, estados
 from orquestador import cola as c
 from orquestador.clasificador import ClasificadorFalso
+from orquestador.entrada_modulo1 import ADJUNTOS, TablasEnMemoria
 from orquestador.errores import ErrorTransitorio
 from orquestador.local import Corrida, conteos
 from orquestador.origen import OrigenLocal
+from orquestador.origen_onelake import OrigenOneLake
 from orquestador.parametros import Parametros
 from orquestador.reloj import RelojManual
 from orquestador.resolucion import Asignacion, resolver_clasificacion
+from test_entrada_modulo1 import CARPETA, EVENTO, _adjunto, _tablas
+from test_origen_onelake import FILES, ClienteFalso
 
 CSV = """id_oferente,ruta_origen,pagina_inicio,pagina_fin,tipo_documental,confianza,subtipo
 ,CPC.pdf,,,TD-01,0.97,
@@ -254,3 +259,120 @@ def test_el_comando_no_escribe_dentro_de_un_repositorio(tmp_path, capsys):
     assert _comando(tmp_path, tmp_path / "repo" / "salida") == 2
     assert "fuera de cualquier repositorio" in capsys.readouterr().err
     assert not (tmp_path / "repo" / "salida").exists()
+
+
+def test_el_comando_local_sin_clasificacion(tmp_path, capsys):
+    escribir(tmp_path, "PROCESO/CPC.pdf", pdf(1, "CPC"))
+    escribir(tmp_path, "OF-001/oferta.pdf", pdf(1, "oferta"))
+    salida = tmp_path / "salida"
+    assert cli.main(["--origen", str(tmp_path / "datalake" / RUTA), "--proceso", P, "--salida", str(salida)]) == 0
+    resumen = json.loads(capsys.readouterr().out)
+    assert resumen["segmentos"] == {"sin_extraccion": 2}
+    assert resumen["solicitudes_por_td"] == {}
+    assert "archivos_bajados" not in resumen
+
+
+ONELAKE = ["--onelake-workspace", "ws", "--onelake-lakehouse", "lkh", "--evento", EVENTO]
+
+
+def test_el_comando_lee_un_evento_de_onelake(tmp_path, capsys):
+    cpc = "Documentos del proceso/cpc.pdf"
+    hijo = "Oferentes/Empresa A/_contenido/anexos/a.pdf"
+    carta = "Oferentes/Empresa A/carta.pdf"
+    oferta = "Oferentes/Empresa B/oferta.pdf"
+    zip_con_hijos = "Oferentes/Empresa A/anexos.zip"
+    rar_sin_hijos = "Oferentes/Empresa B/roto.rar"
+    entregas = {"PROCESO": [cpc], "S100": [hijo, carta], "S200": [oferta]}
+    archivos = {ruta: pdf(1, ruta) for rutas in entregas.values() for ruta in rutas}
+    tablas = _tablas()
+    tablas[ADJUNTOS] = [
+        _adjunto(cpc, "DOCUMENTOS_PROCESO", datos=archivos[cpc]),
+        _adjunto(zip_con_hijos, "OFERENTE", "inv-a", clave="k-zip", comprimido=True),
+        _adjunto(hijo, "OFERENTE", "inv-a", padre="k-zip", datos=archivos[hijo]),
+        _adjunto(carta, "OFERENTE", "inv-a", datos=archivos[carta]),
+        _adjunto(oferta, "OFERENTE", "inv-b", datos=archivos[oferta]),
+        _adjunto(rar_sin_hijos, "OFERENTE", "inv-b", comprimido=True),
+    ]
+    carpeta = f"informacion-adjuntos/{CARPETA}"
+    cliente = ClienteFalso({f"{carpeta}/{ruta}": datos for ruta, datos in
+                            {**archivos, zip_con_hijos: b"x", rar_sin_hijos: b"x"}.items()})
+    cliente.get_file_client = Mock(wraps=cliente.get_file_client)
+    cliente.get_paths = Mock(side_effect=AssertionError("El aviso ya trae las rutas"))
+    origen = OrigenOneLake("ws", "lkh", cliente=cliente)
+
+    salida = tmp_path / "salida"
+    assert cli.main([*ONELAKE, "--salida", str(salida), "--paralelo-bajar", "1"],
+                    tablas=TablasEnMemoria(tablas), origen=origen) == 0
+    pantalla = capsys.readouterr()
+    resumen = json.loads(pantalla.out)
+    assert resumen["archivos_del_aviso"] == resumen["archivos_bajados"] == 4
+    assert resumen["excluidos_por_motivo"] == {"comprimido": 2}
+    assert resumen["comprimidos_sin_contenido"] == 1
+    assert resumen["mb_bajados"] == round(sum(map(len, archivos.values())) / 1_000_000, 3)
+    assert resumen["tiempo_descarga_s"] >= 0
+    assert resumen["mensajes_en_errores"] == {}
+    assert resumen["solicitudes_por_td"] == {}
+    assert json.loads((salida / "conteos.json").read_text()) == resumen
+    assert (salida / "solicitudes-extraccion.jsonl").read_text() == ""
+    for nombre in (EVENTO, "S100", "S200", "Empresa", "Documentos del proceso", "cpc.pdf", "anexos.zip", "roto.rar"):
+        assert nombre not in pantalla.out + pantalla.err
+
+    cliente.get_paths.assert_not_called()
+    assert sorted(llamada.args[0] for llamada in cliente.get_file_client.call_args_list) == sorted(
+        f"{FILES}/{carpeta}/{ruta}" for ruta in archivos)
+    estado = json.loads((salida / "estado.json").read_text())
+    assert {r["id_proceso"] for r in estado} == {EVENTO}
+    proceso, = [r["datos"] for r in estado if r["tipo"] == estados.PROCESO]
+    assert proceso["id_proyecto"] == "WS0000000001"
+    assert proceso["fecha_aviso"] == "2025-11-13T02:13:20Z"
+    assert {r["id"]: r["datos"]["archivos"] for r in estado if r["tipo"] == estados.OFERENTE} == entregas
+    documentos = [r["datos"] for r in estado if r["tipo"] == estados.DOCUMENTO]
+    assert sorted((d["entrega"], d["ruta_origen"]) for d in documentos) == sorted(
+        (entrega, ruta) for entrega, rutas in entregas.items() for ruta in rutas)
+    segmentos = [r["datos"] for r in estado if r["tipo"] == estados.SEGMENTO]
+    assert len(segmentos) == 4
+    assert {(s["tipo_documental"], s["estado"]) for s in segmentos} == {("TD-99", "sin_extraccion")}
+    tarea, = [r["datos"] for r in estado if r["tipo"] == estados.TAREA]
+    assert tarea["estado"] == estados.ABIERTA
+    assert (tarea["clase"], tarea["motivo"], tarea["entrega"], tarea["ruta_origen"]) == (
+        "documento_con_error", "COMPRIMIDO_SIN_CONTENIDO", "S200", rar_sin_hijos)
+
+
+@pytest.mark.parametrize("opciones, motivo", [
+    ([*ONELAKE, "--origen", "local"], "Elija un solo modo"),
+    (["--origen", "local", "--proceso", P, "--evento", EVENTO], "Elija un solo modo"),
+    ([], "requiere --origen y --proceso"),
+    (["--proceso", P], "requiere --origen y --proceso"),
+    (["--origen", "local"], "requiere --origen y --proceso"),
+    (ONELAKE[2:], "requiere --onelake-workspace, --onelake-lakehouse y --evento"),
+    (ONELAKE[:2] + ONELAKE[4:], "requiere --onelake-workspace, --onelake-lakehouse y --evento"),
+    (ONELAKE[:4], "requiere --onelake-workspace, --onelake-lakehouse y --evento"),
+    ([*ONELAKE, "--paralelo-bajar", "0"], "--paralelo-bajar debe ser 1 o más"),
+    ([*ONELAKE, "--paralelo", "0"], "--paralelo debe ser 1 o más"),
+])
+def test_el_comando_rechaza_argumentos(opciones, motivo, tmp_path, capsys):
+    salida = tmp_path / "salida"
+    assert cli.main([*opciones, "--salida", str(salida)]) == 2
+    pantalla = capsys.readouterr()
+    assert pantalla.out == ""
+    assert motivo in pantalla.err
+    assert not salida.exists()
+
+
+def test_el_comando_onelake_no_escribe_dentro_de_un_repositorio(tmp_path, capsys):
+    (tmp_path / "repo" / ".git").mkdir(parents=True)
+    salida = tmp_path / "repo" / "salida"
+    assert cli.main([*ONELAKE, "--salida", str(salida)]) == 2
+    assert "fuera de cualquier repositorio" in capsys.readouterr().err
+    assert not salida.exists()
+
+
+def test_el_comando_imprime_solo_el_motivo_de_un_evento_rechazado(tmp_path, capsys):
+    tablas = _tablas()
+    tablas[ADJUNTOS][0]["doc_category"] = "Oferentes/Nombre privado/oferta.pdf"
+    salida = tmp_path / "salida"
+    assert cli.main([*ONELAKE, "--salida", str(salida)], tablas=TablasEnMemoria(tablas)) == 2
+    pantalla = capsys.readouterr()
+    assert pantalla.out == ""
+    assert pantalla.err == "doc_category desconocida\n"
+    assert not list(salida.iterdir())

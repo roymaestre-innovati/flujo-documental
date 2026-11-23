@@ -1,13 +1,23 @@
 """Normalizar cada entrega (T06; R3, R6 a R8)."""
 
-import pytest
+import hashlib
+from threading import Barrier, Lock, current_thread
+from unittest.mock import Mock
 
-from fabrica import P, RUTA, escribir, pdf, pdf_con_contrasena
+import pytest
+from normalizacion.almacen import AlmacenLocal
+
+from fabrica import AVISO, P, RUTA, escribir, pdf, pdf_con_contrasena
 from fabrica import Mundo as MundoBase
 from orquestador import cola as c
-from orquestador import estados
-from orquestador.errores import reenviar_errores
+from orquestador import estados, normalizar
+from orquestador.clasificador import COLUMNAS, ClasificadorFalso
+from orquestador.errores import procesar_uno, reenviar_errores
+from orquestador.local import Corrida
 from orquestador.normalizar import ruta_en_la_entrega
+from orquestador.origen import ArchivoDistinto, ErrorOrigen, Esperado, Origen, revisar_bajado
+from orquestador.parametros import Parametros
+from orquestador.reloj import RelojManual
 
 
 def _escribir(raiz, ruta, contenido):
@@ -23,6 +33,47 @@ class Mundo(MundoBase):
 
     def documentos(self, entrega):
         return {r.id: r.datos for r in self.estado.listar(P, estados.DOCUMENTO) if r.datos["entrega"] == entrega}
+
+
+class _OrigenEnMemoria(Origen):
+    def __init__(self, archivos, durante_descarga):
+        self.archivos = archivos
+        self.durante_descarga = durante_descarga
+        self.descargas = []
+        self.activas = self.maximo = 0
+        self.candado = Lock()
+
+    def listar(self, carpeta):
+        pytest.fail("El aviso ya trae los archivos")
+
+    def bajar(self, archivo, destino, esperado=None):
+        with self.candado:
+            self.descargas.append((archivo, destino, esperado, current_thread()))
+            self.activas += 1
+            self.maximo = max(self.maximo, self.activas)
+        try:
+            self.durante_descarga(archivo)
+            destino.write_bytes(self.archivos[archivo])
+            revisar_bajado(destino, esperado)
+        finally:
+            with self.candado:
+                self.activas -= 1
+
+
+def _entrega_con_descargas(tmp_path, paralelo, durante_descarga=lambda _: None):
+    archivos = {f"{RUTA}/OF-001/{letra}.pdf": pdf(1, letra) for letra in "abcdef"}
+    origen = _OrigenEnMemoria(archivos, durante_descarga)
+    csv = tmp_path / "clasificacion.csv"
+    csv.write_text(",".join(COLUMNAS) + "\n", encoding="utf-8")
+    corrida = Corrida(origen, AlmacenLocal(tmp_path / "salida"), ClasificadorFalso(csv),
+                      reloj=RelojManual(), parametros=Parametros(paralelo_bajar=paralelo))
+    corrida.publicar_aviso({**AVISO, "archivos": [
+        {"ruta": ruta.removeprefix(f"{RUTA}/"), "id_oferente": "OF-001",
+         "tamano": len(datos), "md5": hashlib.md5(datos).hexdigest()}
+        for ruta, datos in archivos.items()
+    ]})
+    assert procesar_uno(corrida.cola, corrida.apertura).desenlace == "ok"
+    return corrida, origen
 
 
 @pytest.fixture
@@ -174,6 +225,132 @@ def test_archivo_que_falta_en_el_origen_es_transitorio(mundo, tmp_path):
     desenlaces = [r.desenlace for r in mundo.correr()]
     assert desenlaces.count("reintento") == 1
     assert mundo.estado.leer(P, estados.OFERENTE, "OF-002").datos["estado"] == estados.RECIBIDO
+
+
+def test_baja_varios_archivos_a_la_vez_hasta_el_limite(tmp_path):
+    paralelo = 3
+    barrera = Barrier(paralelo, timeout=5)
+    corrida, origen = _entrega_con_descargas(tmp_path, paralelo, lambda _: barrera.wait())
+
+    assert procesar_uno(corrida.cola, corrida.normalizar).desenlace == "ok"
+    assert origen.maximo == paralelo
+    assert len({destino.parent for _, destino, _, _ in origen.descargas}) == 1
+    assert {ruta: esperado for ruta, _, esperado, _ in origen.descargas} == {
+        ruta: Esperado(tamano=len(datos), md5=hashlib.md5(datos).hexdigest())
+        for ruta, datos in origen.archivos.items()
+    }
+    assert len(corrida.estado.listar(P, estados.DOCUMENTO)) == len(origen.archivos)
+
+
+def test_falla_en_paralelo_corta_las_descargas_y_reintenta_la_entrega(tmp_path, monkeypatch):
+    barrera = Barrier(2, timeout=5)
+
+    def fallar(archivo):
+        if archivo.endswith("/b.pdf"):
+            barrera.wait()
+            raise ErrorOrigen("No se encontró el archivo")
+        if archivo.endswith("/c.pdf"):
+            barrera.wait()
+            raise ArchivoDistinto("El archivo bajado no coincide")
+
+    corrida, origen = _entrega_con_descargas(tmp_path, 2, fallar)
+    normalizar_entrega = Mock(wraps=normalizar.normalizar_entrega)
+    monkeypatch.setattr(normalizar, "normalizar_entrega", normalizar_entrega)
+
+    resultado = procesar_uno(corrida.cola, corrida.normalizar)
+    assert resultado.desenlace == "reintento"
+    assert resultado.motivo.startswith("ErrorTransitorio en normalizar.py:")
+    assert sorted(ruta for ruta, _, _, _ in origen.descargas) == list(origen.archivos)[:3]
+    assert origen.activas == 0
+    assert all(not hilo.is_alive() and not destino.parent.exists() for _, destino, _, hilo in origen.descargas)
+    normalizar_entrega.assert_not_called()
+    assert corrida.estado.listar(P, estados.DOCUMENTO) == []
+    assert corrida.estado.leer(P, estados.OFERENTE, "OF-001").datos["estado"] == estados.RECIBIDO
+    assert corrida.cola.pendientes(c.CLASIFICAR) == 0
+
+    origen.durante_descarga = lambda _: None
+    corrida.reloj.adelantar(corrida.parametros.demora_base_s)
+    assert procesar_uno(corrida.cola, corrida.normalizar).desenlace == "ok"
+    normalizar_entrega.assert_called_once()
+    assert len(corrida.estado.listar(P, estados.DOCUMENTO)) == len(origen.archivos)
+
+
+def test_baja_en_serie_con_un_hilo(tmp_path):
+    corrida, origen = _entrega_con_descargas(tmp_path, 1)
+
+    assert procesar_uno(corrida.cola, corrida.normalizar).desenlace == "ok"
+    assert origen.maximo == 1
+    assert [ruta for ruta, _, _, _ in origen.descargas] == list(origen.archivos)
+    assert all(hilo is current_thread() for _, _, _, hilo in origen.descargas)
+    documentos = corrida.estado.listar(P, estados.DOCUMENTO)
+    assert sorted(d.datos["ruta_origen"] for d in documentos) == [f"{letra}.pdf" for letra in "abcdef"]
+    assert all(d.datos["estado"] == estados.NORMALIZADO for d in documentos)
+
+
+def test_conserva_el_orden_si_dos_rutas_tienen_el_mismo_destino(tmp_path):
+    escribir(tmp_path, "OF-001/carta.pdf", pdf(1, "Primera carta"))
+    escribir(tmp_path, "carta.pdf", pdf(2, "Segunda carta"))
+    mundo = Mundo(tmp_path)
+    mundo.abrir({**AVISO, "archivos": [
+        {"ruta": ruta, "id_oferente": "OF-001"} for ruta in ("OF-001/carta.pdf", "carta.pdf")
+    ]})
+
+    assert [r.desenlace for r in mundo.correr()] == ["ok"]
+    [carta] = mundo.documentos("OF-001").values()
+    assert (carta["ruta_origen"], carta["paginas"]) == ("carta.pdf", 2)
+
+
+@pytest.mark.parametrize("esperado", [
+    {"tamano": 0, "md5": "0" * 32},
+    {"tamano": 0},
+    {"md5": "0" * 32},
+], ids=["ambos", "tamano", "md5"])
+def test_archivo_distinto_se_reintenta_y_luego_va_a_errores(tmp_path, esperado):
+    ruta = "OF-001/carta.pdf"
+    escribir(tmp_path, ruta, pdf(1, "Carta"))
+    mundo = Mundo(tmp_path)
+    mundo.abrir({**AVISO, "archivos": [{"ruta": ruta, "id_oferente": "OF-001", **esperado}]})
+
+    for demora in (120, 240, 480):
+        assert [r.desenlace for r in mundo.correr()] == ["reintento"]
+        assert mundo.estado.leer(P, estados.OFERENTE, "OF-001").datos["estado"] == estados.RECIBIDO
+        mundo.reloj.adelantar(demora)
+
+    assert [r.desenlace for r in mundo.correr()] == ["a_errores"]
+    [error] = mundo.cola.errores(c.NORMALIZAR)
+    assert error.mensaje.propiedades["intento"] == 4
+    assert mundo.estado.leer(P, estados.OFERENTE, "OF-001").datos["estado"] == estados.ERROR_PROCESO
+    assert mundo.documentos("OF-001") == {}
+    assert mundo.estado.listar(P, estados.TAREA) == []
+    assert mundo.clasificar() == []
+
+
+@pytest.mark.parametrize("version", ["0.1", "0.2"])
+def test_aviso_sin_los_campos_nuevos_se_normaliza(tmp_path, version):
+    ruta = "OF-001/carta.pdf"
+    escribir(tmp_path, ruta, pdf(1, "Carta"))
+    mundo = Mundo(tmp_path)
+    mundo.abrir({**AVISO, "contrato": f"modulo5-orquestador/{version}",
+                 "archivos": [{"ruta": ruta, "id_oferente": "OF-001"}]})
+
+    assert "id_proyecto" not in mundo.estado.leer(P, estados.PROCESO, P).datos
+    assert "esperados" not in mundo.estado.leer(P, estados.OFERENTE, "OF-001").datos
+    assert [r.desenlace for r in mundo.correr()] == ["ok"]
+    [documento] = mundo.documentos("OF-001").values()
+    assert documento["estado"] == estados.NORMALIZADO
+
+
+def test_normaliza_entrega_con_solo_un_comprimido_anunciado(tmp_path):
+    ruta = "OF-001/roto.zip"
+    escribir(tmp_path, ruta, b"comprimido ilegible")
+    mundo = Mundo(tmp_path)
+    mundo.abrir({**AVISO, "comprimidos_sin_contenido": [{"ruta": ruta, "id_oferente": "OF-001"}]})
+
+    assert [r.desenlace for r in mundo.correr()] == ["ok"]
+    oferente = mundo.estado.leer(P, estados.OFERENTE, "OF-001").datos
+    assert (oferente["archivos"], oferente["documentos"], oferente["estado"]) == ([], 0, estados.PROCESANDO)
+    [tarea] = mundo.estado.listar(P, estados.TAREA)
+    assert (tarea.datos["entrega"], tarea.datos["motivo"]) == ("OF-001", "COMPRIMIDO_SIN_CONTENIDO")
 
 
 def test_version_distinta_del_normalizador_no_normaliza(mundo):

@@ -49,7 +49,7 @@ Consecuencias:
 
 | Frontera | Con quién | Qué hay que acordar |
 |---|---|---|
-| Entrada → flujo | Módulo 1 | Acordado en lo grueso (paso 0): datalake de Fabric y aviso por cola. Falta la forma del mensaje, las carpetas y los identificadores (A-1) |
+| Entrada → flujo | Módulo 1 | Acordado en lo grueso (paso 0): datalake de Fabric y aviso por cola. Contrato 0.2 propuesto, con el evento como identificador (2026-11-20). El orquestador ya corre un evento real leyendo de OneLake (2026-11-23). Falta que el módulo 1 publique el aviso o su vista, y el acceso en producción (A-1) |
 | Flujo ↔ clasificador | Clasificación | Cómo lo llamamos, sobre qué PDF clasifica (el normalizado), qué devuelve por segmento (C1-C3) y qué hacemos con `no_corresponde` (C4) |
 | Flujo → Power App | Equipo de la Power App | Dónde escribimos las tareas de revisión (p. ej. tablas de Dataverse), con qué forma, y cómo leemos las correcciones de vuelta (P1-P3) |
 
@@ -80,38 +80,73 @@ Muestra: proceso SR5658940621, 6 oferentes.
 
 **Cómo lo tomamos:**
 
-1. **Leemos los archivos donde están.** OneLake acepta la API de Azure Data Lake, así que el normalizador lee directo de Fabric con una identidad administrada a la que el módulo 1 le da permiso de lectura en su workspace. Los originales no se copian: siguen siendo del módulo 1 y no hay una segunda copia de documentos con datos personales (principio 6). Lo que producimos (PDF normalizados, lectura, informes) va a nuestro almacenamiento.
+1. **Leemos los archivos donde están.** OneLake acepta la API de Azure Data Lake, así que el orquestador lee directo de Fabric con una identidad administrada a la que el módulo 1 le da permiso de lectura en su workspace (ver "Cómo leemos los archivos de Fabric"). Los originales no se copian: siguen siendo del módulo 1 y no hay una segunda copia de documentos con datos personales (principio 6). Lo que producimos (PDF normalizados, lectura, informes) va a nuestro almacenamiento.
 2. **El aviso llega a una cola de Service Bus, `procesos-listos`.** Es una cola más del mismo Service Bus del paso 4. Si el normalizador está caído, el mensaje espera, y no tenemos que publicar ni proteger una API. Si la herramienta del módulo 1 no puede publicar en Service Bus, el plan B es un endpoint mínimo que solo deja el mensaje en esa misma cola; el resto del flujo no cambia.
 3. **Un aviso por proceso, no por oferente.** Como el proceso llega completo, la apertura arma la ficha con la CPC y las adendas a la mano, y todos los oferentes arrancan juntos.
 
-**Mensaje propuesto** (por confirmar con el módulo 1):
+**Mensaje:** contrato `modulo5-orquestador/0.2` (`contracts/modulo5-orquestador/v0.2/`, 2026-11-20). Mientras el módulo 1 no lo publique, lo arma el orquestador con sus tablas.
 
 | Campo | Contenido |
 |---|---|
-| `id_proceso` | Identificador del proceso (por ejemplo, el de Ariba) |
-| `ruta` | Carpeta del proceso en OneLake |
-| `archivos` | Opcional: lista de archivos con su oferente, o la marca de documento del proceso |
+| `id_proceso` | El evento de Ariba (`event_id`, `Doc…`) |
+| `id_proyecto` | Opcional: el proyecto de Ariba (`WS…`) |
+| `ruta` | Carpeta del proceso en OneLake: `informacion-adjuntos/fase2/<event_id>` |
+| `fecha` | Cuándo quedó completo el proceso |
+| `archivos` | Opcional: lista de archivos con su oferente (`sm_vendor_id`, o vacío si es del proceso), tamaño y MD5. Sin ZIP ni RAR |
+| `comprimidos_sin_contenido` | Opcional: los ZIP o RAR que el módulo 1 no pudo descomprimir. No se bajan; cada uno genera una tarea para el evaluador |
 
 ### Cómo leemos los archivos de Fabric
 
-**Los lee el normalizador (paso 1)**, con el SDK de Azure; no hay un servicio aparte. OneLake responde con la misma API que Azure Data Lake Storage Gen2, en `https://onelake.dfs.fabric.microsoft.com/<workspace>/<lakehouse>.Lakehouse/Files/<ruta>`, y se lee con la librería `azure-storage-file-datalake` y la identidad administrada del job, sin contraseñas.
+**Dónde están (prueba de acceso, 2026-11-18).** El módulo 1 descarga los adjuntos de Ariba a una cuenta de ADLS Gen2 propia, `saazdatalakedllo`, contenedor `informacion-adjuntos`. No los guarda en OneLake: los publica en el lakehouse con un shortcut. Por eso los leemos por OneLake, con permisos de Fabric, sin tener acceso a esa cuenta.
 
-1. Recibe el mensaje de `procesos-listos` con `id_proceso` y `ruta`.
-2. Lista los archivos de esa carpeta en OneLake.
-3. Descarga cada archivo a disco temporal, lo normaliza y lo lee (pasos 1 y 2).
+| Qué | Valor |
+|---|---|
+| Workspace | `workspace-evaluacionofertas-dev` (ambiente de desarrollo) |
+| Lakehouse | `lkh_evaluacionofertas_bronce` |
+| Shortcut | `Files/informacion-adjuntos`, tipo ADLS Gen2, hacia `saazdatalakedllo/informacion-adjuntos` |
+| Ruta de un proceso | `Files/informacion-adjuntos/fase2/<event_id>/` |
+| Endpoint | `https://onelake.dfs.fabric.microsoft.com/<workspace>/<lakehouse>.Lakehouse/Files/...` |
+
+**Lo que confirmó la prueba** (`servicios/prueba-onelake/`, con el usuario del equipo y `az login`): el token sale, el listado de `fase2/` trae 467 archivos en 119 carpetas (1,4 GB, 4 eventos) y dos archivos leídos completos coinciden en tamaño con el listado. La descarga va a unos 1,5 MB/s por archivo: un proceso de 1,4 GB tarda unos 15 minutos en serie, así que se baja en paralelo.
+
+**Primera corrida real (2026-11-23)**, con `orquestar` sobre el evento más chico (59 archivos): todos se bajaron con tamaño y MD5 revisados, sin ningún ZIP ni RAR, en 15,6 s con 8 descargas a la vez (35,8 MB). La corrida entera tardó 3 minutos, casi todo en la normalización. Detalle en la nota de T06 de `specs/005-orquestador/tasks-entrada-onelake.md`.
+
+**Cómo organiza el módulo 1 las carpetas** (lo escribe su notebook `nb_evaluacionofertas_02_descarga_paquete`):
+
+```
+fase2/<event_id>/
+  Documentos del proceso/...          CPC, adendas y anexos del proceso
+  Oferentes/<nombre saneado>/...      una carpeta por oferente
+  .../_contenido/<carpeta>/...        lo que sacan de cada ZIP o RAR
+```
+
+- **No es la forma que espera el orquestador** (`PROCESO/` y una subcarpeta por oferente con su identificador). Por eso el reparto no lista carpetas: sale de las tablas del módulo 1, que dan el oferente de cada archivo (ver más abajo).
+- **La carpeta del oferente lleva su nombre, no un identificador.** El identificador está en la tabla `bronce.tbl_evaluacionofertas_oferentes_control` (`sm_vendor_id`, con `folder_adls_path` para ubicar la carpeta).
+- **Llegan comprimidos, contra lo que se había confirmado** (decisión 2). En la muestra hay 25 ZIP o RAR (20 RAR y 5 ZIP), algunos dentro de otros. El módulo 1 los descomprime de forma recursiva en `_contenido/` y deja también el original. Si se procesan los dos, cada documento entra dos veces, y el comprimido sale como `no_soportado` con una tarea de error que no sirve a nadie. **Se baja solo lo descomprimido** (decisión 2, cambiada): los ZIP y RAR no se bajan.
+- **Hay archivos JSON del módulo 1** (34 en la muestra, con tres formas de nombre fijas). Traen la ficha del oferente, sus ofertas por ítem y el contenido del evento, no documentos del oferente (nota de T01). No están en las tablas, así que no entran al reparto.
+- Las tablas Delta del lakehouse (`bronce.*`, `control.*`) traen los metadatos de cada adjunto: `adls_path`, `md5_hex`, `downloaded_bytes`, `file_status`, `is_compressed_archive` y `parent_archive_key`. **El reparto sale de ellas, no de listar carpetas** (decidido por el usuario, 2026-11-18): la tabla separa el proceso de los oferentes, liga cada archivo a su comprimido y deja fuera 134 archivos huérfanos de una corrida vieja que el listado sí trae. Es provisional: el módulo 1 prometió una vista con lo que necesitamos, que se define con lo que use la primera versión (`specs/005-orquestador/tasks-entrada-onelake.md`, "Lo que usamos de las tablas").
+
+**Quién los lee.** El manejador `Normalizar` del orquestador, no la normalización. La normalización recibe una carpeta local y no sabe de dónde viene; el orquestador ya tiene la interfaz `Origen` (`servicios/orquestador/src/orquestador/origen.py`) con su versión local. `OrigenOneLake` usa la librería `azure-storage-file-datalake` y `DefaultAzureCredential`: en local, el `az login` del equipo; en Azure, la identidad administrada del job.
+
+1. Recibe el mensaje de `procesos-listos` con `id_proceso`, `ruta` (`informacion-adjuntos/fase2/<event_id>`) y la lista de archivos con su oferente, tamaño y MD5. Mientras el módulo 1 no lo publique, lo arma el orquestador con sus tablas.
+2. Reparte esa lista entre el proceso y cada oferente. Cada comprimido sin contenido queda como una tarea para el evaluador.
+3. Baja los archivos de cada entrega a disco temporal, varios a la vez, y revisa el tamaño y el MD5 de cada uno. Luego los normaliza y los lee (pasos 1 y 2).
 4. Escribe el PDF normalizado y la lectura en nuestro almacenamiento. El original no se guarda.
 
 Ningún otro paso vuelve a tocar Fabric: desde ahí todo trabaja con el PDF normalizado.
 
-**Lo que necesitamos del equipo de Fabric:**
+**Permisos.** El shortcut lee la cuenta con la conexión del módulo 1 (`connectionId e498705b-…`), no con la identidad de quien consulta: cualquiera con lectura de datos en el lakehouse ve todos los adjuntos. Para la identidad administrada del job basta el mismo acceso de lectura que tiene hoy el usuario del equipo. Conviene que el módulo 1 limite ese acceso a la carpeta del shortcut (rol de acceso a datos de OneLake).
 
-- Permiso de lectura para la identidad administrada del job en su workspace (rol Viewer, o un rol de acceso solo a la carpeta de archivos).
-- Que un administrador de Fabric habilite en el tenant el uso de las APIs de Fabric por service principals. Suele venir apagado y es lo que más bloquea.
-- El nombre del workspace y del lakehouse, y cómo arman la `ruta` del mensaje.
+**Lo que falta pedirle al módulo 1:**
 
-Las lecturas consumen capacidad de Fabric del módulo 1. Son pocas (unos 19 archivos por oferente), pero hay que avisarles.
+- Acceso de lectura en el workspace para la identidad administrada del job (en desarrollo y, después, en producción).
+- Si el tenant permite que las identidades administradas y los service principals usen las APIs de Fabric. Con el usuario del equipo no hizo falta; con la identidad del job, sin verificar.
+- El workspace y el lakehouse de producción.
+- Cómo se pasa del evento al SR, si el negocio lo necesita. Las tablas traen el evento (`Doc…`) y el proyecto (`WS…`), no el SR. El evento es el identificador del proceso (decidido por el usuario, 2026-11-20): no cambia con las versiones del evento en Ariba.
+- Si un proyecto puede traer más de un evento a evaluar, y si un evento ya descargado puede recibir adjuntos nuevos.
+- Si se pueden borrar los archivos huérfanos de corridas viejas dentro de `_contenido/`.
 
-**Pendiente: prueba de acceso.** Antes de construir el normalizador hay que probar que el job lee una carpeta de prueba en OneLake con su identidad administrada. Va más adelante. La configuración del tenant y los roles se tomaron de memoria, sin verificar en la documentación de Microsoft: la prueba los confirma.
+Las lecturas consumen capacidad de Fabric del módulo 1; hay que avisarles el volumen (unos 1,4 GB por proceso en la muestra).
 
 ---
 
@@ -121,7 +156,7 @@ Las lecturas consumen capacidad de Fabric del módulo 1. Son pocas (unos 19 arch
 
 **Dueño:** nosotros. El módulo 1 solo deja los archivos tal como los entregó el oferente; así controlamos el PDF sobre el que trabajan el clasificador y la extracción.
 
-**Entrada:** los archivos de cada oferente, **ya descomprimidos** (confirmado: no llegan ZIP ni RAR), posiblemente en carpetas anidadas, en el storage que defina el módulo 1.
+**Entrada:** los archivos de cada oferente, posiblemente en carpetas anidadas, bajados de OneLake a una carpeta temporal (paso 0). Los ZIP y RAR ya vienen descomprimidos por el módulo 1 en `_contenido/`; el reparto deja fuera el comprimido original (paso 0), así que aquí no llegan.
 
 **Qué hace:**
 
@@ -655,6 +690,9 @@ Precios de referencia de agregadores, sin confirmar en Azure: gpt-5.4 a $2,50 / 
 ## Cambios a decisiones anteriores
 
 - **D18:** además de PDF e imagen, la extracción acepta el Excel nativo como anexo.
+- **Decisión 2 (2026-11-18):** sí llegan ZIP y RAR, pero el módulo 1 ya los descomprime en `_contenido/`. Confirmado por el usuario: solo se baja lo descomprimido. Los ZIP y RAR no se bajan nunca, tampoco los que vienen dentro de `_contenido/`. Un comprimido sin contenido descomprimido no se baja, pero se avisa al evaluador para que no se evalúe con documentos de menos (T03 de `specs/005-orquestador/tasks-entrada-onelake.md`).
+- **A-1, forma del mensaje (2026-11-20):** contrato 0.2 del orquestador, con el evento como `id_proceso`, el `sm_vendor_id` como oferente, tamaño y MD5 por archivo, proyecto y comprimidos sin contenido. Aprobado por el usuario.
+- **Decisión 35 (2026-11-18):** los archivos los lee el orquestador (manejador `Normalizar`, con `OrigenOneLake`), no la normalización. Están en ADLS Gen2 del módulo 1 y se leen por un shortcut de OneLake. La prueba de acceso se hizo con el usuario del equipo; falta repetirla con la identidad administrada.
 - **D13:** se agrega el motivo de revisión `CLASIFICACION_DUDOSA`, activado por el campo `clasificacion_dudosa` de la entrada.
 - **O1:** el transporte es cola de Service Bus.
 - **D7 y contrato v0:** las versiones se fijan en la apertura del proceso. Sin `version_modelo` en la entrada, se usa la versión registrada del proceso, no la vigente.
@@ -664,7 +702,7 @@ Precios de referencia de agregadores, sin confirmar en Azure: gpt-5.4 a $2,50 / 
 
 | # | Para | Pregunta |
 |---|---|---|
-| A-1 | Módulo 1 | Respondida en parte (paso 0). Falta: ¿pueden publicar en Service Bus? ¿Qué trae el mensaje (proponemos `id_proceso`, `ruta` y la lista de archivos)? ¿Cómo se organizan las carpetas y cómo se distinguen los documentos del proceso de los de cada oferente? ¿Los identificadores son los de Ariba? ¿Los archivos quedan quietos después del aviso? ¿Qué proporción llega escaneada, con contraseña o firmada (M2)? ¿Nos dan permiso de lectura en el workspace, habilitan las APIs de Fabric para service principals en el tenant, y cuáles son el workspace y el lakehouse? |
+| A-1 | Módulo 1 | Respondida en parte (paso 0). Ya se sabe: workspace y lakehouse de desarrollo, estructura de carpetas y acceso por shortcut. Falta: ¿pueden publicar en Service Bus? ¿Aceptan el mensaje del contrato 0.2, o la vista con lo que usamos de sus tablas (`tasks-entrada-onelake.md`)? ¿Un proyecto (`WS…`) puede llegar con más de un evento a evaluar? ¿Un evento ya descargado puede recibir adjuntos nuevos? ¿Cómo se pasa del evento (`Doc…`) al SR, si hace falta? ¿Se pueden borrar los archivos huérfanos de `_contenido/`? ¿Los archivos quedan quietos después del aviso? ¿Qué proporción llega escaneada, con contraseña o firmada (M2)? ¿Dan acceso a la identidad administrada del job, y cuáles son el workspace y el lakehouse de producción? |
 | A-2 | Power App | ¿Dónde escribimos las tareas de revisión y con qué forma? Proponemos una tarea por oferente y área, con puntos que se confirman, corrigen o marcan no cumple. ¿Cómo leemos las correcciones? |
 | A-3 | Negocio | ¿Un PDF modificado después de firmarse digitalmente debe alertar al evaluador? |
 | A-4 | Negocio (N-A) | ¿Una firma digital del oferente cuenta como "Firmado"? ¿Hay que validar la confianza del certificado? |

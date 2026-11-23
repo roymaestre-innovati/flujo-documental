@@ -1,10 +1,4 @@
-"""Comando `orquestar`: corre un proceso completo en local (T10).
-
-    orquestar --origen <carpeta del proceso> --proceso SR... --clasificacion <csv> --salida <carpeta>
-
-La carpeta del proceso trae `PROCESO/` y una subcarpeta por oferente, como la
-dejará el módulo 1 en OneLake. El CSV es el del clasificador falso
-(`clasificador.py`).
+"""Comando `orquestar`: corre un proceso desde una carpeta local o OneLake.
 
 En `<salida>` quedan el almacén (PDF normalizados y lecturas), `estado.json`,
 `solicitudes-extraccion.jsonl`, `errores.json` y `conteos.json`. Todo eso trae
@@ -24,8 +18,10 @@ from normalizacion.almacen import AlmacenLocal
 
 from . import VERSION
 from .clasificador import ClasificadorFalso
+from .entrada_modulo1 import EventoRechazado, Tablas, TablasOneLake, armar_entrada
 from .local import Corrida, aviso, conteos, guardar_salida
 from .origen import OrigenLocal
+from .origen_onelake import OrigenOneLake
 from .parametros import PARAMETROS
 from .registros import configurar
 
@@ -36,22 +32,44 @@ def dentro_de_un_repositorio(ruta: Path) -> bool:
 
 def _argumentos(argv):
     p = argparse.ArgumentParser(prog="orquestar", description="Corre un proceso del aviso a las solicitudes de extracción.")
-    p.add_argument("--origen", type=Path, required=True, help="carpeta del proceso, con PROCESO/ y una por oferente")
-    p.add_argument("--proceso", required=True, help="id_proceso, por ejemplo SR0000000001")
-    p.add_argument("--clasificacion", type=Path, required=True, help="CSV del clasificador falso")
+    local = p.add_argument_group("Entrada local")
+    local.add_argument("--origen", type=Path, help="carpeta del proceso, con PROCESO/ y una por oferente")
+    local.add_argument("--proceso", help="id_proceso, por ejemplo SR0000000001")
+    onelake = p.add_argument_group("Entrada OneLake")
+    onelake.add_argument("--onelake-workspace", help="workspace del módulo 1")
+    onelake.add_argument("--onelake-lakehouse", help="lakehouse del módulo 1")
+    onelake.add_argument("--evento", help="event_id del módulo 1")
+    p.add_argument("--clasificacion", type=Path, help="CSV del clasificador falso (si falta, todo sale TD-99)")
     p.add_argument("--salida", type=Path, required=True, help="carpeta de salida, fuera de cualquier repositorio")
     p.add_argument("--paralelo", type=int, default=PARAMETROS.paralelo_normalizar,
                    help=f"entregas que se normalizan a la vez (por defecto {PARAMETROS.paralelo_normalizar})")
+    p.add_argument("--paralelo-bajar", type=int, default=PARAMETROS.paralelo_bajar,
+                   help=f"archivos que se bajan a la vez por entrega (por defecto {PARAMETROS.paralelo_bajar})")
     p.add_argument("--soffice", help="ruta de LibreOffice, si no está en el PATH")
     p.add_argument("--registros", type=Path, help="archivo para los registros en JSON (sin él, solo advertencias por pantalla)")
     p.add_argument("--version", action="version", version=f"orquestar {VERSION}")
     return p.parse_args(argv)
 
 
-def main(argv: list[str] | None = None) -> int:
+def main(argv: list[str] | None = None, *, tablas: Tablas | None = None, origen: OrigenOneLake | None = None) -> int:
     args = _argumentos(argv)
-    origen, salida = args.origen.resolve(), args.salida.resolve()
-    if not origen.is_dir():
+    opciones_locales = (args.origen, args.proceso)
+    opciones_onelake = (args.onelake_workspace, args.onelake_lakehouse, args.evento)
+    es_onelake = any(valor is not None for valor in opciones_onelake)
+    if es_onelake and any(valor is not None for valor in opciones_locales):
+        print("Elija un solo modo de entrada: local o OneLake.", file=sys.stderr)
+        return 2
+    if es_onelake and not all(opciones_onelake):
+        print("La entrada OneLake requiere --onelake-workspace, --onelake-lakehouse y --evento.", file=sys.stderr)
+        return 2
+    if not es_onelake and None in opciones_locales:
+        print("La entrada local requiere --origen y --proceso. También puede elegir la entrada OneLake.",
+              file=sys.stderr)
+        return 2
+
+    carpeta = args.origen.resolve() if args.origen is not None else None
+    salida = args.salida.resolve()
+    if carpeta is not None and not carpeta.is_dir():
         print("La carpeta del proceso no existe.", file=sys.stderr)
         return 2
     if dentro_de_un_repositorio(salida):
@@ -59,6 +77,9 @@ def main(argv: list[str] | None = None) -> int:
         return 2
     if args.paralelo < 1:
         print("--paralelo debe ser 1 o más.", file=sys.stderr)
+        return 2
+    if args.paralelo_bajar < 1:
+        print("--paralelo-bajar debe ser 1 o más.", file=sys.stderr)
         return 2
     salida.mkdir(parents=True, exist_ok=True)
 
@@ -71,16 +92,36 @@ def main(argv: list[str] | None = None) -> int:
         else:
             configurar(logging.WARNING, sys.stderr)
         inicio = time.perf_counter()
+        if es_onelake:
+            try:
+                if tablas is None:
+                    tablas = TablasOneLake(args.onelake_workspace, args.onelake_lakehouse)
+                entrada = armar_entrada(args.evento, tablas)
+            except EventoRechazado as error:
+                print(error, file=sys.stderr)
+                return 2
+            if origen is None:
+                origen = OrigenOneLake(args.onelake_workspace, args.onelake_lakehouse)
+
         corrida = Corrida(
-            origen=OrigenLocal(origen.parent),
+            origen=origen if es_onelake else OrigenLocal(carpeta.parent),
             almacen=AlmacenLocal(salida / "almacen"),
             clasificador=ClasificadorFalso(args.clasificacion),
-            parametros=dataclasses.replace(PARAMETROS, paralelo_normalizar=args.paralelo),
+            parametros=dataclasses.replace(PARAMETROS, paralelo_normalizar=args.paralelo,
+                                           paralelo_bajar=args.paralelo_bajar),
             soffice=args.soffice,
         )
-        corrida.publicar_aviso(aviso(args.proceso, origen.name, corrida.reloj))
+        cuerpo = entrada.aviso if es_onelake else aviso(args.proceso, carpeta.name, corrida.reloj)
+        corrida.publicar_aviso(cuerpo)
         corrida.correr()
-        resumen = {**conteos(corrida, args.proceso), "tiempo_s": round(time.perf_counter() - inicio, 1)}
+        resumen = {**conteos(corrida, cuerpo["id_proceso"]), "tiempo_s": round(time.perf_counter() - inicio, 1)}
+        if es_onelake:
+            resumen.update(
+                archivos_del_aviso=len(cuerpo["archivos"]),
+                excluidos_por_motivo=dict(entrada.excluidos),
+                comprimidos_sin_contenido=len(cuerpo.get("comprimidos_sin_contenido", [])),
+                **origen.conteos_descarga(),
+            )
     finally:
         if archivo_registros:
             archivo_registros.close()

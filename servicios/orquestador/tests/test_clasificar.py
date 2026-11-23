@@ -226,7 +226,7 @@ SOLICITUD = {"id_documento": "D", "version_ontologia": "1", "paginas": 5}
 
 
 def _respuesta(*segmentos, **extra):
-    return {"contrato": "modulo5-orquestador/0.1", "id_documento": "D", "version_ontologia": "1",
+    return {"contrato": "modulo5-orquestador/0.2", "id_documento": "D", "version_ontologia": "1",
             "segmentos": [{"pagina_inicio": a, "pagina_fin": b, "tipo_documental": t, "subtipo": None,
                            "confianza": 0.9} for a, b, t in segmentos], **extra}
 

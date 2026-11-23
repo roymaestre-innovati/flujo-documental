@@ -1,8 +1,8 @@
 # Orquestador
 
-Lleva cada proceso de selección desde el aviso del módulo 1 hasta las solicitudes de extracción (iniciativa 005, entrega 1). La spec, el plan y las tareas están en `specs/005-orquestador/`; los contratos, en `contracts/modulo5-orquestador/v0/` y `contracts/modulo3-extraccion/v0.2/`.
+Lleva cada proceso de selección desde el aviso del módulo 1 hasta las solicitudes de extracción (iniciativa 005, entrega 1). La spec, el plan y las tareas están en `specs/005-orquestador/`; los contratos, en `contracts/modulo5-orquestador/v0.2/` y `contracts/modulo3-extraccion/v0.2/`.
 
-**Estado:** entrega 1 cerrada (T01 a T11), en local. El resultado con la muestra real está en la nota de T11 de `tasks.md`. Azure (Service Bus, Cosmos, OneLake, Container Apps) va en la entrega 2.
+**Estado**. Entrega 1 cerrada (T01 a T11), en local. El resultado con la muestra real está en la nota de T11 de `tasks.md`. De la entrega 2 está cerrada la entrada desde OneLake (`tasks-entrada-onelake.md`, 2026-11-23): `orquestar` arma el aviso con las tablas del módulo 1, lee los originales de OneLake y ya corrió un evento real. Service Bus, Cosmos, Blob y Container Apps siguen pendientes.
 
 ## Cómo funciona
 
@@ -44,14 +44,34 @@ uv run orquestar --origen <carpeta del proceso> --proceso SR0000000001 \
 ```
 
 - `--origen`: la carpeta del proceso, con `PROCESO/` y una subcarpeta por oferente, nombrada con su identificador. Un archivo suelto en la raíz rechaza el aviso.
-- `--clasificacion`: el CSV del clasificador falso, con las columnas `id_oferente` (vacío para los documentos del proceso), `ruta_origen` (relativa a la carpeta de la entrega), `pagina_inicio` y `pagina_fin` (vacíos para todo el documento), `tipo_documental`, `confianza` y, opcional, `subtipo`. Un documento que no está en el CSV sale como TD-99.
+- `--clasificacion` recibe el CSV opcional del clasificador falso, con las columnas `id_oferente` (vacío para los documentos del proceso), `ruta_origen` (relativa a la carpeta de la entrega), `pagina_inicio` y `pagina_fin` (vacíos para todo el documento), `tipo_documental`, `confianza` y, opcional, `subtipo`. Un documento que no está en el CSV sale como TD-99. Al omitir el CSV, todos los documentos clasificados salen como TD-99.
 - `--paralelo`: entregas que se normalizan a la vez (2 por defecto). Cada conversión con LibreOffice usa cerca de un CPU.
+- `--paralelo-bajar` controla cuántos archivos se bajan a la vez por entrega (8 por defecto). Ambos valores de paralelo deben ser de 1 o más.
 - `--registros <archivo>`: registros en JSON, solo con identificadores. Sin él, por pantalla salen solo las advertencias.
 - `--soffice`: la ruta de LibreOffice, si no está en el `PATH`.
 
 Por pantalla salen **solo conteos**: entregas, documentos y segmentos por estado, solicitudes por tipo documental, tareas abiertas por clase y motivo, registros atascados (en un estado intermedio sin tarea; debe ser 0), mensajes en errores y tiempo. En `<salida>` quedan el almacén (PDF normalizados y lecturas), `estado.json`, `solicitudes-extraccion.jsonl`, `errores.json` y `conteos.json`. **Todo eso trae datos personales**: el comando se niega a escribir dentro de un repositorio git. Termina con 0 si nada quedó en errores, 1 si algo quedó y 2 si los argumentos están mal.
 
 Las demoras de los reintentos no se esperan: el comando adelanta el reloj. Si algo queda en errores, se ve en `errores.json` con su motivo.
+
+## Correr un evento desde OneLake
+
+Desde esta carpeta, inicia sesión con una cuenta con permiso de lectura sobre el lakehouse. Ingresa el `event_id` de un evento en estado `DESCARGADO` y sin archivos fallidos.
+
+```bash
+az login
+read -r -p 'event_id: ' EVENTO
+SALIDA=$(mktemp -d /tmp/orquestador-onelake.XXXXXX)
+uv run orquestar --onelake-workspace workspace-evaluacionofertas-dev \
+                 --onelake-lakehouse lkh_evaluacionofertas_bronce \
+                 --evento "$EVENTO" --salida "$SALIDA"
+```
+
+Las tres opciones de OneLake reemplazan a `--origen` y `--proceso`. El comando arma el aviso 0.2 con las tablas del módulo 1, usa el `event_id` como identificador del proceso y baja los archivos de ese mismo lakehouse. La apertura registra una tarea por cada comprimido sin contenido. Los ZIP y RAR quedan excluidos del aviso. Las opciones de clasificación y paralelo son las mismas del modo local.
+
+El resumen agrega los archivos del aviso, los excluidos por motivo, los comprimidos sin contenido, los archivos bajados y aceptados, sus MB decimales y los segundos con descargas en curso. El tiempo incluye los intentos fallidos y cuenta una sola vez las descargas simultáneas. Los archivos y bytes aceptados se cuentan por descarga, incluidos los que se vuelvan a bajar en un reintento de la entrega.
+
+La salida queda fuera del repositorio git y contiene `almacen/` con los PDF normalizados y las lecturas, `estado.json`, `solicitudes-extraccion.jsonl`, `errores.json` y `conteos.json`. Los originales se bajan a carpetas temporales que se borran al terminar cada entrega. Si se rechaza el evento, el comando imprime el motivo y termina con código 2.
 
 ## Correr la muestra real
 
@@ -88,12 +108,14 @@ Las corridas traen datos personales: el servidor solo escucha en 127.0.0.1 y sol
 | `cola.py` | Colas (`procesos-listos`, `normalizar`, `clasificar`, `extraer`) y `ColaEnMemoria`, que imita Service Bus: bloqueo, reentrega, demora y cola de errores |
 | `estado.py` | Almacén del estado y `EstadoEnMemoria`, con creación idempotente y escritura condicional, como Cosmos |
 | `estados.py` | Las cinco entidades (proceso, oferente, documento, segmento y tarea), sus transiciones, el historial y `consultar` |
-| `errores.py` | Clases de error y el bucle común: reintentos, esperas, cola de errores y alertas |
-| `origen.py` | Dónde están los originales: `OrigenLocal`, una carpeta (OneLake en la entrega 2) |
-| `clasificador.py` | `ClasificadorFalso`, que lee un CSV (el real es de otro equipo) |
+| `errores.py` | Clases de error y el bucle común: reintentos, esperas, cola de errores y alertas. `ErrorDeConfiguracion` va a errores sin reintento, con motivo propio |
+| `origen.py` | Dónde están los originales: la interfaz `Origen` y `OrigenLocal`, una carpeta. `bajar` revisa el tamaño y el MD5 si se los dan |
+| `origen_onelake.py` | `OrigenOneLake`: los originales en `Files/` de un lakehouse, con `DefaultAzureCredential`. Traduce las fallas de OneLake a las clases de error |
+| `entrada_modulo1.py` | Arma el aviso de un evento con las tablas Delta del módulo 1 hasta que exista su vista |
+| `clasificador.py` | `ClasificadorFalso`, con un CSV opcional |
 | `contratos.py` | Valida mensajes contra los esquemas de `contracts/` |
 | `datos.py` y `datos/` | Versiones vigentes, umbrales y tipos documentales, con un archivo por versión |
-| `parametros.py` | Reintentos, demoras, escalamiento y paralelo de normalización |
+| `parametros.py` | Reintentos, demoras, escalamiento y paralelo de normalización y descargas |
 | `registros.py` | Registros en JSON, solo con identificadores |
 | `apertura.py` | Manejador de `procesos-listos`: valida el aviso, reparte las entregas y fija las versiones |
 | `normalizar.py` | Manejador de `normalizar`: baja los originales, llama a la normalización y registra los documentos |
