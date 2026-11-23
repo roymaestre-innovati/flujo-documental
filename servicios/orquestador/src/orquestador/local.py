@@ -75,7 +75,8 @@ class Corrida:
             self.cola = ColaEnMemoria(self.reloj)
         self.extraer = Extraer(self.cola, self.almacen)
         self.apertura = Apertura(self.cola, self.estado, self.origen, self.reloj)
-        self.normalizar = Normalizar(self.cola, self.estado, self.origen, self.almacen, self.reloj, self.soffice)
+        self.normalizar = Normalizar(self.cola, self.estado, self.origen, self.almacen, self.reloj,
+                                     soffice=self.soffice, parametros=self.parametros)
         self.clasificar = Clasificar(self.estado, self.almacen, self.clasificador, self.extraer, self.reloj)
 
     def publicar_aviso(self, cuerpo: dict) -> None:

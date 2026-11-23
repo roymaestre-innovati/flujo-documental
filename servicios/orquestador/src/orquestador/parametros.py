@@ -23,6 +23,8 @@ class Parametros:
     """Un error de proceso sin resolver pasa a tarea humana después de esto (R22)."""
     paralelo_normalizar: int = 2
     """Entregas que se normalizan a la vez (acordado el 2026-11-06)."""
+    paralelo_bajar: int = 8
+    """Archivos de una misma entrega que se bajan a la vez (T04)."""
 
 
 PARAMETROS = Parametros()

@@ -30,8 +30,9 @@ Los mensajes de error no llevan rutas ni nombres, solo la operación y el códig
 import logging
 import re
 from collections.abc import Iterator
-from contextlib import contextmanager
+from contextlib import contextmanager, nullcontext
 from pathlib import Path, PurePosixPath
+from threading import Lock, local
 from typing import Any
 
 from .errores import ErrorDeConfiguracion, ErrorTransitorio
@@ -117,7 +118,9 @@ class OrigenOneLake(Origen):
     `Files/`, con `/` y sin `..`, igual que en `OrigenLocal`.
 
     `cliente` es un `FileSystemClient` del workspace; las pruebas pasan uno falso.
-    Si no se da, se crea con `credencial` o, si falta, con `DefaultAzureCredential`.
+    Si se inyecta, se protege con un candado. Si no se da, se crea uno por hilo,
+    todos con la misma credencial: `credencial` o, si falta, un
+    `DefaultAzureCredential`, que guarda el token para todos.
     """
 
     def __init__(
@@ -133,24 +136,39 @@ class OrigenOneLake(Origen):
         item = lakehouse if lakehouse.endswith(".Lakehouse") else f"{lakehouse}.Lakehouse"
         self._files = PurePosixPath(item, "Files")
         self._concurrencia = concurrencia_por_archivo
-        if cliente is None:
+        self._workspace = workspace
+        if cliente is None and credencial is None:
             from azure.identity import DefaultAzureCredential
-            from azure.storage.filedatalake import DataLakeServiceClient
 
-            if credencial is None:
-                credencial = DefaultAzureCredential(exclude_interactive_browser_credential=True)
-            servicio = DataLakeServiceClient(ENDPOINT, credential=credencial,
-                                             connection_timeout=30, read_timeout=timeout_s)
-            cliente = servicio.get_file_system_client(workspace)
-        self._cliente = cliente
+            credencial = DefaultAzureCredential(exclude_interactive_browser_credential=True)
+        self._credencial = credencial
+        self._timeout_s = timeout_s
+        self._clientes = local()
+        self._cliente_inyectado = cliente
+        self._proteger_cliente = Lock() if cliente is not None else nullcontext()
+
+    def _cliente_del_hilo(self) -> Any:
+        """Cada hilo reutiliza su cliente y su sesión HTTP."""
+        if self._cliente_inyectado is not None:
+            return self._cliente_inyectado
+
+        cliente = getattr(self._clientes, "cliente", None)
+        if cliente is None:
+            from azure.storage.filedatalake import FileSystemClient
+
+            cliente = FileSystemClient(ENDPOINT, self._workspace, credential=self._credencial,
+                                       connection_timeout=30, read_timeout=self._timeout_s)
+            self._clientes.cliente = cliente
+        return cliente
 
     def _ruta(self, ruta: str) -> str:
         return (self._files / _ruta_segura(ruta)).as_posix()
 
     def listar(self, carpeta: str) -> list[str]:
         base = self._ruta(carpeta)
-        with traducir_fallas("listar"):
-            nombres = [p.name for p in self._cliente.get_paths(path=base, recursive=True) if not p.is_directory]
+        with traducir_fallas("listar"), self._proteger_cliente:
+            cliente = self._cliente_del_hilo()
+            nombres = [p.name for p in cliente.get_paths(path=base, recursive=True) if not p.is_directory]
         prefijo = base + "/"
         relativas = []
         for nombre in nombres:
@@ -163,8 +181,9 @@ class OrigenOneLake(Origen):
         ruta = self._ruta(archivo)
         destino.parent.mkdir(parents=True, exist_ok=True)
         try:
-            with traducir_fallas("bajar"):
-                descarga = self._cliente.get_file_client(ruta).download_file(max_concurrency=self._concurrencia)
+            with traducir_fallas("bajar"), self._proteger_cliente:
+                cliente = self._cliente_del_hilo()
+                descarga = cliente.get_file_client(ruta).download_file(max_concurrency=self._concurrencia)
                 with open(destino, "wb") as salida:
                     escritos = descarga.readinto(salida)
             if escritos != descarga.size:

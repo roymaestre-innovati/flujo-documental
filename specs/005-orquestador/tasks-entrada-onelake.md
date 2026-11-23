@@ -4,7 +4,7 @@ Es la primera pieza de la entrega 2 del orquestador: la interfaz `Origen` deja d
 
 **Meta:** correr `orquestar` en la máquina del equipo sobre un evento real de `workspace-evaluacionofertas-dev`, leyendo directo de OneLake, sin copiar los originales, y llegar a los mismos conteos que reporta el módulo 1 en sus tablas.
 
-**Estado al 2026-11-23:** T01 a T03b hechas. La apertura y `Normalizar` usan los campos del aviso 0.2. Sigue T04, descarga en paralelo. La prueba de acceso está en `servicios/prueba-onelake/`.
+**Estado al 2026-11-23:** T01 a T04 hechas. La apertura y `Normalizar` usan los campos del aviso 0.2 y los archivos de cada entrega se descargan en paralelo. Sigue T05, comando. La prueba de acceso está en `servicios/prueba-onelake/`.
 
 ## Dónde va
 
@@ -58,7 +58,7 @@ Un servicio aparte solo agregaría una copia de los originales o un salto de red
   - Pruebas: un aviso con tamaño y MD5 que no coinciden con lo bajado, uno con un comprimido sin contenido y uno sin los campos nuevos.
   - Al cerrar: quitar `OrigenRevisado` y `crear_tareas_sin_contenido` si ya no los usa nadie.
 
-- [ ] **T04 — Bajar en paralelo.** `Normalizar` baja hoy los archivos de uno en uno. A ~1,5 MB/s por archivo, un oferente de 200 MB tarda más de 2 minutos solo en bajar.
+- [x] **T04 — Bajar en paralelo.** Hecha el 2026-11-23 (ver la nota de T04). A ~1,5 MB/s por archivo, bajar en serie los 200 MB de un oferente tarda más de 2 minutos.
   - Se baja con varios hilos (`paralelo_bajar`, 8 por defecto) a la misma carpeta temporal. Cada archivo cuesta ~1,8 s de latencia aunque sea chico (nota de T02): la entrega más grande, con 57 archivos, tarda ~100 s en serie y ~15 s con 8 hilos.
   - Tamaños de la muestra sin comprimidos (2026-11-20): la entrega más grande pesa 106 MB (57 archivos), la mediana 7 MB y el archivo más grande 11 MB. El disco efímero de una réplica de 0,5 vCPU basta.
   - Si un archivo falla, falla la entrega, como hoy.
@@ -199,3 +199,9 @@ Revisión de la historia de las tablas Delta, todas sus versiones (desde octubre
 - Se retiraron `OrigenRevisado` y `crear_tareas_sin_contenido` de `entrada_modulo1.py` y de sus pruebas.
 - Una entrega que solo trae comprimidos sin contenido queda con cero archivos y pasa a `procesando` con cero documentos. Su tarea es lo único que la persona revisa.
 - Pruebas nuevas: un tamaño o MD5 que no coincide se reintenta y luego va a errores; un aviso 0.1 o 0.2 sin los campos nuevos; una entrega con solo un comprimido; un aviso repetido no duplica las tareas. La suite completa pasa: 248 pruebas.
+
+### T04 — Bajar en paralelo (2026-11-23)
+
+- `Corrida` pasa `Parametros` a `Normalizar`. `paralelo_bajar` limita las descargas por entrega a 8 por defecto. Todos los archivos van a la misma carpeta temporal, cada uno con su `Esperado` leído del estado. Con un hilo, o si dos rutas apuntan al mismo destino, se conserva el orden de descarga.
+- `OrigenOneLake` reutiliza un cliente del SDK y su sesión HTTP por hilo, todos con una sola credencial creada al construirlo, para no pedir el token en cada hilo. Un cliente inyectado se protege con un candado.
+- La primera falla corta la asignación de archivos. Las descargas en curso terminan antes de borrar la carpeta temporal. Un `ErrorOrigen`, incluido `ArchivoDistinto`, reintenta la entrega completa sin normalizar documentos.

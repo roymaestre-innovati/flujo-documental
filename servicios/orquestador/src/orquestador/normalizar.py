@@ -22,7 +22,9 @@ entregas siguen (R23).
 
 import logging
 import tempfile
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path, PurePosixPath
+from threading import Lock
 
 import normalizacion
 from normalizacion.almacen import Almacen
@@ -36,6 +38,7 @@ from .cola import CLASIFICAR, NORMALIZAR, Cola
 from .errores import ErrorTransitorio
 from .estado import Estado
 from .origen import ErrorOrigen, Esperado, Origen
+from .parametros import PARAMETROS, Parametros
 from .reloj import Reloj
 
 registro = logging.getLogger("orquestador.normalizar")
@@ -74,6 +77,7 @@ class Normalizar:
         almacen: Almacen,
         reloj: Reloj,
         soffice: str | None = None,
+        parametros: Parametros = PARAMETROS,
     ) -> None:
         self._cola = cola
         self._estado = estado
@@ -81,6 +85,7 @@ class Normalizar:
         self._almacen = almacen
         self._reloj = reloj
         self._soffice = soffice
+        self._parametros = parametros
 
     def procesar(self, cuerpo: dict) -> None:
         id_proceso, entrega = cuerpo["id_proceso"], cuerpo["entrega"]
@@ -99,17 +104,13 @@ class Normalizar:
                 f"El proceso fijó el normalizador {versiones['normalizador']} con parámetros "
                 f"{versiones['parametros_normalizacion']}, y está instalado {instaladas[0]} con {instaladas[1]}")
 
-        esperados = oferente.datos.get("esperados", {})
         with tempfile.TemporaryDirectory(prefix="entrega-") as temporal:
             carpeta = Path(temporal)
-            for archivo in oferente.datos["archivos"]:
-                campos = esperados.get(archivo)
-                esperado = Esperado(**campos) if campos else None
-                try:
-                    self._origen.bajar(f"{proceso.datos['ruta']}/{archivo}",
-                                       carpeta / ruta_en_la_entrega(archivo, entrega), esperado=esperado)
-                except ErrorOrigen:
-                    raise ErrorTransitorio("No se pudo bajar un archivo del origen") from None
+            try:
+                self._bajar_entrega(proceso.datos["ruta"], entrega, oferente.datos["archivos"],
+                                    oferente.datos.get("esperados", {}), carpeta)
+            except ErrorOrigen:
+                raise ErrorTransitorio("No se pudo bajar un archivo del origen") from None
             resultado = normalizar_entrega(
                 carpeta, id_proceso, None if entrega == ENTREGA_DEL_PROCESO else entrega, self._almacen,
                 soffice=self._soffice)
@@ -132,6 +133,44 @@ class Normalizar:
         )
         registro.info("Entrega normalizada: %s documentos, %s para clasificar",
                       len(manifiesto["archivos"]), normalizados)
+
+    def _bajar_entrega(self, ruta: str, entrega: str, archivos: list[str], esperados: dict, carpeta: Path) -> None:
+        def bajar(archivo: str, destino: Path) -> None:
+            campos = esperados.get(archivo)
+            esperado = Esperado(**campos) if campos else None
+            self._origen.bajar(f"{ruta}/{archivo}", destino, esperado=esperado)
+
+        destinos = [carpeta / ruta_en_la_entrega(archivo, entrega) for archivo in archivos]
+        pendientes = zip(archivos, destinos)
+        hilos = min(self._parametros.paralelo_bajar, len(archivos))
+        # Dos rutas pueden acabar en el mismo destino al quitar el prefijo de la entrega.
+        if hilos <= 1 or len(set(destinos)) < len(destinos):
+            for archivo, destino in pendientes:
+                bajar(archivo, destino)
+            return
+
+        candado = Lock()
+        fallo = False
+
+        def bajar_pendientes() -> None:
+            nonlocal fallo
+            while True:
+                with candado:
+                    if fallo or (pendiente := next(pendientes, None)) is None:
+                        return
+                try:
+                    bajar(*pendiente)
+                except BaseException:
+                    with candado:
+                        if fallo:
+                            return
+                        fallo = True
+                    raise
+
+        with ThreadPoolExecutor(max_workers=hilos) as grupo:
+            futuros = [grupo.submit(bajar_pendientes) for _ in range(hilos)]
+            for futuro in futuros:
+                futuro.result()
 
     def _registrar(self, id_proceso: str, entrega: str, archivo: dict) -> None:
         id_documento = archivo["id_documento"]

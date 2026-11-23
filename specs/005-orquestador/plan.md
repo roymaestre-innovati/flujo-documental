@@ -95,6 +95,7 @@ Detalles de la cola `normalizar` (acordados el 2026-11-06):
 
 - **Unidad: la entrega.** Por proceso se pierde el paralelo y el aislamiento; por archivo se rompe el manifiesto y la detección de copias de la normalización, que trabajan por entrega.
 - **Máximo 2 entregas en paralelo**, como parámetro (`paralelo_normalizar`). Cada conversión con LibreOffice usa cerca de un CPU. Se ajusta después de medir; si llegan varios procesos juntos, la cola guarda el resto. En la versión local el comando `orquestar` respeta el mismo límite.
+- **Máximo 8 descargas en paralelo por entrega** (`paralelo_bajar`). La entrega pasa a normalización cuando están todos los archivos en su carpeta temporal.
 - **Quién mira OneLake.** Si el aviso trae `archivos`, la apertura reparte con esa lista sin leer nada. Si no, lista las carpetas de `ruta`, con la misma identidad que usa la normalización. Se anota en A-1.
 - **Mensaje repetido o trabajador caído:** la normalización reusa lo que ya quedó escrito y los `clasificar` repetidos se ignoran por su clave. No hace falta lógica nueva.
 - **Imagen aparte.** Solo este manejador necesita LibreOffice (1,2 GB). En la entrega 2 va en su propia imagen y los demás manejadores en una liviana. El código no cambia.

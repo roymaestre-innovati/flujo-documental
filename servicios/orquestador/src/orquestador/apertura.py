@@ -17,7 +17,7 @@ proceso no tiene la marca del paso 5, publica otra vez todas las entregas. Un
 aviso repetido no hace nada.
 
 Los originales no se copian (R3): aquí solo se listan. Los baja la
-normalización, uno por uno, a una carpeta temporal.
+normalización a una carpeta temporal por entrega.
 """
 
 import hashlib

@@ -1,15 +1,19 @@
 """OrigenOneLake con un cliente de OneLake falso, en memoria: sin Azure."""
 
 import hashlib
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
+from threading import Barrier, Lock
 
 import pytest
+from azure import identity
 from azure.core.exceptions import (
     ClientAuthenticationError,
     HttpResponseError,
     ResourceNotFoundError,
     ServiceRequestError,
 )
+from azure.storage import filedatalake
 
 from orquestador.cola import ColaEnMemoria
 from orquestador.errores import ErrorDeConfiguracion, ErrorTransitorio, procesar_uno
@@ -116,6 +120,34 @@ def test_baja_con_varias_partes_a_la_vez(origen, cliente, tmp_path):
     origen.bajar("informacion-adjuntos/fase2/Doc1/Oferentes/A/sub/carta.pdf", destino)
     assert destino.read_bytes() == b"carta"
     assert cliente.concurrencia == 3
+
+
+def test_un_cliente_por_hilo_con_la_misma_credencial(monkeypatch, tmp_path):
+    clientes = []
+    candado = Lock()
+    barrera = Barrier(2, timeout=5)
+
+    def crear_cliente(endpoint, workspace, *, credential, **kwargs):
+        cliente = ClienteFalso({"a.pdf": b"a", "b.pdf": b"b"})
+        with candado:
+            clientes.append((cliente, credential))
+        return cliente
+
+    monkeypatch.setattr(identity, "DefaultAzureCredential", lambda **kwargs: object())
+    monkeypatch.setattr(filedatalake, "FileSystemClient", crear_cliente)
+    origen = OrigenOneLake("ws", "lkh")
+
+    def bajar_dos(n):
+        origen.bajar("a.pdf", tmp_path / f"a-{n}.pdf")
+        barrera.wait()
+        origen.bajar("b.pdf", tmp_path / f"b-{n}.pdf")
+
+    with ThreadPoolExecutor(max_workers=2) as grupo:
+        list(grupo.map(bajar_dos, range(2)))
+
+    [(cliente_1, credencial_1), (cliente_2, credencial_2)] = clientes
+    assert cliente_1 is not cliente_2 and credencial_1 is credencial_2
+    assert [p.read_bytes() for p in sorted(tmp_path.glob("*.pdf"))] == [b"a", b"a", b"b", b"b"]
 
 
 def test_revisa_tamano_y_md5(origen, tmp_path):
