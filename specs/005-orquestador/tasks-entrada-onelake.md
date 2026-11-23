@@ -4,7 +4,7 @@ Es la primera pieza de la entrega 2 del orquestador: la interfaz `Origen` deja d
 
 **Meta:** correr `orquestar` en la máquina del equipo sobre un evento real de `workspace-evaluacionofertas-dev`, leyendo directo de OneLake, sin copiar los originales, y llegar a los mismos conteos que reporta el módulo 1 en sus tablas.
 
-**Estado al 2026-11-23:** T01 a T05 hechas. `orquestar` ya lee eventos desde OneLake. Sigue T06, la corrida con un evento real que hace el usuario en su máquina. La prueba de acceso está en `servicios/prueba-onelake/`.
+**Estado al 2026-11-23:** T01 a T06 hechas. `orquestar` corrió un evento real leyendo directo de OneLake y sus conteos cuadran con las tablas del módulo 1. Sigue T07, el cierre. La prueba de acceso está en `servicios/prueba-onelake/`.
 
 ## Dónde va
 
@@ -66,7 +66,7 @@ Un servicio aparte solo agregaría una copia de los originales o un salto de red
 
 - [x] **T05 — Comando.** Hecha el 2026-11-23 (ver la nota de T05). `orquestar` acepta `--onelake-workspace`, `--onelake-lakehouse` y `--evento <event_id>` en lugar de `--origen` y `--proceso`. Publica el aviso que arma T03 con el `event_id` como identificador del proceso. Sin `--clasificacion` los documentos clasificados salen como TD-99. El README incluye cómo correrlo y la prueba de punta a punta usa tablas en memoria y un cliente falso.
 
-- [ ] **T06 — Corrida con un evento real.** La corre el usuario en su máquina, con `az login`, sobre el evento más chico de `fase2/` (39 archivos del proceso y 6 oferentes, o 21 y 9).
+- [x] **T06 — Corrida con un evento real.** Hecha el 2026-11-23 (ver la nota de T06). La corre el usuario en su máquina, con `az login`, sobre el evento más chico de `fase2/`.
   - Debe imprimir solo conteos: filas de la tabla, archivos excluidos por motivo, bajados, MB y tiempo de descarga. También, para revisar la tabla: cuántos archivos hay en la carpeta del evento que no están en la tabla (sin contar los JSON).
   - Debe imprimir también los documentos normalizados, copias exactas y errores por tipo, y compararlos con los `file_status` de `adjuntos_metadata` de ese evento.
   - La salida va fuera del repositorio y se borra al terminar.
@@ -211,3 +211,15 @@ Revisión de la historia de las tablas Delta, todas sus versiones (desde octubre
 - `cli.py` publica el aviso 0.2 de `armar_entrada` y usa el mismo workspace y lakehouse para las tablas y los originales. La apertura crea las tareas de los comprimidos sin contenido. Las pruebas inyectan `TablasEnMemoria` y un `OrigenOneLake` con un cliente falso.
 - Después de `az login`, desde `servicios/orquestador`, se corre `uv run orquestar --onelake-workspace <workspace> --onelake-lakehouse <lakehouse> --evento <event_id> --salida <carpeta-fuera-del-repo>`. En ambos modos se puede omitir `--clasificacion` para usar TD-99 y ajustar `--paralelo-bajar` (8 por defecto).
 - El resumen agrega archivos del aviso, excluidos por motivo, comprimidos sin contenido, archivos bajados, MB y segundos con descargas en curso. `OrigenOneLake` mide las descargas simultáneas sin sumar dos veces el mismo intervalo. Un evento rechazado sale con código 2 e imprime solo el motivo.
+
+### T06 — Corrida con un evento real (2026-11-23)
+
+Corrida del usuario con `orquestar` sobre el evento 3 de T03 (el más chico: 59 archivos, 24 del proceso y 35 de un oferente), sin `--clasificacion` y con `--paralelo-bajar 8`. Solo conteos.
+
+- **Los criterios se cumplen.** Los 59 archivos del aviso quedaron en 2 entregas y se bajaron todos, con tamaño y MD5 revisados. Se excluyeron 4 comprimidos y ninguno se bajó. El comprimido sin contenido (un ZIP) tiene su tarea `COMPRIMIDO_SIN_CONTENIDO`. No quedó nada en errores.
+- **Documentos:** 55 clasificados (todos TD-99, sin extracción), 1 copia exacta y 3 con error de entrada, que son tareas `NO_SOPORTADO`: dos KMZ y un archivo sin extensión. La copia exacta es un tercer KMZ.
+- **Tabla contra `file_status`:** `armar_entrada` rechaza un evento con un archivo que no esté `EXITOSO` o `YA_EXISTIA_IDENTICO`, así que cada fila de documento terminó en un documento. Las 63 filas son los 59 documentos más los 4 comprimidos.
+- **Carpeta contra tabla:** la carpeta del evento trae 99 archivos, 91 sin contar los JSON. Las 63 filas existen en la carpeta. Los 28 archivos que no están en la tabla son los huérfanos de `_contenido/` que ya registró T01 para este evento. Ninguno entró a la corrida.
+- **Tiempos:** 184,6 s en total. Bajar los 35,8 MB tomó 15,6 s con 8 hilos (~2,3 MB/s). Armar el aviso toma ~23 s (nota de T03). El resto, ~145 s, es la normalización, con 5 DOCX y 3 XLSX por LibreOffice y 2 entregas a la vez. `paralelo_bajar` se queda en 8: la descarga no es el cuello de botella.
+- **Listado de eventos:** los cuatro eventos `DESCARGADO` arman su aviso sin rechazo. De menor a mayor: 59, 67, 74 y 81 archivos.
+- La salida quedó en `/tmp` y se borró al terminar.
