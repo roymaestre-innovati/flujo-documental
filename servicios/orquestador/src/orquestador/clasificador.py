@@ -39,10 +39,13 @@ class ClasificadorFalso(Clasificador):
     - `id_oferente` vacío es un documento del proceso.
     - `pagina_inicio` y `pagina_fin` vacíos quieren decir "todo el documento".
     - Un documento que no está en el CSV sale como TD-99 con confianza 1.
+    - Sin CSV, todos los documentos salen como TD-99.
     """
 
-    def __init__(self, csv_ruta: str | Path) -> None:
+    def __init__(self, csv_ruta: str | Path | None = None) -> None:
         self._filas: dict[tuple[str | None, str], list[dict]] = defaultdict(list)
+        if csv_ruta is None:
+            return
         with open(csv_ruta, encoding="utf-8", newline="") as f:
             lector = csv.DictReader(f)
             faltan = [c for c in COLUMNAS if c not in (lector.fieldnames or [])]

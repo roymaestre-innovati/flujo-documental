@@ -4,7 +4,7 @@ Es la primera pieza de la entrega 2 del orquestador: la interfaz `Origen` deja d
 
 **Meta:** correr `orquestar` en la máquina del equipo sobre un evento real de `workspace-evaluacionofertas-dev`, leyendo directo de OneLake, sin copiar los originales, y llegar a los mismos conteos que reporta el módulo 1 en sus tablas.
 
-**Estado al 2026-11-23:** T01 a T04 hechas. La apertura y `Normalizar` usan los campos del aviso 0.2 y los archivos de cada entrega se descargan en paralelo. Sigue T05, comando. La prueba de acceso está en `servicios/prueba-onelake/`.
+**Estado al 2026-11-23:** T01 a T05 hechas. `orquestar` ya lee eventos desde OneLake. Sigue T06, la corrida con un evento real que hace el usuario en su máquina. La prueba de acceso está en `servicios/prueba-onelake/`.
 
 ## Dónde va
 
@@ -64,7 +64,7 @@ Un servicio aparte solo agregaría una copia de los originales o un salto de red
   - Si un archivo falla, falla la entrega, como hoy.
   - Se mide en T06 y se ajusta el valor.
 
-- [ ] **T05 — Comando.** `orquestar` acepta `--onelake-workspace`, `--onelake-lakehouse` y `--evento <event_id>` en lugar de `--origen`, y arma el aviso con la lista de T03 y el identificador del proceso que salga de T01. Sin `--clasificacion` sigue saliendo todo TD-99. Prueba de punta a punta con el cliente falso. README del orquestador actualizado.
+- [x] **T05 — Comando.** Hecha el 2026-11-23 (ver la nota de T05). `orquestar` acepta `--onelake-workspace`, `--onelake-lakehouse` y `--evento <event_id>` en lugar de `--origen` y `--proceso`. Publica el aviso que arma T03 con el `event_id` como identificador del proceso. Sin `--clasificacion` los documentos clasificados salen como TD-99. El README incluye cómo correrlo y la prueba de punta a punta usa tablas en memoria y un cliente falso.
 
 - [ ] **T06 — Corrida con un evento real.** La corre el usuario en su máquina, con `az login`, sobre el evento más chico de `fase2/` (39 archivos del proceso y 6 oferentes, o 21 y 9).
   - Debe imprimir solo conteos: filas de la tabla, archivos excluidos por motivo, bajados, MB y tiempo de descarga. También, para revisar la tabla: cuántos archivos hay en la carpeta del evento que no están en la tabla (sin contar los JSON).
@@ -205,3 +205,9 @@ Revisión de la historia de las tablas Delta, todas sus versiones (desde octubre
 - `Corrida` pasa `Parametros` a `Normalizar`. `paralelo_bajar` limita las descargas por entrega a 8 por defecto. Todos los archivos van a la misma carpeta temporal, cada uno con su `Esperado` leído del estado. Con un hilo, o si dos rutas apuntan al mismo destino, se conserva el orden de descarga.
 - `OrigenOneLake` reutiliza un cliente del SDK y su sesión HTTP por hilo, todos con una sola credencial creada al construirlo, para no pedir el token en cada hilo. Un cliente inyectado se protege con un candado.
 - La primera falla corta la asignación de archivos. Las descargas en curso terminan antes de borrar la carpeta temporal. Un `ErrorOrigen`, incluido `ArchivoDistinto`, reintenta la entrega completa sin normalizar documentos.
+
+### T05 — Comando (2026-11-23)
+
+- `cli.py` publica el aviso 0.2 de `armar_entrada` y usa el mismo workspace y lakehouse para las tablas y los originales. La apertura crea las tareas de los comprimidos sin contenido. Las pruebas inyectan `TablasEnMemoria` y un `OrigenOneLake` con un cliente falso.
+- Después de `az login`, desde `servicios/orquestador`, se corre `uv run orquestar --onelake-workspace <workspace> --onelake-lakehouse <lakehouse> --evento <event_id> --salida <carpeta-fuera-del-repo>`. En ambos modos se puede omitir `--clasificacion` para usar TD-99 y ajustar `--paralelo-bajar` (8 por defecto).
+- El resumen agrega archivos del aviso, excluidos por motivo, comprimidos sin contenido, archivos bajados, MB y segundos con descargas en curso. `OrigenOneLake` mide las descargas simultáneas sin sumar dos veces el mismo intervalo. Un evento rechazado sale con código 2 e imprime solo el motivo.

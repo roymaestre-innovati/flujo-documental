@@ -33,6 +33,7 @@ from collections.abc import Iterator
 from contextlib import contextmanager, nullcontext
 from pathlib import Path, PurePosixPath
 from threading import Lock, local
+from time import perf_counter
 from typing import Any
 
 from .errores import ErrorDeConfiguracion, ErrorTransitorio
@@ -146,6 +147,39 @@ class OrigenOneLake(Origen):
         self._clientes = local()
         self._cliente_inyectado = cliente
         self._proteger_cliente = Lock() if cliente is not None else nullcontext()
+        self._candado_conteos = Lock()
+        self._archivos_bajados = 0
+        self._bytes_bajados = 0
+        self._descargas_activas = 0
+        self._inicio_descargas = 0.0
+        self._tiempo_descarga = 0.0
+
+    @contextmanager
+    def _medir_descarga(self) -> Iterator[None]:
+        with self._candado_conteos:
+            if self._descargas_activas == 0:
+                self._inicio_descargas = perf_counter()
+            self._descargas_activas += 1
+        try:
+            yield
+        finally:
+            with self._candado_conteos:
+                self._descargas_activas -= 1
+                if self._descargas_activas == 0:
+                    self._tiempo_descarga += perf_counter() - self._inicio_descargas
+
+    def conteos_descarga(self) -> dict:
+        """Archivos verificados, MB decimales y segundos con descargas en curso.
+
+        Se consulta al terminar la corrida. El tiempo incluye intentos fallidos
+        y cuenta una sola vez los intervalos de descargas simultáneas.
+        """
+        with self._candado_conteos:
+            return {
+                "archivos_bajados": self._archivos_bajados,
+                "mb_bajados": round(self._bytes_bajados / 1_000_000, 3),
+                "tiempo_descarga_s": round(self._tiempo_descarga, 3),
+            }
 
     def _cliente_del_hilo(self) -> Any:
         """Cada hilo reutiliza su cliente y su sesión HTTP."""
@@ -181,7 +215,7 @@ class OrigenOneLake(Origen):
         ruta = self._ruta(archivo)
         destino.parent.mkdir(parents=True, exist_ok=True)
         try:
-            with traducir_fallas("bajar"), self._proteger_cliente:
+            with traducir_fallas("bajar"), self._proteger_cliente, self._medir_descarga():
                 cliente = self._cliente_del_hilo()
                 descarga = cliente.get_file_client(ruta).download_file(max_concurrency=self._concurrencia)
                 with open(destino, "wb") as salida:
@@ -192,3 +226,6 @@ class OrigenOneLake(Origen):
             destino.unlink(missing_ok=True)
             raise
         revisar_bajado(destino, esperado)
+        with self._candado_conteos:
+            self._archivos_bajados += 1
+            self._bytes_bajados += escritos

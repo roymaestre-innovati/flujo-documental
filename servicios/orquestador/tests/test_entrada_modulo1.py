@@ -107,7 +107,7 @@ def _cambiar(tablas, tabla, indice, **cambios):
     (_cambiar(_tablas(), ADJUNTOS, 6, md5_hex="otro"), "datos distintos"),
     (_cambiar(_tablas(), ADJUNTOS, 0, adls_path="fase2/Doc0000000009/cpc.pdf"), "fuera de su carpeta"),
     (_cambiar(_tablas(), ADJUNTOS, 0, adls_path=f"{CARPETA}/a/../../x.pdf"), "ruta no válida"),
-    (_cambiar(_tablas(), ADJUNTOS, 0, file_status="FALLIDO"), "file_status FALLIDO"),
+    (_cambiar(_tablas(), ADJUNTOS, 0, file_status="FALLIDO"), "file_status que no corresponde"),
 ])
 def test_rechaza_lo_que_no_cuadra(tablas, texto):
     with pytest.raises(EventoRechazado, match=texto) as error:

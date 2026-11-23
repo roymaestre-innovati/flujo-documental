@@ -214,7 +214,7 @@ def armar_entrada(id_evento: str, tablas: Tablas) -> EntradaDelEvento:
         raise EventoRechazado(f"El evento aparece {len(eventos)} veces en eventos_control")
     evento = eventos[0]
     if evento["control_status"] != DESCARGADO:
-        raise EventoRechazado(f"El evento no está {DESCARGADO} (está {evento['control_status']})")
+        raise EventoRechazado(f"El evento no está {DESCARGADO}")
     if evento["total_files_failed"]:
         raise EventoRechazado(f"El evento tiene {evento['total_files_failed']} archivos que no se bajaron")
 
@@ -229,13 +229,16 @@ def armar_entrada(id_evento: str, tablas: Tablas) -> EntradaDelEvento:
 
     carpeta = f"{PREFIJO}/{id_evento}/"
     ruta_evento = f"{SHORTCUT}/{PREFIJO}/{id_evento}"
-    _ruta_segura(ruta_evento)
+    try:
+        _ruta_segura(ruta_evento)
+    except ErrorOrigen:
+        raise EventoRechazado("El evento tiene una ruta no válida") from None
     padres = {f["parent_archive_key"] for f in filas if f["parent_archive_key"]}
     entrada = EntradaDelEvento(aviso={}, proyecto=evento["parent_project_id"])
     archivos = []
     for fila in filas:
         if fila["file_status"] not in ESTADOS_BAJADOS:
-            raise EventoRechazado(f"Un archivo está en file_status {fila['file_status']}")
+            raise EventoRechazado("Un archivo tiene un file_status que no corresponde a una descarga exitosa")
         if not fila["adls_path"].startswith(carpeta):
             raise EventoRechazado("Un archivo del evento está fuera de su carpeta")
         relativa = fila["adls_path"][len(carpeta):]
@@ -254,7 +257,7 @@ def armar_entrada(id_evento: str, tablas: Tablas) -> EntradaDelEvento:
                     f"({len(candidatos)} candidatos)")
             id_oferente = next(iter(candidatos))
         else:
-            raise EventoRechazado(f"doc_category desconocida: {fila['doc_category']}")
+            raise EventoRechazado("doc_category desconocida")
 
         if fila["is_compressed_archive"]:
             entrada.excluidos["comprimido"] += 1
