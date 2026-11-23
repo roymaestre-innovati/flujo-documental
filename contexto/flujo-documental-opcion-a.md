@@ -49,7 +49,7 @@ Consecuencias:
 
 | Frontera | Con quién | Qué hay que acordar |
 |---|---|---|
-| Entrada → flujo | Módulo 1 | Acordado en lo grueso (paso 0): datalake de Fabric y aviso por cola. Acceso probado y carpetas conocidas (2026-11-18). Falta la forma del mensaje y los identificadores (A-1) |
+| Entrada → flujo | Módulo 1 | Acordado en lo grueso (paso 0): datalake de Fabric y aviso por cola. Contrato 0.2 propuesto, con el evento como identificador (2026-11-20). El orquestador ya corre un evento real leyendo de OneLake (2026-11-23). Falta que el módulo 1 publique el aviso o su vista, y el acceso en producción (A-1) |
 | Flujo ↔ clasificador | Clasificación | Cómo lo llamamos, sobre qué PDF clasifica (el normalizado), qué devuelve por segmento (C1-C3) y qué hacemos con `no_corresponde` (C4) |
 | Flujo → Power App | Equipo de la Power App | Dónde escribimos las tareas de revisión (p. ej. tablas de Dataverse), con qué forma, y cómo leemos las correcciones de vuelta (P1-P3) |
 
@@ -109,6 +109,8 @@ Muestra: proceso SR5658940621, 6 oferentes.
 
 **Lo que confirmó la prueba** (`servicios/prueba-onelake/`, con el usuario del equipo y `az login`): el token sale, el listado de `fase2/` trae 467 archivos en 119 carpetas (1,4 GB, 4 eventos) y dos archivos leídos completos coinciden en tamaño con el listado. La descarga va a unos 1,5 MB/s por archivo: un proceso de 1,4 GB tarda unos 15 minutos en serie, así que se baja en paralelo.
 
+**Primera corrida real (2026-11-23)**, con `orquestar` sobre el evento más chico (59 archivos): todos se bajaron con tamaño y MD5 revisados, sin ningún ZIP ni RAR, en 15,6 s con 8 descargas a la vez (35,8 MB). La corrida entera tardó 3 minutos, casi todo en la normalización. Detalle en la nota de T06 de `specs/005-orquestador/tasks-entrada-onelake.md`.
+
 **Cómo organiza el módulo 1 las carpetas** (lo escribe su notebook `nb_evaluacionofertas_02_descarga_paquete`):
 
 ```
@@ -118,17 +120,17 @@ fase2/<event_id>/
   .../_contenido/<carpeta>/...        lo que sacan de cada ZIP o RAR
 ```
 
-- **No es la forma que espera el orquestador** (`PROCESO/` y una subcarpeta por oferente con su identificador). El reparto se adapta a esta forma (tareas de `specs/005-orquestador/tasks-entrada-onelake.md`).
+- **No es la forma que espera el orquestador** (`PROCESO/` y una subcarpeta por oferente con su identificador). Por eso el reparto no lista carpetas: sale de las tablas del módulo 1, que dan el oferente de cada archivo (ver más abajo).
 - **La carpeta del oferente lleva su nombre, no un identificador.** El identificador está en la tabla `bronce.tbl_evaluacionofertas_oferentes_control` (`sm_vendor_id`, con `folder_adls_path` para ubicar la carpeta).
 - **Llegan comprimidos, contra lo que se había confirmado** (decisión 2). En la muestra hay 25 ZIP o RAR (20 RAR y 5 ZIP), algunos dentro de otros. El módulo 1 los descomprime de forma recursiva en `_contenido/` y deja también el original. Si se procesan los dos, cada documento entra dos veces, y el comprimido sale como `no_soportado` con una tarea de error que no sirve a nadie. **Se baja solo lo descomprimido** (decisión 2, cambiada): los ZIP y RAR no se bajan.
-- **Hay archivos JSON del módulo 1** (34 en la muestra, con tres formas de nombre fijas) que no son documentos del oferente. Hay que confirmar qué traen antes de excluirlos.
+- **Hay archivos JSON del módulo 1** (34 en la muestra, con tres formas de nombre fijas). Traen la ficha del oferente, sus ofertas por ítem y el contenido del evento, no documentos del oferente (nota de T01). No están en las tablas, así que no entran al reparto.
 - Las tablas Delta del lakehouse (`bronce.*`, `control.*`) traen los metadatos de cada adjunto: `adls_path`, `md5_hex`, `downloaded_bytes`, `file_status`, `is_compressed_archive` y `parent_archive_key`. **El reparto sale de ellas, no de listar carpetas** (decidido por el usuario, 2026-11-18): la tabla separa el proceso de los oferentes, liga cada archivo a su comprimido y deja fuera 134 archivos huérfanos de una corrida vieja que el listado sí trae. Es provisional: el módulo 1 prometió una vista con lo que necesitamos, que se define con lo que use la primera versión (`specs/005-orquestador/tasks-entrada-onelake.md`, "Lo que usamos de las tablas").
 
-**Quién los lee.** El manejador `Normalizar` del orquestador, no la normalización. La normalización recibe una carpeta local y no sabe de dónde viene; el orquestador ya tiene la interfaz `Origen` (`servicios/orquestador/src/orquestador/origen.py`) con su versión local. Se agrega `OrigenOneLake` con la librería `azure-storage-file-datalake` y `DefaultAzureCredential`: en local, el `az login` del equipo; en Azure, la identidad administrada del job.
+**Quién los lee.** El manejador `Normalizar` del orquestador, no la normalización. La normalización recibe una carpeta local y no sabe de dónde viene; el orquestador ya tiene la interfaz `Origen` (`servicios/orquestador/src/orquestador/origen.py`) con su versión local. `OrigenOneLake` usa la librería `azure-storage-file-datalake` y `DefaultAzureCredential`: en local, el `az login` del equipo; en Azure, la identidad administrada del job.
 
-1. Recibe el mensaje de `procesos-listos` con `id_proceso` y `ruta` (`informacion-adjuntos/fase2/<event_id>`).
-2. Lista los archivos de esa carpeta en OneLake y los reparte entre el proceso y cada oferente.
-3. Baja cada archivo a disco temporal, lo normaliza y lo lee (pasos 1 y 2).
+1. Recibe el mensaje de `procesos-listos` con `id_proceso`, `ruta` (`informacion-adjuntos/fase2/<event_id>`) y la lista de archivos con su oferente, tamaño y MD5. Mientras el módulo 1 no lo publique, lo arma el orquestador con sus tablas.
+2. Reparte esa lista entre el proceso y cada oferente. Cada comprimido sin contenido queda como una tarea para el evaluador.
+3. Baja los archivos de cada entrega a disco temporal, varios a la vez, y revisa el tamaño y el MD5 de cada uno. Luego los normaliza y los lee (pasos 1 y 2).
 4. Escribe el PDF normalizado y la lectura en nuestro almacenamiento. El original no se guarda.
 
 Ningún otro paso vuelve a tocar Fabric: desde ahí todo trabaja con el PDF normalizado.
@@ -700,7 +702,7 @@ Precios de referencia de agregadores, sin confirmar en Azure: gpt-5.4 a $2,50 / 
 
 | # | Para | Pregunta |
 |---|---|---|
-| A-1 | Módulo 1 | Respondida en parte (paso 0). Ya se sabe: workspace y lakehouse de desarrollo, estructura de carpetas y acceso por shortcut. Falta: ¿pueden publicar en Service Bus? ¿Qué trae el mensaje (proponemos `id_proceso`, `ruta` y la lista de archivos)? ¿Un proyecto (`WS…`) puede llegar con más de un evento a evaluar? ¿Un evento ya descargado puede recibir adjuntos nuevos? ¿Cómo se pasa del evento (`Doc…`) al SR, si hace falta? ¿Se pueden borrar los archivos huérfanos de `_contenido/`? ¿Los archivos quedan quietos después del aviso? ¿Qué proporción llega escaneada, con contraseña o firmada (M2)? ¿Dan acceso a la identidad administrada del job, y cuáles son el workspace y el lakehouse de producción? |
+| A-1 | Módulo 1 | Respondida en parte (paso 0). Ya se sabe: workspace y lakehouse de desarrollo, estructura de carpetas y acceso por shortcut. Falta: ¿pueden publicar en Service Bus? ¿Aceptan el mensaje del contrato 0.2, o la vista con lo que usamos de sus tablas (`tasks-entrada-onelake.md`)? ¿Un proyecto (`WS…`) puede llegar con más de un evento a evaluar? ¿Un evento ya descargado puede recibir adjuntos nuevos? ¿Cómo se pasa del evento (`Doc…`) al SR, si hace falta? ¿Se pueden borrar los archivos huérfanos de `_contenido/`? ¿Los archivos quedan quietos después del aviso? ¿Qué proporción llega escaneada, con contraseña o firmada (M2)? ¿Dan acceso a la identidad administrada del job, y cuáles son el workspace y el lakehouse de producción? |
 | A-2 | Power App | ¿Dónde escribimos las tareas de revisión y con qué forma? Proponemos una tarea por oferente y área, con puntos que se confirman, corrigen o marcan no cumple. ¿Cómo leemos las correcciones? |
 | A-3 | Negocio | ¿Un PDF modificado después de firmarse digitalmente debe alertar al evaluador? |
 | A-4 | Negocio (N-A) | ¿Una firma digital del oferente cuenta como "Firmado"? ¿Hay que validar la confianza del certificado? |

@@ -2,7 +2,7 @@
 
 Lleva cada proceso de selección desde el aviso del módulo 1 hasta las solicitudes de extracción (iniciativa 005, entrega 1). La spec, el plan y las tareas están en `specs/005-orquestador/`; los contratos, en `contracts/modulo5-orquestador/v0.2/` y `contracts/modulo3-extraccion/v0.2/`.
 
-**Estado**. Entrega 1 cerrada (T01 a T11), en local. El resultado con la muestra real está en la nota de T11 de `tasks.md`. De la entrega 2, `orquestar` ya puede armar el aviso con las tablas del módulo 1 y leer los originales de OneLake. Sigue la corrida con un evento real (T06 de `tasks-entrada-onelake.md`). Service Bus, Cosmos, Blob y Container Apps siguen pendientes.
+**Estado**. Entrega 1 cerrada (T01 a T11), en local. El resultado con la muestra real está en la nota de T11 de `tasks.md`. De la entrega 2 está cerrada la entrada desde OneLake (`tasks-entrada-onelake.md`, 2026-11-23): `orquestar` arma el aviso con las tablas del módulo 1, lee los originales de OneLake y ya corrió un evento real. Service Bus, Cosmos, Blob y Container Apps siguen pendientes.
 
 ## Cómo funciona
 

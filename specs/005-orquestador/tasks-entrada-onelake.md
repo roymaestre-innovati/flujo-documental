@@ -4,7 +4,7 @@ Es la primera pieza de la entrega 2 del orquestador: la interfaz `Origen` deja d
 
 **Meta:** correr `orquestar` en la máquina del equipo sobre un evento real de `workspace-evaluacionofertas-dev`, leyendo directo de OneLake, sin copiar los originales, y llegar a los mismos conteos que reporta el módulo 1 en sus tablas.
 
-**Estado al 2026-11-23:** T01 a T06 hechas. `orquestar` corrió un evento real leyendo directo de OneLake y sus conteos cuadran con las tablas del módulo 1. Sigue T07, el cierre. La prueba de acceso está en `servicios/prueba-onelake/`.
+**Estado al 2026-11-23: cerrada** (T01 a T07). `orquestar` corrió un evento real leyendo directo de OneLake, y sus conteos cuadran con las tablas del módulo 1. Lo que queda abierto está en "Fuera de esta versión" y en A-1 del diseño. La prueba de acceso está en `servicios/prueba-onelake/`.
 
 ## Dónde va
 
@@ -72,7 +72,7 @@ Un servicio aparte solo agregaría una copia de los originales o un salto de red
   - La salida va fuera del repositorio y se borra al terminar.
   - Criterio: cada fila de documento de la tabla queda en una entrega, no se baja ningún ZIP ni RAR y cada comprimido sin contenido tiene su tarea.
 
-- [ ] **T07 — Cierre.** Notas de lo encontrado aquí. Actualizar el paso 0 y A-1 del diseño, la tabla de interfaces de `plan.md` ("Lo que cambió al implementar") y el README del repo.
+- [x] **T07 — Cierre.** Hecha el 2026-11-23 (ver la nota de T07). Notas de lo encontrado aquí. Actualizar el paso 0 y A-1 del diseño, la tabla de interfaces de `plan.md` ("Lo que cambió al implementar") y el README del repo.
 
 ## Fuera de esta versión
 
@@ -223,3 +223,11 @@ Corrida del usuario con `orquestar` sobre el evento 3 de T03 (el más chico: 59 
 - **Tiempos:** 184,6 s en total. Bajar los 35,8 MB tomó 15,6 s con 8 hilos (~2,3 MB/s). Armar el aviso toma ~23 s (nota de T03). El resto, ~145 s, es la normalización, con 5 DOCX y 3 XLSX por LibreOffice y 2 entregas a la vez. `paralelo_bajar` se queda en 8: la descarga no es el cuello de botella.
 - **Listado de eventos:** los cuatro eventos `DESCARGADO` arman su aviso sin rechazo. De menor a mayor: 59, 67, 74 y 81 archivos.
 - La salida quedó en `/tmp` y se borró al terminar.
+
+### T07 — Cierre (2026-11-23)
+
+- **Diseño** (`contexto/flujo-documental-opcion-a.md`): el paso 0 describe la lectura como quedó. El aviso trae la lista con tamaño y MD5, el reparto sale de esa lista y no de listar carpetas, y la descarga va en paralelo con revisión. Se agregan los resultados de la primera corrida real y se cierra la duda de los JSON (nota de T01). En A-1, la pregunta por la forma del mensaje pasa a ser si el módulo 1 acepta el contrato 0.2 o la vista.
+- **`plan.md`:** "Lo que cambió al implementar" suma T03b a T06.
+- **README del repo:** esta primera versión queda cerrada.
+- **Queda abierto**, sin cambios: la identidad administrada y el acceso en producción, el aviso por Service Bus y la vista del módulo 1 ("Fuera de esta versión"). También las preguntas de A-1 al módulo 1: borrar los huérfanos de `_contenido/`, proyectos con varios eventos y adjuntos nuevos en un evento ya descargado.
+- **Para después:** armar el aviso toma ~23 s porque lee las tablas enteras. Una corrida con varios oferentes (el evento de 67 archivos y 4 oferentes) probaría mejor el reparto, pero la prueba de T03 con la apertura de verdad ya lo cubre.

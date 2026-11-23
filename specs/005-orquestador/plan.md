@@ -252,7 +252,7 @@ El detalle y el porqué de cada punto están en las notas de `tasks.md`.
 - **La cola y el estado en memoria tienen un candado** (T10), porque la corrida local normaliza en hilos. Con la muestra real, los hilos casi no aceleran (T11); en producción cada entrega corre en su propio contenedor.
 - **Para la entrega 2:** dos trabajadores pueden normalizar la misma entrega a la vez si el `normalizar` llega repetido. En local da el mismo resultado; con Blob hay que confirmar que escribir lo mismo a la vez sea seguro, o tomar un lease por entrega (T10). Las pruebas de mensajes repetidos y de cambio condicional se repiten contra Cosmos.
 
-### Entrada desde OneLake (2026-11-20, entrega 2 en curso)
+### Entrada desde OneLake (2026-11-20 a 2026-11-23)
 
 Se trabaja con `tasks-entrada-onelake.md`.
 
@@ -260,4 +260,9 @@ Se trabaja con `tasks-entrada-onelake.md`.
 - **El aviso lo arma el orquestador** con las tablas del módulo 1 (`entrada_modulo1.py`) mientras el módulo 1 no lo publique ni exista su vista. La apertura no cambia: reparte con `archivos`.
 - **`Origen.bajar` recibe un `esperado`** (tamaño y MD5), y hay una versión de OneLake (`origen_onelake.py`).
 - **Clase de error nueva, `ErrorDeConfiguracion`:** permisos, credenciales u opciones del entorno. Va a errores sin reintento, con el motivo "Configuración: …".
+- **Lo esperado de cada archivo va en el estado** (T03b): la apertura guarda el tamaño y el MD5 en la entrega, y `Normalizar` los lee de ahí. En Azure, el trabajador que baja no tiene el aviso en memoria.
+- **La apertura crea las tareas de los comprimidos sin contenido** (T03b), aunque el oferente no traiga otro archivo. Antes era un paso aparte del comando.
+- **Los archivos de una entrega se bajan en paralelo** (T04, `paralelo_bajar`, 8 por defecto). La primera falla corta las descargas y la entrega se reintenta completa. `OrigenOneLake` usa un cliente por hilo con una sola credencial.
+- **`orquestar` corre un evento de OneLake** (T05) con `--onelake-workspace`, `--onelake-lakehouse` y `--evento`. `--clasificacion` es opcional: sin él, todo sale TD-99.
+- **Primera corrida real** (T06): el evento más chico cuadra con las tablas del módulo 1. La descarga no es el cuello de botella (15,6 s de 3 minutos), la normalización sí.
 
