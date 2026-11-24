@@ -30,7 +30,7 @@ En el **orquestador**, al lado de las versiones en memoria: `servicios/orquestad
 
 - Leer antes `plan.md` (secciones "Mensajes internos" y "Estado") y "Manejo de errores" del paso 4 de `contexto/flujo-documental-opcion-a.md`. También las interfaces: `estado.py`, `cola.py` y el bucle `procesar_uno` de `errores.py`, que es quien usa la cola.
 - **Las pruebas normales no tocan Azure.** La versión de Mongo se prueba con un Mongo falso en memoria (recomendado: `mongomock`, como dependencia de pruebas). La de Service Bus, con un cliente falso mínimo que imite lo que se usa del SDK. Las pruebas contra Azure llevan la marca `azure(variable=...)` y solo corren con `--azure` y con la variable de entorno indicada.
-- **Los recursos de Azure son compartidos.** Cada prueba contra Azure usa un `id_proceso` inventado y único (`PRUEBA-<uuid>`) y borra lo suyo al terminar. Contra Service Bus, solo se corren cuando no hay workers consumiendo las colas de desarrollo, porque la prueba recibiría sus mensajes. Se vacía lo que la prueba publicó.
+- **Los recursos de Azure son compartidos.** Cada prueba de estado usa un `id_proceso` inventado y único (`PRUEBA-<uuid>`) y borra lo suyo al terminar. Las pruebas de Service Bus se corren con las colas de desarrollo libres de otros usuarios y workers. Cada prueba limpia los ids de mensaje que publicó.
 - **Nada de secretos** en el código, las pruebas, los registros ni el repositorio. La cadena de conexión se lee de una variable de entorno y nunca se imprime.
 - **El repositorio de GitHub es público.** No se escriben en él nombres de cuentas, namespaces ni grupos de Azure: van en variables de entorno.
 - En los registros, solo identificadores (principio 6).
@@ -167,22 +167,49 @@ La última línea del script cuenta los documentos cuyo `id_proceso` empieza por
 
 - El adaptador toma `RetryAfterMs` de los campos de error previstos, reintenta los timeouts de escritura y oculta los detalles del servidor en fallas inesperadas. Exige escrituras confirmadas y revisa JSON y BSON antes de escribir.
 - La batería verifica la lectura de tipos desconocidos, la validación antes de llamar a Mongo y los mensajes repetidos y conflictos en memoria y con `mongomock`. Azure exige `--azure` y su variable. La limpieza reintenta borrados transitorios por partición y el script suma las RU de cada solicitud de las operaciones compuestas.
-- Con `DEBUG`, el registrador `pymongo.command` muestra el host y el documento. El punto de entrada del worker, en la pieza siguiente, debe dejarlo en `WARNING` o más.
+- Con `DEBUG`, el registrador `pymongo.command` muestra el host y el documento. `registros.configurar` aplica como mínimo `WARNING` a `pymongo` y `azure`.
 - Si el registro no existe durante `replace_one` y otro trabajador lo crea antes de la lectura, `reemplazar` puede devolver un `Conflicto` aparente. En este flujo se reemplazan registros leídos previamente y nunca se borran.
 
 ### T04 — Batería de contrato de Cola
 
 La batería usa una cola conocida, verifica que quede vacía junto con la de errores y recibe la demora y el plazo de cada implementación. La prueba con reloj manual queda en `test_interfaces.py`.
-Cada entrega en memoria recibe su propio token. El bucle devuelve `bloqueo_perdido` con un aviso, conserva cualquier copia de reintento ya publicada y reserva la alerta a operación para un paso a errores confirmado.
+Cada entrega en memoria recibe su propio token. Cuando la cola da `BloqueoPerdido` al resolver una entrega, `procesar_uno` devuelve `bloqueo_perdido` con un aviso, conserva cualquier copia de reintento ya publicada y reserva la alerta a operación para un paso a errores confirmado. Si el manejador lanza esa excepción, se tramita como un bug.
 En memoria, el reenvío publica y retira los mensajes de errores en orden bajo el mismo candado. Cada copia empieza con un id nuevo y con la primera entrega.
+Las dos implementaciones exigen un cuerpo `dict` serializable como JSON, sin `NaN` ni infinitos. Las propiedades admiten claves de texto no vacías ni reservadas y valores de texto, booleanos, enteros de 32 bits con signo y flotantes finitos. Las publicaciones actuales del orquestador usan enteros para `intento` y `esperas`.
 
 ### T05 — ColaServiceBus
 
-El adaptador reusa emisores y receptores por cola, resuelve por token y pagina el diagnóstico con `peek`. Limita el cuerpo y las propiedades a 248 000 bytes medidos en JSON para dejar margen a las cabeceras. El reenvío publica con un id nuevo antes de completar el original, por lo que una caída entre ambas operaciones puede dejar un duplicado.
+El adaptador reusa emisores y receptores por cola, verifica la cola y el id asociados al token, y pagina el diagnóstico con `peek`. Después de un fallo pasajero se puede reintentar la resolución con la misma entrega. Si pyamqp cerró el enlace, el receptor se vuelve a abrir y el SDK puede recurrir a la resolución por token. El adaptador guarda hasta 1000 tokens de entregas abandonadas y descarta los más viejos.
+Standard acepta 262 144 bytes por mensaje con las cabeceras incluidas. El límite de 248 000 bytes medidos en JSON para el cuerpo y las propiedades deja un margen conservador. Los mensajes actuales pesan menos de 30 KB.
+El reenvío toma los números de secuencia con `peek` al empezar. Las llegadas posteriores quedan para la siguiente llamada. Usa la espera normal para abrir el receptor de errores y una espera corta en las lecturas siguientes. Publica con un id nuevo antes de completar el original, por lo que una caída entre ambas operaciones puede dejar un duplicado.
+Los mensajes ilegibles pasan directamente a errores con un motivo fijo. El diagnóstico devuelve su motivo y un cuerpo vacío. En `MensajeEnErrores.cuando`, memoria guarda la hora del paso a errores y Service Bus la hora de entrada a la cola original. El servicio no guarda la hora del paso a errores.
 En el SDK 7.15, `delivery_count` lee el encabezado AMQP y el adaptador suma uno. El cuerpo DATA puede llegar en fragmentos de bytes y el SDK entrega las propiedades de texto como bytes. Python pasa los campos de errores al servicio sin recortarlos. El adaptador usa hasta 200 caracteres en `reason` y conserva el motivo en `error_description` hasta las 4096 unidades de texto documentadas para .NET. [AMQP 1.0](https://docs.oasis-open.org/amqp/core/v1.0/amqp-core-messaging-v1.0.html), [documentación de Service Bus](https://learn.microsoft.com/en-us/dotnet/api/azure.messaging.servicebus.servicebusreceiver.deadlettermessageasync).
 T07 queda para repetir el contrato contra Azure y confirmar la primera entrega, la demora, `peek`, los permisos y el reenvío. También verifica la renovación después de T06.
 
 ### T06 — Renovación del bloqueo
 
-Cada instancia crea un `AutoLockRenewer` al recibir la primera entrega de la cola principal. El máximo es configurable (30 minutos por defecto) y el SDK usa dos hilos. La pérdida se marca por token bajo un candado y la resolución devuelve `BloqueoPerdido` sin llamar al SDK. La subcola de errores se procesa sin renovación.
-El receptor del SDK marca el mensaje con `_settled` al resolverlo y el renovador deja de renovarlo. La cola cierra el renovador antes que los receptores y el cliente. T07 queda para correr el contrato en Azure y comprobar la renovación con una entrega de más de cinco minutos.
+Cada instancia crea un `AutoLockRenewer` al recibir la primera entrega legible de la cola principal. El máximo es configurable (30 minutos por defecto) y la configuración usa dos hilos. Una falla de renovación solo registra el id, la cola corta y el tipo de error. Al resolver, el SDK comprueba el bloqueo y el adaptador traduce `MessageLockLostError` a `BloqueoPerdido`. La subcola de errores se procesa sin renovación.
+El receptor del SDK marca el mensaje con `_settled` al resolverlo y el renovador deja de renovarlo. La cola cierra el renovador antes que los receptores y el cliente, y cierra la credencial si la creó.
+
+Queda pendiente para el worker revisar la salida del SDK de Service Bus. El transporte puede registrar en `ERROR` la excepción original de una falla de transporte, incluso con el mínimo de `WARNING` aplicado en `registros.configurar`.
+
+### T07 — preparación
+
+El usuario necesita los roles **Azure Service Bus Data Sender** y **Azure Service Bus Data Receiver** en la cola de desarrollo que las pruebas llaman `clasificar`. Ejecuta `az login` con esa identidad y confirma que nadie más está usando las colas, incluidos los workers. Cada prueba comprueba con `peek` que `clasificar` y `clasificar/$DeadLetter` estén vacías antes de publicar.
+
+Desde `servicios/orquestador`, sustituye el marcador por el nombre completo del namespace.
+
+```bash
+export SERVICEBUS_NAMESPACE='<nombre completo>'
+uv run pytest --azure -m azure -v -k cola
+```
+
+Reserva entre 1 y 3 minutos para la batería. Comprueba que la primera entrega cuente 1 y la siguiente al abandono cuente 2, que la demora de 5 s se respete dentro del plazo de 30 s y que el reenvío conserve el cuerpo y las propiedades previstas. La prueba de renovación se salta en esta corrida si `SERVICEBUS_PRUEBA_LARGA` no está activada.
+
+```bash
+SERVICEBUS_PRUEBA_LARGA=1 uv run pytest --azure -m azure -v -s tests/test_cola_servicebus_azure.py
+```
+
+Reserva entre 6 y 7 minutos. Con `-s` se ve el avance cada minuto. El segundo receptor debe seguir sin recibir el mensaje, incluso después de los 5 minutos del bloqueo inicial. Al final, el primer receptor debe completarlo con el mismo token.
+
+La limpieza revisa ambas colas y completa los ids publicados por cada prueba, incluidos los del reenvío. Dispone de 40 s para buscar las entregas de la prueba. Si falla el chequeo inicial, revisa los conteos y coordina con el equipo antes de volver a correr. Si quedan mensajes al finalizar, revisa en el explorador de Service Bus la cola corta y los ids indicados. Espera a que venzan los bloqueos, si los hay, y retira únicamente los mensajes que confirmes que son de la prueba. Si hay mensajes ajenos, coordina con sus responsables antes de intervenir.

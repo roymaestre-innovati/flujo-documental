@@ -33,10 +33,13 @@ from azure.servicebus.exceptions import (
     ServiceBusQuotaExceededError,
     ServiceBusServerBusyError,
 )
+from azure.servicebus._pyamqp.cbs import CBSAuthenticator, CbsAuthState
+from azure.servicebus._transport._pyamqp_transport import PyamqpTransport
 from orquestador import cola_servicebus as sb
 from orquestador.cola import CLASIFICAR, RESULTADOS, BloqueoPerdido, ErrorCola
 from orquestador.errores import ErrorDeConfiguracion, ErrorTransitorio, procesar_uno
 from orquestador.parametros import Parametros
+from servicebus_azure import ERRORES, limpiar_colas
 from servicebus_falso import ServiceBusFalso
 
 DETALLE = "texto privado del SDK"
@@ -152,7 +155,7 @@ def test_programa_en_utc_y_peek_ve_el_mensaje(adaptador):
 @pytest.mark.parametrize("propiedades", [{"dato": []}, {"dato": None}, {"dato": object()}, {1: "valor"}, []])
 def test_rechaza_propiedades_que_no_son_json_simple(adaptador, propiedades):
     cola, cliente = adaptador
-    with pytest.raises(TypeError, match="valores JSON simples"):
+    with pytest.raises(TypeError, match="propiedades"):
         cola.publicar(CLASIFICAR, {}, propiedades=propiedades)
     assert cliente.operaciones == []
 
@@ -169,6 +172,18 @@ def test_rechaza_demora_negativa(adaptador):
     with pytest.raises(ErrorCola, match="negativa"):
         cola.publicar(CLASIFICAR, {}, demora_s=-1)
     assert cliente.operaciones == []
+
+
+@pytest.mark.parametrize("espera", [0, -1])
+def test_rechaza_esperas_no_positivas(espera):
+    cliente = ServiceBusFalso()
+    with pytest.raises(ValueError, match="espera_recibir_s"):
+        sb.ColaServiceBus(cliente, espera_recibir_s=espera)
+    with pytest.raises(ValueError, match="max_wait_time"):
+        cliente.get_queue_receiver(CLASIFICAR, max_wait_time=espera)
+    receptor = cliente.get_queue_receiver(CLASIFICAR, max_wait_time=1)
+    with pytest.raises(ValueError, match="max_wait_time"):
+        receptor.receive_messages(max_message_count=1, max_wait_time=espera)
 
 
 def test_limite_mide_cuerpo_y_propiedades_en_bytes(adaptador):
@@ -238,6 +253,36 @@ def test_traduce_falla_de_credencial_envuelta_por_pyamqp(adaptador):
     assert error.value.__suppress_context__
 
 
+def test_traduce_timeout_de_cbs_envuelto_por_pyamqp(adaptador):
+    cola, cliente = adaptador
+    autenticador = Mock(auth_state=CbsAuthState.TIMEOUT)
+    autenticador._cbs_link_ready.return_value = True
+    with pytest.raises(TimeoutError, match="Authentication attempt timed-out") as timeout:
+        CBSAuthenticator.handle_token(autenticador)
+    envuelta = PyamqpTransport.create_servicebus_exception(Mock(), timeout.value)
+    assert type(envuelta) is ServiceBusError and envuelta.inner_exception is timeout.value
+    cliente.fallas["receive_messages"] = envuelta
+    with pytest.raises(ErrorTransitorio, match=r"receive_messages en clasificar \(TimeoutError\)$") as error:
+        cola.recibir(CLASIFICAR)
+    assert error.value.__suppress_context__
+
+
+@pytest.mark.parametrize(("atributo", "clase"), [
+    ("__cause__", ConnectionError), ("__context__", OSError), ("inner_exception", TimeoutError),
+])
+def test_traduce_fallas_de_transporte_en_cadenas_de_causas(adaptador, atributo, clase):
+    cola, cliente = adaptador
+    falla = ServiceBusError(DETALLE)
+    intermedia = RuntimeError(DETALLE)
+    intermedia.__cause__ = clase(DETALLE)
+    setattr(falla, atributo, intermedia)
+    cliente.fallas["receive_messages"] = falla
+    with pytest.raises(ErrorTransitorio, match=clase.__name__) as error:
+        cola.recibir(CLASIFICAR)
+    assert DETALLE not in str(error.value)
+    assert error.value.__suppress_context__
+
+
 @pytest.mark.parametrize("clase", [ServiceBusError, ServiceBusQuotaExceededError])
 def test_otras_fallas_del_sdk_salen_limpias(adaptador, clase):
     cola, cliente = adaptador
@@ -251,9 +296,8 @@ def test_otras_fallas_del_sdk_salen_limpias(adaptador, clase):
 @pytest.mark.parametrize(("falla", "traducida"), [
     (MessageLockLostError(message=DETALLE), BloqueoPerdido),
     (MessageAlreadySettled(action=DETALLE), ErrorCola),
-    (OperationTimeoutError(message=DETALLE), ErrorTransitorio),
 ])
-def test_completar_traduce_y_retira_la_entrega_aun_si_falla(adaptador, falla, traducida):
+def test_completar_retira_la_entrega_si_el_sdk_confirma_que_ya_no_esta_activa(adaptador, falla, traducida):
     cola, cliente = adaptador
     cola.publicar(CLASIFICAR, {})
     recibido = cola.recibir(CLASIFICAR)
@@ -267,6 +311,51 @@ def test_completar_traduce_y_retira_la_entrega_aun_si_falla(adaptador, falla, tr
     with pytest.raises(ErrorCola, match="ya se resolvió o nunca se recibió"):
         cola.completar(recibido)
     assert cliente.operaciones.count("complete_message") == 1
+
+
+@pytest.mark.parametrize(("resolver", "operacion", "argumentos"), [
+    ("completar", "complete_message", ()), ("abandonar", "abandon_message", ()),
+    ("a_errores", "dead_letter_message", ("motivo",)),
+])
+@pytest.mark.parametrize(("falla", "traducida"), [
+    (OperationTimeoutError(message=DETALLE), ErrorTransitorio),
+    (ServiceBusError(DETALLE), sb.ErrorServiceBus),
+])
+def test_puede_reintentar_solo_la_resolucion(adaptador, resolver, operacion, argumentos, falla, traducida):
+    cola, cliente = adaptador
+    cola.publicar(CLASIFICAR, {})
+    recibido = cola.recibir(CLASIFICAR)
+    resolver = getattr(cola, resolver)
+    cliente.fallas[operacion] = falla
+    with pytest.raises(traducida) as error:
+        resolver(recibido, *argumentos)
+    assert str(error.value) == f"Service Bus {operacion} en clasificar ({type(falla).__name__})"
+    assert error.value.__suppress_context__
+    assert cliente.receptores[0].abierto == (traducida is ErrorTransitorio)
+
+    del cliente.fallas[operacion]
+    resolver(recibido, *argumentos)
+    assert cliente.operaciones.count(operacion) == 2
+    assert cliente.operaciones.count("receive_messages") == 1
+    assert cliente.operaciones.count("send_messages") == 1
+
+
+def test_historial_de_abandonos_conserva_solo_los_tokens_mas_recientes(adaptador, monkeypatch):
+    cola, _ = adaptador
+    monkeypatch.setattr(sb, "LIMITE_TOKENS_ABANDONADOS", 2)
+    cola.publicar(CLASIFICAR, {})
+    viejas = []
+    for _ in range(3):
+        mensaje = cola.recibir(CLASIFICAR)
+        cola.abandonar(mensaje)
+        viejas.append(mensaje)
+
+    with pytest.raises(ErrorCola):
+        cola.completar(viejas[0])
+    for reciente in viejas[1:]:
+        with pytest.raises(BloqueoPerdido):
+            cola.completar(reciente)
+    cola.completar(cola.recibir(CLASIFICAR))
 
 
 def test_el_falso_distingue_un_objeto_resuelto_de_un_token_viejo(adaptador):
@@ -300,28 +389,27 @@ def test_procesar_uno_informa_el_bloqueo_perdido(adaptador):
     manejador.al_fallar.assert_not_called()
 
 
-@pytest.mark.parametrize(("resolver", "argumentos"), [
-    ("completar", ()), ("abandonar", ()), ("a_errores", ("motivo",)),
-])
-def test_falla_de_renovacion_impide_resolver_solo_el_token_perdido(adaptador, caplog, monkeypatch, resolver, argumentos):
+@pytest.mark.parametrize("bloqueo_vencido", [False, True])
+def test_falla_de_renovacion_solo_avisa_y_el_sdk_comprueba_el_bloqueo(adaptador, caplog, bloqueo_vencido):
     cola, cliente = adaptador
-    monkeypatch.setattr(sb, "uuid4", lambda: UUID(int=1))
     publicado = cola.publicar(CLASIFICAR, {"texto": "cuerpo privado"})
-    cola.publicar(CLASIFICAR, {})
-    perdida, vigente = cola.recibir(CLASIFICAR), cola.recibir(CLASIFICAR)
+    recibido = cola.recibir(CLASIFICAR)
     [renovador] = cliente.renovadores
-    (_, original), _ = renovador.registros
-    renovador.fallar(original, MessageLockLostError(message=DETALLE))
-    operaciones = cliente.operaciones[:]
+    [(receptor, original)] = renovador.registros
+    renovador.fallar(original, OperationTimeoutError(message=DETALLE))
 
-    with pytest.raises(BloqueoPerdido, match="falló la renovación"):
-        getattr(cola, resolver)(perdida, *argumentos)
-    assert cliente.operaciones == operaciones
-    assert caplog.messages == [f"Falló la renovación del bloqueo del mensaje {publicado} en clasificar (MessageLockLostError)"]
-    cola.completar(vigente)
+    if bloqueo_vencido:
+        receptor.vencer_bloqueo(original)
+        with pytest.raises(BloqueoPerdido, match="MessageLockLostError"):
+            cola.completar(recibido)
+        cola.completar(cola.recibir(CLASIFICAR))
+    else:
+        cola.completar(recibido)
+    assert cliente.operaciones.count("complete_message") == (2 if bloqueo_vencido else 1)
+    assert caplog.messages == [f"Falló la renovación del bloqueo del mensaje {publicado} en clasificar (OperationTimeoutError)"]
 
 
-def test_procesar_uno_informa_la_perdida_de_renovacion(adaptador):
+def test_procesar_uno_completa_tras_un_aviso_del_hilo_de_renovacion(adaptador):
     cola, cliente = adaptador
     cuerpo = {"id_proceso": "P1"}
     publicado = cola.publicar(CLASIFICAR, cuerpo)
@@ -336,10 +424,55 @@ def test_procesar_uno_informa_la_perdida_de_renovacion(adaptador):
     manejador.procesar.side_effect = fallar_renovacion
     resultado = procesar_uno(cola, manejador)
 
-    assert (resultado.id_mensaje, resultado.desenlace) == (publicado, "bloqueo_perdido")
-    assert "complete_message" not in cliente.operaciones
+    assert (resultado.id_mensaje, resultado.desenlace) == (publicado, "ok")
+    assert "complete_message" in cliente.operaciones
     manejador.procesar.assert_called_once_with(cuerpo)
     manejador.al_fallar.assert_not_called()
+
+
+@pytest.mark.parametrize(("cuerpo", "propiedades"), [
+    (b"texto privado", None),
+    (b'["texto privado"]', None),
+    (b'{"dato": NaN}', None),
+    (b'{}', {b"\xff": b"texto privado"}),
+    (b'{}', {b"dato": b"\xff"}),
+])
+def test_recibir_manda_un_mensaje_ilegible_a_errores_y_sigue(adaptador, caplog, cuerpo, propiedades):
+    cola, cliente = adaptador
+    cola._emisor(CLASIFICAR, "prueba-clasificar").send_messages(
+        ServiceBusMessage(cuerpo, application_properties=propiedades, message_id="ilegible")
+    )
+    id_valido = cola.publicar(CLASIFICAR, {"n": 1})
+    recibido = cola.recibir(CLASIFICAR)
+    assert recibido.id == id_valido
+    [renovador] = cliente.renovadores
+    assert [original.message_id for _, original in renovador.registros] == [id_valido]
+    cola.completar(recibido)
+    assert caplog.messages == ["Mensaje ilegible ilegible en clasificar"]
+
+    [en_errores] = cola.errores(CLASIFICAR)
+    assert (en_errores.mensaje.id, en_errores.mensaje.cuerpo, en_errores.motivo) == (
+        "ilegible", {}, sb.MOTIVO_MENSAJE_ILEGIBLE,
+    )
+    with pytest.raises(ErrorCola, match=sb.MOTIVO_MENSAJE_ILEGIBLE):
+        cola.reenviar_errores(CLASIFICAR)
+    assert len(cliente.envios) == 2
+    assert [error.mensaje.id for error in cola.errores(CLASIFICAR)] == ["ilegible"]
+
+
+def test_recibir_acota_las_lecturas_si_solo_llegan_mensajes_ilegibles(adaptador, monkeypatch):
+    cola, cliente = adaptador
+    monkeypatch.setattr(sb, "LIMITE_LECTURAS_POR_RECEPCION", 2)
+    emisor = cola._emisor(CLASIFICAR, "prueba-clasificar")
+    for n in range(3):
+        emisor.send_messages(ServiceBusMessage(b"ilegible", message_id=str(n)))
+    assert cola.recibir(CLASIFICAR) is None
+    assert cliente.operaciones.count("receive_messages") == 2
+    assert cola.pendientes(CLASIFICAR) == 1
+    assert cola.recibir(CLASIFICAR) is None
+    assert cola.pendientes(CLASIFICAR) == 0
+    assert len(cola.errores(CLASIFICAR)) == 3
+    assert cliente.renovadores == []
 
 
 @pytest.mark.parametrize(("motivo", "descripcion"), [
@@ -406,7 +539,7 @@ def test_reenviar_abandona_el_original_si_falla_el_envio(adaptador):
 
     del cliente.fallas["send_messages"]
     assert cola.reenviar_errores(CLASIFICAR) == 1
-    assert cliente.operaciones[-4:] == ["receive_messages", "send_messages", "complete_message", "receive_messages"]
+    assert cliente.operaciones[-3:] == ["receive_messages", "send_messages", "complete_message"]
     copia = cola.recibir(CLASIFICAR)
     assert copia.id != viejo
     assert copia.propiedades == {"origen": "revisión"}
@@ -424,6 +557,69 @@ def test_reenviar_no_registra_entregas_de_la_subcola_de_errores(adaptador):
     assert renovador.registros == [registro]
 
 
+@pytest.mark.parametrize("regresa_la_copia", [False, True], ids=["llegada-nueva", "copia-que-regresa"])
+def test_reenviar_se_acota_a_los_originales_vistos_al_empezar(monkeypatch, regresa_la_copia):
+    cliente = ServiceBusFalso()
+    with sb.ColaServiceBus(cliente, espera_recibir_s=2, crear_renovador=cliente.crear_renovador) as cola:
+        nombre = "evaluacion-ofertas-clasificar"
+        if not regresa_la_copia:
+            # Ya estaba en la principal y su número de secuencia es menor.
+            id_nuevo = cola.publicar(CLASIFICAR, {"n": 0})
+            llega_durante_reenvio = cola.recibir(CLASIFICAR)
+        for n in (1, 2):
+            cola.publicar(CLASIFICAR, {"n": n})
+            cola.a_errores(cola.recibir(CLASIFICAR), "motivo")
+
+        [emisor] = cliente.emisores
+        enviar = emisor.send_messages
+        ids_copias = []
+
+        def enviar_y_mandar_a_errores(copia):
+            enviar(copia)
+            ids_copias.append(copia.message_id)
+            if regresa_la_copia:
+                cola.a_errores(cola.recibir(CLASIFICAR), "la copia volvió a errores")
+            elif len(ids_copias) == 1:
+                cola.a_errores(llega_durante_reenvio, "llegó durante el reenvío")
+
+        with monkeypatch.context() as parche:
+            parche.setattr(emisor, "send_messages", enviar_y_mandar_a_errores)
+            assert cola.reenviar_errores(CLASIFICAR) == 2
+        assert len(ids_copias) == 2
+        assert [error.mensaje.id for error in cola.errores(CLASIFICAR)] == (
+            ids_copias if regresa_la_copia else [id_nuevo]
+        )
+        receptor = cliente.receptores[1]
+        assert receptor.nombre == nombre and receptor.subcola == ServiceBusSubQueue.DEAD_LETTER
+        assert receptor.espera == 2
+        assert receptor.llamadas_recibir == [(1, 2), (1, sb.ESPERA_REENVIO_S)]
+
+
+def test_reenviar_abandona_una_llegada_ajena_al_listado_inicial(adaptador, monkeypatch):
+    cola, cliente = adaptador
+    id_nuevo = cola.publicar(CLASIFICAR, {"n": 0})
+    nuevo = cola.recibir(CLASIFICAR)
+    id_inicial = cola.publicar(CLASIFICAR, {"n": 1})
+    cola.a_errores(cola.recibir(CLASIFICAR), "motivo")
+    [visto] = cola._ver(CLASIFICAR, ServiceBusSubQueue.DEAD_LETTER)
+
+    def listado_inicial(*args):
+        cola.a_errores(nuevo, "llegó después del listado")
+        en_errores = cliente.colas["prueba-clasificar", ServiceBusSubQueue.DEAD_LETTER]
+        en_errores.sort(key=lambda mensaje: mensaje.secuencia)
+        return iter([visto])
+
+    with monkeypatch.context() as parche:
+        parche.setattr(cola, "_ver", listado_inicial)
+        assert cola.reenviar_errores(CLASIFICAR) == 1
+    assert [error.mensaje.id for error in cola.errores(CLASIFICAR)] == [id_nuevo]
+    assert len(cliente.envios) == 3
+    copia = cola.recibir(CLASIFICAR)
+    assert copia.id != id_inicial and copia.cuerpo == {"n": 1}
+    cola.completar(copia)
+    assert cliente.operaciones.count("abandon_message") == 1
+
+
 def test_reenviar_conserva_la_falla_de_envio_si_falla_el_abandono(adaptador):
     cola, cliente = adaptador
     cola.publicar(CLASIFICAR, {})
@@ -435,6 +631,25 @@ def test_reenviar_conserva_la_falla_de_envio_si_falla_el_abandono(adaptador):
         cola.reenviar_errores(CLASIFICAR)
     assert cola.pendientes(CLASIFICAR) == 0
     assert len(cola.errores(CLASIFICAR)) == 1
+
+
+def test_limpieza_de_pruebas_completa_solo_los_ids_propios(adaptador):
+    cola, cliente = adaptador
+    en_errores = cola.publicar(CLASIFICAR, {})
+    cola.a_errores(cola.recibir(CLASIFICAR), "motivo")
+    bloqueado = cola.publicar(CLASIFICAR, {})
+    cola.recibir(CLASIFICAR)
+    receptor = cliente.receptores[0]
+    recibidos = [(receptor, receptor.entregas[-1])]
+    ajeno = cola.publicar(CLASIFICAR, {})
+    visible = cola.publicar(CLASIFICAR, {})
+
+    restos = limpiar_colas(cola, {en_errores, bloqueado, visible}, recibidos, plazo_s=1)
+
+    assert restos == {None: [ajeno], ERRORES: []}
+    recibido = cola.recibir(CLASIFICAR)
+    assert (recibido.id, recibido.entregas) == (ajeno, 2)
+    cola.completar(recibido)
 
 
 def test_cola_desde_entorno_exige_namespace_antes_de_crear_recursos(monkeypatch):
@@ -462,6 +677,37 @@ def test_cola_desde_entorno_configura_el_cliente_y_el_prefijo(monkeypatch, prefi
         cola.publicar(RESULTADOS, {})
     crear_cliente.assert_called_once_with(fully_qualified_namespace=namespace, credential=credencial)
     assert cliente.envios[0][0] == (prefijo or "evaluacion-ofertas-") + "resultados"
+    credencial.close.assert_not_called()
+
+
+def test_cola_desde_entorno_cierra_la_credencial_propia_al_cerrar(monkeypatch):
+    monkeypatch.setenv("SERVICEBUS_NAMESPACE", "<namespace>.servicebus.windows.net")
+    cliente = ServiceBusFalso()
+    credencial = Mock()
+    crear_credencial = Mock(return_value=credencial)
+    monkeypatch.setattr(sb, "DefaultAzureCredential", crear_credencial)
+
+    with sb.cola_desde_entorno(Mock(return_value=cliente), espera_recibir_s=0.01) as cola:
+        assert cola.recibir(CLASIFICAR) is None
+        credencial.close.assert_not_called()
+    cola.cerrar()
+
+    crear_credencial.assert_called_once_with(exclude_interactive_browser_credential=True)
+    assert cliente.cerrado and cliente.receptores[0].espera == 0.01
+    credencial.close.assert_called_once_with()
+
+
+@pytest.mark.parametrize("credencial_inyectada", [False, True])
+def test_falla_al_crear_cliente_cierra_solo_la_credencial_propia(monkeypatch, credencial_inyectada):
+    monkeypatch.setenv("SERVICEBUS_NAMESPACE", "<namespace>.servicebus.windows.net")
+    credencial = Mock()
+    monkeypatch.setattr(sb, "DefaultAzureCredential", Mock(return_value=credencial))
+    crear_cliente = Mock(side_effect=ServiceBusConnectionError(message=DETALLE))
+
+    with pytest.raises(ErrorTransitorio, match="crear cliente"):
+        sb.cola_desde_entorno(crear_cliente, credencial=credencial if credencial_inyectada else None)
+
+    assert credencial.close.call_count == (0 if credencial_inyectada else 1)
 
 
 def test_falla_autenticacion_al_armar_la_credencial(monkeypatch):

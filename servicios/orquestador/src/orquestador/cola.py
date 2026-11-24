@@ -21,6 +21,7 @@ import threading
 import datetime
 import itertools
 import json
+import math
 from abc import ABC, abstractmethod
 from collections import defaultdict, deque
 from dataclasses import dataclass, field
@@ -34,6 +35,7 @@ CLASIFICAR = "clasificar"
 EXTRAER = "extraer"
 RESULTADOS = "resultados"
 COLAS = (PROCESOS_LISTOS, NORMALIZAR, CLASIFICAR, EXTRAER, RESULTADOS)
+_METADATOS_ERRORES = {"DeadLetterReason", "DeadLetterErrorDescription"}
 
 
 class ErrorCola(Exception):
@@ -62,6 +64,9 @@ class MensajeEnErrores:
     mensaje: Mensaje
     motivo: str
     cuando: datetime.datetime
+    """En memoria, cuándo pasó a errores. En Service Bus, cuándo entró a la
+    cola original, ya que el servicio no guarda la hora del paso a errores.
+    """
 
 
 class Cola(ABC):
@@ -73,7 +78,12 @@ class Cola(ABC):
 
     @abstractmethod
     def publicar(self, cola: str, cuerpo: dict, demora_s: float = 0, propiedades: dict | None = None) -> str:
-        """Publica un mensaje y devuelve su id. Con demora, no se ve hasta que pase."""
+        """Publica un dict serializable como JSON y devuelve su id.
+
+        Las propiedades usan claves de texto no vacías ni reservadas y valores
+        de texto, booleanos, enteros de 32 bits con signo o flotantes finitos.
+        Con demora, el mensaje se ve cuando pasa ese tiempo.
+        """
 
     @abstractmethod
     def recibir(self, cola: str) -> Mensaje | None:
@@ -100,13 +110,39 @@ class Cola(ABC):
         """Republica los mensajes de errores desde el más viejo y devuelve cuántos reenvió.
 
         Conserva el cuerpo y las propiedades salvo `intento` y `esperas`. Cada
-        mensaje reenviado es nuevo y se quita de errores tras publicarlo.
+        mensaje reenviado es nuevo y se quita de errores tras publicarlo. Las
+        llegadas posteriores al listado inicial quedan para otra llamada.
         """
 
     @abstractmethod
     def pendientes(self, cola: str) -> int:
         """Mensajes que faltan por completar, visibles o no, sin contar errores."""
 
+
+
+def _serializar_cuerpo(cuerpo: dict) -> str:
+    if not isinstance(cuerpo, dict):
+        raise TypeError("El cuerpo del mensaje debe ser un dict")
+    return json.dumps(cuerpo, ensure_ascii=False, allow_nan=False)
+
+
+def _validar_propiedades(propiedades: dict | None) -> dict:
+    if propiedades is None:
+        return {}
+    if not isinstance(propiedades, dict):
+        raise TypeError("Las propiedades deben ser un dict")
+    for clave, valor in propiedades.items():
+        if not isinstance(clave, str):
+            raise TypeError("Las claves de las propiedades deben ser de texto")
+        if not clave or clave in _METADATOS_ERRORES or clave.startswith("x-opt-"):
+            raise ValueError("Las claves de las propiedades no pueden estar vacías ni ser reservadas")
+        if not isinstance(valor, (str, bool, int, float)):
+            raise TypeError("Las propiedades requieren valores JSON simples")
+        if isinstance(valor, int) and not -(2**31) <= valor < 2**31:
+            raise ValueError("Los enteros de las propiedades deben caber en 32 bits con signo")
+        if isinstance(valor, float) and not math.isfinite(valor):
+            raise ValueError("Los flotantes de las propiedades deben ser finitos")
+    return propiedades
 
 
 def _con_candado(metodo):
@@ -142,8 +178,8 @@ class ColaEnMemoria(Cola):
         if demora_s < 0:
             raise ErrorCola("La demora no puede ser negativa")
         # Como en Service Bus, el mensaje viaja serializado: se copia y debe ser JSON.
-        cuerpo = json.loads(json.dumps(cuerpo, ensure_ascii=False))
-        propiedades = json.loads(json.dumps(propiedades or {}, ensure_ascii=False))
+        cuerpo = json.loads(_serializar_cuerpo(cuerpo))
+        propiedades = _validar_propiedades(propiedades).copy()
         visible = self._reloj.ahora() + datetime.timedelta(seconds=demora_s)
         mensaje = Mensaje(id=f"m{next(self._ids):06d}", cola=cola, cuerpo=cuerpo, propiedades=propiedades,
                           visible_desde=visible)
@@ -167,7 +203,7 @@ class ColaEnMemoria(Cola):
     def _soltar(self, mensaje: Mensaje) -> Mensaje:
         if mensaje.bloqueo is not None:
             vigente = self._bloqueados.get(mensaje.id)
-            if vigente is not None and mensaje.bloqueo == vigente.bloqueo:
+            if vigente is not None and mensaje.bloqueo == vigente.bloqueo and mensaje.cola == vigente.cola:
                 return self._bloqueados.pop(mensaje.id)
             if vigente is not None or any(
                 pendiente.id == mensaje.id and pendiente.entregas > 0 for pendiente in self._colas.get(mensaje.cola, ())

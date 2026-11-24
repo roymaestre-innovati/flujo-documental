@@ -255,3 +255,20 @@ def test_alerta_con_identificadores_y_sin_datos_personales(cola, reloj):
     assert alerta["nivel"] == "ERROR"
     assert (alerta["id_proceso"], alerta["id_oferente"], alerta["id_documento"]) == ("SR1", "OF-001", "OF-001-aaa")
     assert "Juan" not in salida.getvalue()
+
+
+def test_configurar_en_debug_silencia_debug_de_los_sdk(caplog, monkeypatch):
+    for nombre in ("normalizacion", "orquestador", "azure", "pymongo"):
+        paquete = logging.getLogger(nombre)
+        for atributo in ("handlers", "level", "propagate"):
+            monkeypatch.setattr(paquete, atributo, getattr(paquete, atributo))
+        paquete.handlers = paquete.handlers.copy()
+
+    with caplog.at_level(logging.DEBUG):
+        registros.configurar(logging.DEBUG, io.StringIO())
+        for nombre in ("azure.servicebus", "pymongo.command"):
+            sdk = logging.getLogger(nombre)
+            sdk.debug("datos privados")
+            sdk.warning("aviso del SDK")
+
+    assert caplog.messages == ["aviso del SDK", "aviso del SDK"]

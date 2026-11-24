@@ -12,7 +12,7 @@ from azure.servicebus import (
     ServiceBusReceiveMode,
     ServiceBusSubQueue,
 )
-from azure.servicebus.exceptions import MessageAlreadySettled, MessageLockLostError
+from azure.servicebus.exceptions import MessageAlreadySettled, MessageLockLostError, ServiceBusError
 
 
 @dataclass
@@ -34,6 +34,7 @@ class MensajeRecibidoFalso:
         self._resuelto = False
         self._bloqueo = mensaje.bloqueo if recibido else None
         self.delivery_count = mensaje.entregas_fallidas
+        self.body_type = mensaje.enviado.body_type
         self.message_id = mensaje.enviado.message_id
         self.sequence_number = mensaje.secuencia
         self.enqueued_time_utc = mensaje.cuando
@@ -45,7 +46,8 @@ class MensajeRecibidoFalso:
         if mensaje.descripcion is not None:
             propiedades["DeadLetterErrorDescription"] = mensaje.descripcion
         self.application_properties = {
-            clave.encode("utf-8"): valor.encode("utf-8") if isinstance(valor, str) else valor
+            (clave.encode("utf-8") if isinstance(clave, str) else clave):
+            valor.encode("utf-8") if isinstance(valor, str) else valor
             for clave, valor in propiedades.items()
         } or None
 
@@ -83,6 +85,8 @@ class EmisorFalso:
 
 class ReceptorFalso:
     def __init__(self, cliente: "ServiceBusFalso", nombre: str, subcola, modo, prefetch: int, espera: float | None):
+        if espera is not None and espera <= 0:
+            raise ValueError("The max_wait_time must be greater than 0.")
         self.cliente = cliente
         self.nombre = nombre
         self.subcola = subcola
@@ -90,6 +94,7 @@ class ReceptorFalso:
         self.prefetch = prefetch
         self.espera = espera
         self.cerrado = False
+        self.abierto = False
         self.llamadas_recibir = []
         self.llamadas_peek = []
         self.entregas = []
@@ -98,11 +103,19 @@ class ReceptorFalso:
     def _mensajes(self):
         return self.cliente.colas[self.nombre, self.subcola]
 
+    def __enter__(self):
+        assert not self.cerrado
+        self.abierto = True
+        return self
+
     def receive_messages(self, *, max_message_count: int, max_wait_time: float | None = None):
         self.cliente.operar("receive_messages")
         assert not self.cerrado and self.modo == ServiceBusReceiveMode.PEEK_LOCK and self.prefetch == 0
+        if max_wait_time is not None and max_wait_time <= 0:
+            raise ValueError("The max_wait_time must be greater than 0.")
+        self.abierto = True
         self.llamadas_recibir.append((max_message_count, max_wait_time))
-        espera = max_wait_time if max_wait_time is not None else self.espera
+        espera = max_wait_time if max_wait_time is not None else self.espera or 60
         limite = monotonic() + espera
         while True:
             ahora = datetime.now(timezone.utc)
@@ -119,9 +132,12 @@ class ReceptorFalso:
                 return []
             sleep(min(restante, 0.005))
 
-    def peek_messages(self, *, sequence_number: int, max_message_count: int):
+    def peek_messages(self, *, sequence_number: int, max_message_count: int, timeout: float | None = None):
         self.cliente.operar("peek_messages")
         assert not self.cerrado
+        if timeout is not None and timeout <= 0:
+            raise ValueError("The timeout must be greater than 0.")
+        self.abierto = True
         self.llamadas_peek.append((sequence_number, max_message_count))
         mensajes = sorted(self._mensajes, key=lambda mensaje: mensaje.secuencia)
         limite = min(max_message_count, self.cliente.tope_peek)
@@ -129,10 +145,17 @@ class ReceptorFalso:
         return [MensajeRecibidoFalso(mensaje, self, recibido=False) for mensaje in pagina]
 
     def _resolver(self, mensaje: MensajeRecibidoFalso, operacion: str) -> _EnCola:
-        self.cliente.operar(operacion)
         assert not self.cerrado and mensaje._receptor is self
         if mensaje._resuelto:
             raise MessageAlreadySettled(action=operacion)
+        if not self.abierto:
+            raise ValueError("El enlace del receptor está cerrado")
+        try:
+            self.cliente.operar(operacion)
+        except ServiceBusError as error:
+            if error._shutdown_handler:
+                self.abierto = False
+            raise
         original = mensaje._original
         if mensaje.lock_token is None or mensaje.lock_token != original.bloqueo:
             raise MessageLockLostError()
@@ -148,6 +171,11 @@ class ReceptorFalso:
         original = self._resolver(mensaje, "abandon_message")
         original.entregas_fallidas += 1
 
+    def vencer_bloqueo(self, mensaje: MensajeRecibidoFalso) -> None:
+        assert mensaje._receptor is self and mensaje.lock_token == mensaje._original.bloqueo
+        mensaje._original.bloqueo = None
+        mensaje._original.entregas_fallidas += 1
+
     def dead_letter_message(self, mensaje: MensajeRecibidoFalso, *, reason: str, error_description: str) -> None:
         original = self._resolver(mensaje, "dead_letter_message")
         self._mensajes.remove(original)
@@ -162,21 +190,23 @@ class ReceptorFalso:
 
 class RenovadorFalso:
     def __init__(self, cliente: "ServiceBusFalso", *, max_lock_renewal_duration: float,
-                 on_lock_renew_failure, max_workers: int):
+                 max_workers: int, on_lock_renew_failure=None):
         self.cliente = cliente
         self.max_lock_renewal_duration = max_lock_renewal_duration
         self.on_lock_renew_failure = on_lock_renew_failure
         self.max_workers = max_workers
         self.registros: list[tuple[ReceptorFalso, MensajeRecibidoFalso]] = []
+        self._avisos = {}
         self.cerrado = False
 
-    def register(self, receptor: ReceptorFalso, mensaje: MensajeRecibidoFalso) -> None:
+    def register(self, receptor: ReceptorFalso, mensaje: MensajeRecibidoFalso, *, on_lock_renew_failure=None) -> None:
         assert not self.cerrado and mensaje._receptor is receptor
         self.registros.append((receptor, mensaje))
+        self._avisos[mensaje] = on_lock_renew_failure or self.on_lock_renew_failure
 
     def fallar(self, mensaje: MensajeRecibidoFalso, error: Exception | None) -> None:
-        assert (mensaje._receptor, mensaje) in self.registros
-        self.on_lock_renew_failure(mensaje, error)
+        if aviso := self._avisos[mensaje]:
+            aviso(mensaje, error)
 
     def close(self) -> None:
         self.cliente.operar("close_renewer")

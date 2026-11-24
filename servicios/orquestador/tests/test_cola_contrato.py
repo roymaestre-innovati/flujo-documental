@@ -6,9 +6,10 @@ from time import monotonic, sleep
 import pytest
 from orquestador import cola as c
 from orquestador.cola_servicebus import ColaServiceBus
+from servicebus_azure import COLA_PRUEBA_AZURE
 from servicebus_falso import ServiceBusFalso
 
-NOMBRE = c.CLASIFICAR
+NOMBRE = COLA_PRUEBA_AZURE
 
 
 @pytest.fixture
@@ -23,12 +24,18 @@ def cola_servicebus_falso():
         yield cola, 0.3, 2
 
 
+@pytest.fixture
+def cola_servicebus_azure(cola_servicebus_de_prueba):
+    return cola_servicebus_de_prueba, 5, 30
+
+
 # Cada implementación agrega un fixture con la cola, la demora y el plazo en segundos.
 # Si recibir espera, su tiempo máximo debe ser menor que la demora de la prueba.
 # Para Azure, ese fixture hará el peek inicial y la limpieza aun si falla la prueba.
 @pytest.fixture(params=[
     pytest.param("cola_en_memoria", id="memoria"),
     pytest.param("cola_servicebus_falso", id="servicebus_falso"),
+    pytest.param("cola_servicebus_azure", id="azure", marks=pytest.mark.azure(variable="SERVICEBUS_NAMESPACE")),
 ])
 def implementacion_cola(request):
     return request.getfixturevalue(request.param)
@@ -39,7 +46,7 @@ def cola(implementacion_cola):
     instancia, _, _ = implementacion_cola
     yield instancia
     assert instancia.pendientes(NOMBRE) == 0
-    assert instancia.errores(NOMBRE) == []
+    assert [error.mensaje.id for error in instancia.errores(NOMBRE)] == []
 
 
 @pytest.fixture(params=["completar", "abandonar", "a_errores"])
@@ -79,17 +86,22 @@ def test_cola_abandonar_vuelve_a_entregar(cola):
 
 def test_cola_demora_con_reloj_real(cola, implementacion_cola):
     _, demora_s, plazo_s = implementacion_cola
-    id_mensaje = cola.publicar(NOMBRE, {"n": 1}, demora_s=demora_s)
+    cola.publicar(NOMBRE, {})
+    cola.completar(cola.recibir(NOMBRE))
     assert cola.recibir(NOMBRE) is None
 
-    limite = monotonic() + plazo_s
+    inicio = monotonic()
+    id_mensaje = cola.publicar(NOMBRE, {"n": 1}, demora_s=demora_s)
+    limite = inicio + plazo_s
+    margen_s = min(0.2, demora_s / 5)
     while monotonic() < limite:
         mensaje = cola.recibir(NOMBRE)
         if mensaje is not None:
-            a_tiempo = monotonic() <= limite
+            transcurrido = monotonic() - inicio
             cola.completar(mensaje)
-            assert a_tiempo, f"El mensaje {id_mensaje} llegó después de {plazo_s} s"
             assert mensaje.id == id_mensaje
+            assert transcurrido >= demora_s - margen_s, f"El mensaje {id_mensaje} llegó en {transcurrido:.3f} s"
+            assert transcurrido <= plazo_s, f"El mensaje {id_mensaje} llegó después de {plazo_s} s"
             return
         sleep(0.01)
     pytest.fail(f"El mensaje {id_mensaje} no llegó en {plazo_s} s")
@@ -97,7 +109,8 @@ def test_cola_demora_con_reloj_real(cola, implementacion_cola):
 
 def test_cola_lleva_las_propiedades_aparte_del_cuerpo(cola):
     cuerpo = {"n": 1}
-    propiedades = {"intento": 2, "esperas": 3, "origen": "revisión"}
+    propiedades = {"intento": 2, "esperas": 3, "origen": "revisión", "listo": True, "puntaje": 1.25,
+                   "minimo": -(2**31), "maximo": 2**31 - 1}
     cola.publicar(NOMBRE, cuerpo, propiedades=propiedades)
     mensaje = cola.recibir(NOMBRE)
     assert mensaje.cuerpo == cuerpo
@@ -133,6 +146,22 @@ def test_cola_rechaza_una_entrega_vieja(cola, resolver):
     cola.completar(vigente)
 
 
+def test_cola_rechaza_el_token_de_otro_mensaje_o_cola(cola, resolver):
+    cola.publicar(NOMBRE, {"n": 1})
+    cola.publicar(NOMBRE, {"n": 2})
+    primero, segundo = cola.recibir(NOMBRE), cola.recibir(NOMBRE)
+    copia = deepcopy(primero)
+    copia.bloqueo = segundo.bloqueo
+    with pytest.raises(c.BloqueoPerdido):
+        resolver(copia)
+    copia.bloqueo = primero.bloqueo
+    copia.cola = c.NORMALIZAR
+    with pytest.raises(c.BloqueoPerdido):
+        resolver(copia)
+    cola.completar(primero)
+    cola.completar(segundo)
+
+
 def test_cola_copia_el_cuerpo(cola):
     cuerpo = {"lista": [1]}
     cola.publicar(NOMBRE, cuerpo)
@@ -147,6 +176,26 @@ def test_cola_publicar_exige_json_y_una_cola_conocida(cola):
         cola.publicar(NOMBRE, {"no_json": object()})
     with pytest.raises(c.ErrorCola):
         cola.publicar("otra", {})
+    for cuerpo in (None, [], 5, "texto"):
+        with pytest.raises(TypeError, match="dict"):
+            cola.publicar(NOMBRE, cuerpo)
+    for numero in (float("nan"), float("inf"), float("-inf")):
+        with pytest.raises(ValueError):
+            cola.publicar(NOMBRE, {"lista": [numero]})
+
+
+def test_cola_rechaza_propiedades_invalidas(cola):
+    for propiedades in ([], {1: "privado"}, {"dato": ["privado"]}, {"dato": None}, {"dato": b"privado"}):
+        with pytest.raises(TypeError) as error:
+            cola.publicar(NOMBRE, {}, propiedades=propiedades)
+        assert "privado" not in str(error.value)
+    for clave in ("", "DeadLetterReason", "DeadLetterErrorDescription", "x-opt-privado"):
+        with pytest.raises(ValueError) as error:
+            cola.publicar(NOMBRE, {}, propiedades={clave: "privado"})
+        assert "privado" not in str(error.value)
+    for numero in (-(2**31) - 1, 2**31, float("inf"), float("-inf"), float("nan")):
+        with pytest.raises(ValueError):
+            cola.publicar(NOMBRE, {}, propiedades={"dato": numero})
 
 
 def test_cola_pendientes_cuenta_visibles_y_bloqueados_sin_errores(cola):

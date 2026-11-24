@@ -16,8 +16,10 @@ lanza una de estas excepciones y el bucle decide qué hacer:
 | ErrorDeConfiguracion   | 4     | Falta un permiso, una credencial o una opción del entorno  |
 |                        |       | (por ejemplo, OneLake responde 403): sin reintento, a      |
 |                        |       | operación, con un motivo que dice qué revisar              |
-| BloqueoPerdido         | —     | Registra un aviso. La cola vuelve a entregar el mensaje    |
 | cualquier otra         | 4     | Un bug: sin reintento                                      |
+
+Si la cola da `BloqueoPerdido` al resolver una entrega, `procesar_uno` avisa y
+la cola puede volver a entregar el original.
 
 Cuando se agotan los reintentos, o con un bug, el bucle llama a `al_fallar` del
 manejador (que deja la entidad en `error_proceso`), manda el mensaje a la cola de
