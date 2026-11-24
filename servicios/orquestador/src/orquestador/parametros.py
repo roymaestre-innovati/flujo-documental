@@ -25,6 +25,8 @@ class Parametros:
     """Entregas que se normalizan a la vez (acordado el 2026-11-06)."""
     paralelo_bajar: int = 8
     """Archivos de una misma entrega que se bajan a la vez (T04)."""
+    espera_limite_estado_s: float = 1
+    """Espera cuando Cosmos limita las RU y no indica cuándo reintentar."""
 
 
 PARAMETROS = Parametros()

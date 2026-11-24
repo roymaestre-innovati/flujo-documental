@@ -4,13 +4,19 @@ from copy import deepcopy
 from dataclasses import replace
 from uuid import uuid4
 
+import mongomock
 import pytest
 
 from orquestador.estado import Conflicto, ErrorEstado, EstadoEnMemoria, Registro
+from orquestador.estado_mongo import EstadoMongo
+
+
+def _estado_mongo():
+    return EstadoMongo(mongomock.MongoClient().evaluacion_ofertas.estado)
 
 
 # Cada implementación agrega su fábrica como un parámetro de este fixture.
-@pytest.fixture(params=[pytest.param(EstadoEnMemoria, id="memoria")])
+@pytest.fixture(params=[pytest.param(EstadoEnMemoria, id="memoria"), pytest.param(_estado_mongo, id="mongomock")])
 def estado(request):
     return request.param()
 

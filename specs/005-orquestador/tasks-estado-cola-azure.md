@@ -51,7 +51,7 @@ En el **orquestador**, al lado de las versiones en memoria: `servicios/orquestad
 
   `guardar()` no es parte de `Estado`: su prueba queda solo para `EstadoEnMemoria`.
 
-- [ ] **T02 — `EstadoMongo`.** Implementa `Estado` sobre una colección de `pymongo`. Recibe la colección ya armada, para poder pasarle una falsa en las pruebas, y trae una función que la arma desde el entorno (`ESTADO_MONGO_URL`, y la base y la colección con valores por defecto `evaluacion_ofertas` y `estado`). Pasa la batería de T01 con `mongomock`.
+- [x] **T02 — `EstadoMongo`.** Implementa `Estado` sobre una colección de `pymongo`. Recibe la colección ya armada, para poder pasarle una falsa en las pruebas, y trae una función que la arma desde el entorno (`ESTADO_MONGO_URL`, y la base y la colección con valores por defecto `evaluacion_ofertas` y `estado`). Pasa la batería de T01 con `mongomock`.
   - Forma de cada documento: `{"_id": {"p": <id_proceso>, "t": <tipo>, "i": <id>}, "id_proceso", "tipo", "id", "version", "datos": {...}}`. `datos` va anidado, para que un campo del flujo nunca choque con `version` ni con `_id`.
   - Se valida con `_revisar` antes de tocar Mongo (lo que no es JSON da `TypeError`, como en memoria) y se revisa el tamaño del documento BSON completo contra el límite de Cosmos (2 MB): si se pasa, `ErrorEstado` con el tamaño, sin el contenido.
   - **Todo filtro lleva `id_proceso`**, porque es la clave de partición. La única excepción es `procesos()` (`distinct`), que la usan solo los trabajos periódicos.
@@ -109,3 +109,9 @@ En el **orquestador**, al lado de las versiones en memoria: `servicios/orquestad
 `test_estado_contrato.py` parametriza el fixture `estado` por fábrica, con `memoria` como primer caso.
 Cada prueba usa IDs de proceso propios y `procesos()` se comprueba sobre esos IDs para que la batería pueda correr en una base compartida.
 `guardar()` se sigue probando con `EstadoEnMemoria` en `test_interfaces.py`. La implementación en memoria cumple los casos agregados sin cambios.
+
+### T02 — EstadoMongo
+
+`EstadoMongo` valida el BSON completo, usa `id_proceso` en las operaciones por partición y reemplaza por versión. El límite de RU se traduce a una espera con un valor configurable cuando Cosmos no indica el tiempo.
+La batería de T01 también corre con `mongomock`, que acepta el `_id` en subdocumento y conserva las claves con `.` y `$` en `datos`. Como `mongomock` funciona en memoria, la clave de partición y las fallas de red y de RU se prueban con envoltorios y colecciones falsas.
+T03 confirmará estos formatos y el `distinct` entre particiones en Cosmos, probará la concurrencia real y medirá el consumo de RU.

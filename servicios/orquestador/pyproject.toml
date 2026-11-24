@@ -12,6 +12,7 @@ dependencies = [
     "azure-storage-file-datalake>=12.18",
     "deltalake>=1.6",
     "pyarrow>=18",
+    "pymongo>=4.10",
 ]
 
 [project.scripts]
@@ -26,6 +27,7 @@ dev = [
     "pytest>=8",
     "reportlab>=5.1.0",
     "openpyxl>=3.1.5",
+    "mongomock>=4.3",
 ]
 
 [build-system]
