@@ -11,6 +11,7 @@ Los errores traducidos incluyen la operación, el tipo de excepción y su códig
 cuando existe, sin reproducir el mensaje del servidor.
 """
 
+import math
 import os
 import re
 from collections.abc import Callable, Iterator
@@ -19,14 +20,14 @@ from copy import deepcopy
 
 import bson
 import pymongo
+from bson.errors import InvalidDocument
 from pymongo.collection import Collection
 from pymongo.errors import (
     ConfigurationError,
     ConnectionFailure,
     DuplicateKeyError,
-    ExecutionTimeout,
     OperationFailure,
-    WTimeoutError,
+    PyMongoError,
 )
 
 from .errores import ErrorDeConfiguracion, ErrorTransitorio
@@ -37,25 +38,54 @@ LIMITE_DOCUMENTO_BSON_BYTES = 2 * 1024 * 1024
 _REINTENTO_MS = re.compile(r"\bRetryAfterMs['\"]?\s*[:=]\s*['\"]?([0-9]+(?:\.[0-9]+)?)\b")
 
 
+class ErrorMongo(Exception):
+    """Falla inesperada de MongoDB: un bug (clase 4)."""
+
+
+def _espera_limite(error: PyMongoError, parametros: Parametros) -> float:
+    detalles = (error.details or {}) if isinstance(error, OperationFailure) else {}
+    valor = detalles.get("RetryAfterMs")
+    if isinstance(valor, (int, float, str)) and not isinstance(valor, bool):
+        try:
+            milisegundos = float(valor)
+        except (ValueError, OverflowError):
+            pass
+        else:
+            if math.isfinite(milisegundos) and milisegundos >= 0:
+                return milisegundos / 1000
+
+    # PyMongo añade todos los detalles a args[0], incluido el documento en `op`.
+    mensaje = error.args[0] if error.args else None
+    if isinstance(mensaje, str):
+        mensaje = mensaje.partition(", full error: ")[0]
+    for texto in (detalles.get("errmsg"), mensaje):
+        if isinstance(texto, str) and (tiempo := _REINTENTO_MS.search(texto)):
+            milisegundos = float(tiempo[1])
+            if math.isfinite(milisegundos):
+                return milisegundos / 1000
+    return parametros.espera_limite_estado_s
+
+
 @contextmanager
-def _traducir_fallas(operacion: str, parametros: Parametros = PARAMETROS) -> Iterator[None]:
+def _traducir_fallas(
+    operacion: str, parametros: Parametros = PARAMETROS, *, permitir_duplicado: bool = False,
+) -> Iterator[None]:
     try:
         yield
-    except (ConfigurationError, ConnectionFailure, OperationFailure) as error:
+    except PyMongoError as error:
         codigo = getattr(error, "code", None)
-        detalle = f", código {codigo}" if codigo is not None else ""
+        detalle = f", código {codigo}" if isinstance(codigo, int) else ""
         mensaje = f"MongoDB {operacion} ({type(error).__name__}{detalle})"
         if codigo == 16500:
-            # PyMongo incluye `details` en el texto de OperationFailure.
-            tiempo = _REINTENTO_MS.search(str(error))
-            espera = float(tiempo[1]) / 1000 if tiempo else parametros.espera_limite_estado_s
-            raise ErrorTransitorio(mensaje, espera_s=espera) from None
+            raise ErrorTransitorio(mensaje, espera_s=_espera_limite(error, parametros)) from None
         if isinstance(error, ConfigurationError) or codigo in (13, 18):
             raise ErrorDeConfiguracion(mensaje) from None
         # ConnectionFailure incluye AutoReconnect y los tiempos de espera de red y de selección de servidor.
-        if isinstance(error, (ConnectionFailure, ExecutionTimeout, WTimeoutError)):
+        if isinstance(error, ConnectionFailure) or error.timeout:
             raise ErrorTransitorio(mensaje) from None
-        raise
+        if permitir_duplicado and isinstance(error, DuplicateKeyError):
+            raise
+        raise ErrorMongo(mensaje) from None
 
 
 def coleccion_desde_entorno(
@@ -87,7 +117,10 @@ def _documento(id_proceso: str, tipo: str, id: str, version: int, datos: dict) -
         "version": version,
         "datos": _revisar(tipo, datos),
     }
-    tamano = len(bson.encode(documento))
+    try:
+        tamano = len(bson.encode(documento))
+    except (OverflowError, InvalidDocument, UnicodeEncodeError) as error:
+        raise ErrorEstado(f"Documento inválido para BSON ({type(error).__name__})") from None
     if tamano > LIMITE_DOCUMENTO_BSON_BYTES:
         raise ErrorEstado(f"Documento BSON de {tamano} bytes supera el límite de {LIMITE_DOCUMENTO_BSON_BYTES} bytes")
     return documento
@@ -100,6 +133,8 @@ def _registro(documento: dict) -> Registro:
 
 class EstadoMongo(Estado):
     def __init__(self, coleccion: Collection[dict], *, parametros: Parametros = PARAMETROS) -> None:
+        if not coleccion.write_concern.acknowledged:
+            raise ErrorDeConfiguracion("MongoDB requiere confirmar las escrituras. Revisa la opción w de ESTADO_MONGO_URL")
         self._coleccion = coleccion
         self._parametros = parametros
 
@@ -111,7 +146,7 @@ class EstadoMongo(Estado):
     def crear_si_no_existe(self, id_proceso: str, tipo: str, id: str, datos: dict) -> tuple[Registro, bool]:
         documento = _documento(id_proceso, tipo, id, 1, datos)
         try:
-            with _traducir_fallas("insert_one", self._parametros):
+            with _traducir_fallas("insert_one", self._parametros, permitir_duplicado=True):
                 self._coleccion.insert_one(documento)
         except DuplicateKeyError:
             pass

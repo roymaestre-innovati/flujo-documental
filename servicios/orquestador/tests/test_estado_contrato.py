@@ -29,7 +29,7 @@ def estado_mongo_azure(coleccion_mongo_de_prueba):
 @pytest.fixture(params=[
     pytest.param("estado_en_memoria", id="memoria"),
     pytest.param("estado_mongomock", id="mongomock"),
-    pytest.param("estado_mongo_azure", id="azure", marks=pytest.mark.azure),
+    pytest.param("estado_mongo_azure", id="azure", marks=pytest.mark.azure(variable="ESTADO_MONGO_URL")),
 ])
 def estado(request):
     return request.getfixturevalue(request.param)
@@ -70,6 +70,7 @@ def test_estado_reemplazar_un_registro_inexistente(estado, id_proceso):
 
 def test_estado_leer_un_registro_inexistente(estado, id_proceso):
     assert estado.leer(id_proceso, "documento", "D1") is None
+    assert estado.leer(id_proceso, "otro", "D1") is None
 
 
 def test_estado_lista_por_proceso_y_tipo(estado, procesos_de_prueba):
@@ -114,10 +115,20 @@ def test_estado_crear_rechaza_tipos_desconocidos_y_lo_que_no_es_json(estado, id_
 
 def test_estado_reemplazar_rechaza_tipos_desconocidos_y_lo_que_no_es_json(estado, id_proceso):
     registro, _ = estado.crear_si_no_existe(id_proceso, "proceso", id_proceso, {})
-    with pytest.raises(ErrorEstado):
+    with pytest.raises(ErrorEstado, match="Tipo desconocido"):
         estado.reemplazar(replace(registro, tipo="otro"), {})
     with pytest.raises(TypeError):
         estado.reemplazar(registro, {"x": object()})
+
+
+def test_estado_rechaza_numeros_no_finitos(estado, id_proceso):
+    registro = Registro(id_proceso, "documento", "D1", 1, {})
+    for numero in (float("nan"), float("inf"), float("-inf")):
+        datos = {"valores": [numero]}
+        with pytest.raises(ValueError):
+            estado.crear_si_no_existe(id_proceso, "documento", "D1", datos)
+        with pytest.raises(ValueError):
+            estado.reemplazar(registro, datos)
 
 
 def test_estado_crear_copia_los_datos(estado, id_proceso):

@@ -1,9 +1,11 @@
 """Estados, transiciones, historial y consulta (R24 a R26, R28)."""
 
+import mongomock
 import pytest
 
 from orquestador import estados as e
 from orquestador.estado import Conflicto, EstadoEnMemoria
+from orquestador.estado_mongo import EstadoMongo
 from orquestador.reloj import RelojManual
 
 P = "SR0000000001"
@@ -14,9 +16,11 @@ def reloj():
     return RelojManual()
 
 
-@pytest.fixture
-def estado():
-    return EstadoEnMemoria()
+@pytest.fixture(params=["memoria", "mongomock"], autouse=True)
+def estado(request):
+    if request.param == "memoria":
+        return EstadoEnMemoria()
+    return EstadoMongo(mongomock.MongoClient().evaluacion_ofertas.estado)
 
 
 def _documento(estado, reloj, id="OF-001-aaa", inicial=e.NORMALIZADO, entrega="OF-001"):
@@ -125,40 +129,39 @@ def test_cambiar_lo_que_no_existe_es_un_bug(estado, reloj):
         e.cambiar(estado, reloj, P, e.TAREA, "no-hay", e.ABIERTA, e.RESUELTA, "m")
 
 
-class EstadoConOtroTrabajador(EstadoEnMemoria):
+def _simular_otro_trabajador(estado, monkeypatch, veces, cambio_ajeno):
     """Antes de cada escritura, otro trabajador cambia el registro."""
+    reemplazar_original = estado.reemplazar
 
-    def __init__(self, veces, cambio_ajeno):
-        super().__init__()
-        self.veces = veces
-        self.cambio_ajeno = cambio_ajeno
+    def reemplazar(registro, datos):
+        nonlocal veces
+        if veces:
+            veces -= 1
+            actual = estado.leer(registro.id_proceso, registro.tipo, registro.id)
+            reemplazar_original(actual, cambio_ajeno(actual.datos))
+        return reemplazar_original(registro, datos)
 
-    def reemplazar(self, registro, datos):
-        if self.veces:
-            self.veces -= 1
-            actual = super().leer(registro.id_proceso, registro.tipo, registro.id)
-            super().reemplazar(actual, self.cambio_ajeno(actual.datos))
-        return super().reemplazar(registro, datos)
+    monkeypatch.setattr(estado, "reemplazar", reemplazar)
 
 
-def test_conflicto_se_relee_y_se_decide_de_nuevo(reloj):
+def test_conflicto_se_relee_y_se_decide_de_nuevo(estado, reloj, monkeypatch):
     # El otro trabajador solo toca un dato: al releer, el cambio sigue siendo válido.
-    estado = EstadoConOtroTrabajador(1, lambda d: {**d, "otro": 1})
+    _simular_otro_trabajador(estado, monkeypatch, 1, lambda d: {**d, "otro": 1})
     _documento(estado, reloj)
     cambio = e.cambiar(estado, reloj, P, e.DOCUMENTO, "OF-001-aaa", e.NORMALIZADO, e.CLASIFICADO, "clasificador")
     assert cambio.aplicado
     assert cambio.registro.datos["otro"] == 1
 
 
-def test_conflicto_que_ya_hizo_el_cambio_es_un_repetido(reloj):
-    estado = EstadoConOtroTrabajador(1, lambda d: {**d, "estado": e.CLASIFICADO})
+def test_conflicto_que_ya_hizo_el_cambio_es_un_repetido(estado, reloj, monkeypatch):
+    _simular_otro_trabajador(estado, monkeypatch, 1, lambda d: {**d, "estado": e.CLASIFICADO})
     _documento(estado, reloj)
     cambio = e.cambiar(estado, reloj, P, e.DOCUMENTO, "OF-001-aaa", e.NORMALIZADO, e.CLASIFICADO, "clasificador")
     assert not cambio.aplicado
 
 
-def test_conflicto_sin_fin(reloj):
-    estado = EstadoConOtroTrabajador(99, lambda d: {**d, "otro": d.get("otro", 0) + 1})
+def test_conflicto_sin_fin(estado, reloj, monkeypatch):
+    _simular_otro_trabajador(estado, monkeypatch, 99, lambda d: {**d, "otro": d.get("otro", 0) + 1})
     _documento(estado, reloj)
     with pytest.raises(Conflicto):
         e.cambiar(estado, reloj, P, e.DOCUMENTO, "OF-001-aaa", e.NORMALIZADO, e.CLASIFICADO, "m", intentos=3)

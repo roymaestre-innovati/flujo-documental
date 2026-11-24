@@ -5,6 +5,8 @@ from unittest.mock import Mock, call
 import bson
 import mongomock
 import pytest
+from bson.errors import InvalidDocument
+from bson.int64 import Int64
 from pymongo.collection import Collection
 from pymongo.errors import (
     AutoReconnect,
@@ -15,18 +17,30 @@ from pymongo.errors import (
     NetworkTimeout,
     OperationFailure,
     ServerSelectionTimeoutError,
+    WriteError,
     WTimeoutError,
 )
+from pymongo.write_concern import WriteConcern
 
-from orquestador.errores import ErrorDeConfiguracion, ErrorTransitorio
+from orquestador.cola import CLASIFICAR, ColaEnMemoria
+from orquestador.errores import ErrorDeConfiguracion, ErrorTransitorio, procesar_uno
 from orquestador.estado import Conflicto, ErrorEstado, Registro
-from orquestador.estado_mongo import EstadoMongo, coleccion_desde_entorno
+from orquestador.estado_mongo import ErrorMongo, EstadoMongo, coleccion_desde_entorno
 from orquestador.parametros import Parametros
+from orquestador.reloj import RelojManual
 
 
 @pytest.fixture
 def coleccion():
     return mongomock.MongoClient().evaluacion_ofertas.estado
+
+
+def test_rechaza_escrituras_sin_confirmar(coleccion):
+    sin_confirmar = coleccion.with_options(write_concern=WriteConcern(w=0))
+    assert not sin_confirmar.write_concern.acknowledged
+
+    with pytest.raises(ErrorDeConfiguracion, match="Revisa la opción w de ESTADO_MONGO_URL"):
+        EstadoMongo(sin_confirmar)
 
 
 def test_documento_guardado(coleccion):
@@ -91,6 +105,37 @@ def test_limite_incluye_el_documento_bson_completo(coleccion):
     assert espia.mock_calls == []
 
 
+@pytest.mark.parametrize(("datos", "falla"), [
+    ({"contenido privado": 2**63}, OverflowError),
+    ({"contenido privado\x00": 1}, InvalidDocument),
+    ({"texto": "contenido privado\ud800"}, UnicodeEncodeError),
+])
+def test_rechaza_datos_que_bson_no_acepta_sin_tocar_mongo(datos, falla):
+    falsa = Mock(spec=Collection)
+    estado = EstadoMongo(falsa)
+    registro = Registro("P1", "documento", "D1", 1, {})
+
+    for escribir in (lambda: estado.crear_si_no_existe("P1", "documento", "D1", datos),
+                     lambda: estado.reemplazar(registro, datos)):
+        with pytest.raises(ErrorEstado, match=falla.__name__) as error:
+            escribir()
+        assert "contenido privado" not in str(error.value)
+        assert error.value.__suppress_context__
+    assert falsa.mock_calls == []
+
+
+def test_escribir_rechaza_tipo_desconocido_sin_tocar_mongo():
+    falsa = Mock(spec=Collection)
+    estado = EstadoMongo(falsa)
+
+    with pytest.raises(ErrorEstado, match="Tipo desconocido"):
+        estado.crear_si_no_existe("P1", "otro", "D1", {})
+    with pytest.raises(ErrorEstado, match="Tipo desconocido"):
+        estado.reemplazar(Registro("P1", "otro", "D1", 1, {}), {})
+
+    assert falsa.mock_calls == []
+
+
 def test_crear_devuelve_el_registro_del_trabajador_que_gano(coleccion):
     espia = Mock(wraps=coleccion)
     estado = EstadoMongo(espia)
@@ -119,9 +164,11 @@ def test_crear_avisa_si_el_duplicado_ya_no_esta(coleccion):
 
 @pytest.mark.parametrize(("mensaje", "detalles", "espera"), [
     ("detalle interno RetryAfterMs=250", None, 0.25),
+    ("detalle interno RetryAfterMs=250", {"errmsg": "x", "op": {"RetryAfterMs": 3600000}}, 0.25),
     ("detalle interno RetryAfterMs=0", None, 0),
     ("detalle interno", {"errmsg": "RetryAfterMs=625"}, 0.625),
     ("detalle interno", {"RetryAfterMs": 1500}, 1.5),
+    ("detalle interno", {"RetryAfterMs": Int64(1500)}, 1.5),
     ("detalle interno", None, 1),
 ])
 def test_limite_de_ru_pide_esperar(mensaje, detalles, espera):
@@ -134,6 +181,18 @@ def test_limite_de_ru_pide_esperar(mensaje, detalles, espera):
     assert error.value.espera_s == espera
     assert str(error.value) == "MongoDB insert_one (OperationFailure, código 16500)"
     assert error.value.__suppress_context__
+
+
+def test_limite_de_ru_ignora_el_documento_y_otros_detalles_anidados():
+    falsa = Mock(spec=Collection)
+    falsa.insert_one.side_effect = WriteError("x", 16500, {
+        "errmsg": "x", "op": {"datos": {"RetryAfterMs": 3600000}}, "extra": {"RetryAfterMs": 500},
+    })
+
+    with pytest.raises(ErrorTransitorio) as error:
+        EstadoMongo(falsa).crear_si_no_existe("P1", "documento", "D1", {})
+
+    assert error.value.espera_s == 1
 
 
 def test_espera_por_limite_de_ru_es_configurable():
@@ -167,6 +226,17 @@ def test_fallas_de_red_y_tiempo_se_reintentan_sin_espera(falla, codigo):
     assert str(error.value) == f"MongoDB find_one ({type(falla).__name__}{codigo})"
 
 
+def test_timeout_de_escritura_se_reintenta_sin_espera():
+    falsa = Mock(spec=Collection)
+    falsa.replace_one.side_effect = WriteError("x", 50, {"op": {"datos": {"texto": "contenido privado"}}})
+
+    with pytest.raises(ErrorTransitorio) as error:
+        EstadoMongo(falsa).reemplazar(Registro("P1", "documento", "D1", 1, {}), {})
+
+    assert error.value.espera_s is None
+    assert str(error.value) == "MongoDB replace_one (WriteError, código 50)"
+
+
 @pytest.mark.parametrize(("falla", "detalle"), [
     (OperationFailure("detalle interno", 13), "OperationFailure, código 13"),
     (OperationFailure("detalle interno", 18), "OperationFailure, código 18"),
@@ -197,15 +267,37 @@ def test_falla_al_recorrer_el_cursor_tambien_se_traduce():
     assert str(error.value) == "MongoDB find (OperationFailure, código 16500)"
 
 
-def test_otras_fallas_de_mongo_se_propagan_tal_cual():
-    falla = OperationFailure("detalle interno", 2)
+@pytest.mark.parametrize("falla", [
+    OperationFailure("texto del servidor", 2, {"op": {"datos": {"texto": "contenido privado"}}}),
+    DuplicateKeyError("texto del servidor", 11000),
+])
+def test_otras_fallas_de_mongo_se_traducen_sin_texto_del_servidor(falla):
     falsa = Mock(spec=Collection)
     falsa.find.side_effect = falla
 
-    with pytest.raises(OperationFailure) as error:
+    with pytest.raises(ErrorMongo) as error:
         EstadoMongo(falsa).listar("P1")
 
-    assert error.value is falla
+    assert str(error.value) == f"MongoDB find ({type(falla).__name__}, código {falla.code})"
+    assert error.value.__suppress_context__
+
+
+def test_procesar_uno_manda_error_mongo_a_errores_sin_reintentar():
+    falsa = Mock(spec=Collection)
+    falsa.find.side_effect = OperationFailure("texto del servidor", 2)
+    estado = EstadoMongo(falsa)
+    cola = ColaEnMemoria(RelojManual())
+    cuerpo = {"id_proceso": "P1"}
+    cola.publicar(CLASIFICAR, cuerpo)
+    manejador = Mock(cola=CLASIFICAR, procesar=lambda mensaje: estado.listar(mensaje["id_proceso"]))
+
+    resultado = procesar_uno(cola, manejador)
+
+    assert resultado.desenlace == "a_errores"
+    assert resultado.motivo.startswith("Bug: ErrorMongo en ")
+    assert cola.pendientes(CLASIFICAR) == 0
+    assert [mensaje.motivo for mensaje in cola.errores(CLASIFICAR)] == [resultado.motivo]
+    manejador.al_fallar.assert_called_once_with(cuerpo, resultado.motivo)
 
 
 def test_coleccion_desde_entorno_exige_url(monkeypatch):

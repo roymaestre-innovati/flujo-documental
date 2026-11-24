@@ -8,7 +8,7 @@ import pytest
 from orquestador.estado import Conflicto, Registro
 from orquestador.estado_mongo import EstadoMongo
 
-pytestmark = pytest.mark.azure
+pytestmark = pytest.mark.azure(variable="ESTADO_MONGO_URL")
 
 
 @pytest.mark.parametrize("repeticion", range(10))

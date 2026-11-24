@@ -29,7 +29,7 @@ En el **orquestador**, al lado de las versiones en memoria: `servicios/orquestad
 ## Para quien implemente
 
 - Leer antes `plan.md` (secciones "Mensajes internos" y "Estado") y "Manejo de errores" del paso 4 de `contexto/flujo-documental-opcion-a.md`. También las interfaces: `estado.py`, `cola.py` y el bucle `procesar_uno` de `errores.py`, que es quien usa la cola.
-- **Las pruebas normales no tocan Azure.** La versión de Mongo se prueba con un Mongo falso en memoria (recomendado: `mongomock`, como dependencia de pruebas). La de Service Bus, con un cliente falso mínimo que imite lo que se usa del SDK. Las pruebas contra Azure llevan la marca `azure` y solo corren si están sus variables de entorno. Si no están, se saltan.
+- **Las pruebas normales no tocan Azure.** La versión de Mongo se prueba con un Mongo falso en memoria (recomendado: `mongomock`, como dependencia de pruebas). La de Service Bus, con un cliente falso mínimo que imite lo que se usa del SDK. Las pruebas contra Azure llevan la marca `azure(variable=...)` y solo corren con `--azure` y con la variable de entorno indicada.
 - **Los recursos de Azure son compartidos.** Cada prueba contra Azure usa un `id_proceso` inventado y único (`PRUEBA-<uuid>`) y borra lo suyo al terminar. Contra Service Bus, solo se corren cuando no hay workers consumiendo las colas de desarrollo, porque la prueba recibiría sus mensajes. Se vacía lo que la prueba publicó.
 - **Nada de secretos** en el código, las pruebas, los registros ni el repositorio. La cadena de conexión se lee de una variable de entorno y nunca se imprime.
 - **El repositorio de GitHub es público.** No se escriben en él nombres de cuentas, namespaces ni grupos de Azure: van en variables de entorno.
@@ -53,12 +53,12 @@ En el **orquestador**, al lado de las versiones en memoria: `servicios/orquestad
 
 - [x] **T02 — `EstadoMongo`.** Implementa `Estado` sobre una colección de `pymongo`. Recibe la colección ya armada, para poder pasarle una falsa en las pruebas, y trae una función que la arma desde el entorno (`ESTADO_MONGO_URL`, y la base y la colección con valores por defecto `evaluacion_ofertas` y `estado`). Pasa la batería de T01 con `mongomock`.
   - Forma de cada documento: `{"_id": {"p": <id_proceso>, "t": <tipo>, "i": <id>}, "id_proceso", "tipo", "id", "version", "datos": {...}}`. `datos` va anidado, para que un campo del flujo nunca choque con `version` ni con `_id`.
-  - Se valida con `_revisar` antes de tocar Mongo (lo que no es JSON da `TypeError`, como en memoria) y se revisa el tamaño del documento BSON completo contra el límite de Cosmos (2 MB): si se pasa, `ErrorEstado` con el tamaño, sin el contenido.
+  - Se valida con `_revisar` antes de tocar Mongo. Como en memoria, los objetos que JSON no puede serializar dan `TypeError` y los números no finitos dan `ValueError`. Se revisa el tamaño del documento BSON completo contra el límite de Cosmos (2 MB). Si se pasa, se lanza `ErrorEstado` con el tamaño, sin el contenido.
   - **Todo filtro lleva `id_proceso`**, porque es la clave de partición. La única excepción es `procesos()` (`distinct`), que la usan solo los trabajos periódicos.
   - `crear_si_no_existe`: `insert_one`. Ante `DuplicateKeyError`, lee lo que quedó y lo devuelve con `False`.
   - `reemplazar`: `replace_one` con filtro `{_id, id_proceso, version}` que escribe `version + 1`. Si no coincide nada, se lee para distinguir `ErrorEstado` (no existe) de `Conflicto` (cambió).
   - `listar`: `find` por `id_proceso` y, si viene, `tipo`. El orden se hace en Python, porque no es alfabético.
-  - **Límite de RU:** Cosmos responde el error 16500 (`TooManyRequests`), a veces con el tiempo de espera en el mensaje (`RetryAfterMs`). Se convierte en `ErrorTransitorio` con ese `espera_s` en segundos, para que el bucle lo reprograme sin contar intento (R19). Si no viene el tiempo, se usa una espera por defecto (parámetro, 1 s), para que el límite de RU nunca gaste intentos. Puede llegar también al recorrer un cursor de `find`. Los errores de red de `pymongo` son `ErrorTransitorio` sin espera.
+  - **Límite de RU.** Cosmos responde el error 16500 (`TooManyRequests`), a veces con el tiempo de espera en el mensaje (`RetryAfterMs`). Se convierte en `ErrorTransitorio` con ese `espera_s` en segundos. Si falta el tiempo, se usa el valor configurable de 1 s por defecto. Las primeras `max_esperas` (20) reprogramaciones no cuentan como intento (R19). Al alcanzar el límite, el bucle sigue la ruta de falla transitoria, que sí cuenta intentos. El 16500 puede llegar también al recorrer un cursor de `find`. Los errores de red y los timeouts de `pymongo` son `ErrorTransitorio` sin espera.
   - La cadena de conexión de Cosmos trae `retrywrites=false`: no cambiarlo.
 
 - [x] **T03 — `EstadoMongo` contra la base de desarrollo.** Correr la batería de T01 con la marca `azure` contra la base real (`ESTADO_MONGO_URL` del entorno). Repetir contra Mongo las pruebas de mensajes repetidos y de cambio condicional, con dos hilos que intentan crear o reemplazar lo mismo a la vez: gana uno y el otro recibe `False` o `Conflicto`. La corrió el usuario el 2026-11-24.
@@ -108,13 +108,13 @@ En el **orquestador**, al lado de las versiones en memoria: `servicios/orquestad
 
 `test_estado_contrato.py` parametriza el fixture `estado` por fábrica, con `memoria` como primer caso.
 Cada prueba usa IDs de proceso propios y `procesos()` se comprueba sobre esos IDs para que la batería pueda correr en una base compartida.
-`guardar()` se sigue probando con `EstadoEnMemoria` en `test_interfaces.py`. La implementación en memoria cumple los casos agregados sin cambios.
+`guardar()` se sigue probando con `EstadoEnMemoria` en `test_interfaces.py`. `leer` devuelve `None` si el tipo es desconocido. Las dos implementaciones rechazan `NaN` e infinitos al crear o reemplazar.
 
 ### T02 — EstadoMongo
 
 `EstadoMongo` valida el BSON completo, usa `id_proceso` en las operaciones por partición y reemplaza por versión. El límite de RU se traduce a una espera con un valor configurable cuando Cosmos no indica el tiempo.
+La versión en memoria acepta enteros fuera del rango de 64 bits con signo y claves con `\u0000`. Mongo los rechaza con `ErrorEstado`. El flujo no usa esos valores ni claves.
 La batería de T01 también corre con `mongomock`, que acepta el `_id` en subdocumento y conserva las claves con `.` y `$` en `datos`. Como `mongomock` funciona en memoria, la clave de partición y las fallas de red y de RU se prueban con envoltorios y colecciones falsas.
-T03 confirmará estos formatos y el `distinct` entre particiones en Cosmos, probará la concurrencia real y medirá el consumo de RU.
 
 ### T03 — EstadoMongo contra la base de desarrollo
 
@@ -124,22 +124,22 @@ Desde `servicios/orquestador`, en Bash, pega la cadena de desarrollo cuando `rea
 read -rs ESTADO_MONGO_URL
 printf '\n'
 export ESTADO_MONGO_URL
-uv run pytest -m azure -v
+uv run pytest --azure -m azure -v
 uv run python scripts/medir_ru_estado.py
 unset ESTADO_MONGO_URL
 ```
 
-Las 36 pruebas hacen unas 230 solicitudes, incluidos los borrados. Con 60–70 ms por solicitud, son unos 14–16 s de ida y vuelta en serie. Reserva unos 20–35 s para las pruebas, contando la conexión inicial y la carga de la base. El script hace unas 22 solicitudes, incluidas las de estadísticas y limpieza. Reserva unos 2–5 s.
+La batería hace unas 230 solicitudes, incluidos los borrados. Con 60–70 ms por solicitud, son unos 14–16 s de ida y vuelta en serie. Reserva unos 20–35 s para las pruebas, contando la conexión inicial y la carga de la base. El script hace unas 24 solicitudes, incluidas las de estadísticas y limpieza. Reserva unos 2–5 s.
 
-Revisa que Cosmos guarde y encuentre el `_id` en subdocumento y que las claves de `datos.esperados` con `.` y `$` inicial se conserven al crear, leer y reemplazar. `distinct` debe devolver los procesos de prueba de varias particiones en el orden que aplica `procesos()`. En cada una de las diez carreras de creación debe haber un `True` y una copia del registro ganador para cada hilo. En las diez carreras de reemplazo, un hilo debe guardar la versión 2 y el otro recibir `Conflicto`.
+Revisa que Cosmos guarde y encuentre el `_id` en subdocumento y que las claves de `datos.esperados` con `.` y `$` inicial se conserven al crear, leer y reemplazar. `distinct` debe devolver los procesos de prueba de varias particiones en el orden que aplica `procesos()`. En cada carrera de creación debe haber un `True` y una copia del registro ganador para cada hilo. En cada carrera de reemplazo, un hilo debe guardar la versión 2 y el otro recibir `Conflicto`.
 
 Si Cosmos rechaza el `_id` en subdocumento, aplica el plan acordado de usar un texto con separador escapado y repite las pruebas. Si falla la ida y vuelta de las claves o `distinct`, anota la operación y el código de error sin copiar datos de conexión. Si la consulta por `tipo` falla o resulta costosa por falta de índice, anótalo y agrega el índice en `infra/recursos.bicep` de `infra-azure-inicial`.
 
-El script mide los milisegundos de la operación completa. La RU corresponde a la última solicitud de esa operación. `crear repetido` y `reemplazar con conflicto` hacen también una lectura interna, así que en esas filas la RU corresponde a esa lectura.
+El script mide el tiempo de las operaciones de estado sin incluir las consultas de estadísticas. Para `crear repetido` y `reemplazar con conflicto` muestra el total de RU y el desglose de las dos solicitudes de cada operación.
 
-**Resultado (2026-11-24, corrida del usuario).** Las 36 pruebas `azure` pasaron en 36 s: Cosmos acepta el `_id` en subdocumento, conserva las claves con `.` y `$` en `datos`, `distinct` devuelve los procesos de varias particiones, y en las 20 carreras con dos hilos ganó siempre uno solo. No hace falta el plan B. La limpieza dejó 0 documentos `PRUEBA-`. `pymongo` avisa con un `UserWarning` que está conectado a Cosmos; es solo informativo.
+**Resultado (2026-11-24, corrida del usuario).** La batería `azure` pasó en 36 s. Cosmos acepta el `_id` en subdocumento, conserva las claves con `.` y `$` en `datos` y `distinct` devuelve los procesos de varias particiones. En todas las carreras con dos hilos ganó uno solo. La limpieza dejó 0 documentos `PRUEBA-`. `pymongo` emite un `UserWarning` informativo al conectarse a Cosmos.
 
-RU y tiempo de cada operación, con un oferente de 80 archivos en `esperados`:
+La medición usó un solo registro por partición, con un oferente de 80 archivos en `esperados`.
 
 | Operación | RU | ms |
 |---|---|---|
@@ -153,10 +153,19 @@ RU y tiempo de cada operación, con un oferente de 80 archivos en `esperados`:
 | Listar por tipo | 5,74 | 145 |
 | Procesos | 2,29 | 155 |
 
+Queda pendiente que el usuario vuelva a medir las RU de `crear repetido` y `reemplazar con conflicto` con el script corregido. Los valores históricos de la tabla corresponden a la lectura posterior.
+
 Lo que sale de aquí:
 
 - **Latencia:** cada solicitud tarda de 150 a 200 ms desde la máquina del usuario, más que los 60 a 70 ms estimados entre regiones de Azure. Las operaciones que hacen dos solicitudes (crear repetido, conflicto) tardan el doble. Desde los jobs en Azure debería bajar; se mide cuando corran allá.
-- **Consumo:** escribir un documento de este tamaño cuesta de 10 a 20 RU y leerlo unos 3. Un proceso con unos cientos de operaciones de estado queda muy por debajo de las 100 RU/s mínimas de la base.
-- **Índice por `tipo`:** no hace falta por ahora; `listar` por tipo cuesta menos de 6 RU.
+- **Consumo.** Escribir un documento de este tamaño cuesta de 10 a 20 RU y leerlo unas 3. Las RU/s dependen de cuántas operaciones caen en el mismo segundo. Cinco reemplazos de 20,33 RU en un segundo superan las 100 RU/s. Al alcanzar el límite, Cosmos responde con 16500 y el bucle aplica la espera.
+- **Índice por `tipo`.** `listar` por tipo costó menos de 6 RU en esa medición. El índice se revisará con un proceso real.
 
 La última línea del script cuenta los documentos cuyo `id_proceso` empieza por `PRUEBA-`, con una consulta entre particiones. El conteo esperado es `0` cuando no hay otras corridas de prueba activas. Si quedan documentos, revisa el resultado del borrado y verifica con el equipo si hay otra corrida en curso antes de intervenir en la base compartida.
+
+### Revisión de T01 a T03
+
+- El adaptador toma `RetryAfterMs` de los campos de error previstos, reintenta los timeouts de escritura y oculta los detalles del servidor en fallas inesperadas. Exige escrituras confirmadas y revisa JSON y BSON antes de escribir.
+- La batería verifica la lectura de tipos desconocidos, la validación antes de llamar a Mongo y los mensajes repetidos y conflictos en memoria y con `mongomock`. Azure exige `--azure` y su variable. La limpieza reintenta borrados transitorios por partición y el script suma las RU de cada solicitud de las operaciones compuestas.
+- Con `DEBUG`, el registrador `pymongo.command` muestra el host y el documento. El punto de entrada del worker, en la pieza siguiente, debe dejarlo en `WARNING` o más.
+- Si el registro no existe durante `replace_one` y otro trabajador lo crea antes de la lectura, `reemplazar` puede devolver un `Conflicto` aparente. En este flujo se reemplazan registros leídos previamente y nunca se borran.
