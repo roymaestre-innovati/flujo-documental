@@ -2,7 +2,6 @@
 
 from copy import deepcopy
 from dataclasses import replace
-from uuid import uuid4
 
 import mongomock
 import pytest
@@ -11,19 +10,29 @@ from orquestador.estado import Conflicto, ErrorEstado, EstadoEnMemoria, Registro
 from orquestador.estado_mongo import EstadoMongo
 
 
-def _estado_mongo():
+@pytest.fixture
+def estado_mongomock():
     return EstadoMongo(mongomock.MongoClient().evaluacion_ofertas.estado)
 
 
-# Cada implementación agrega su fábrica como un parámetro de este fixture.
-@pytest.fixture(params=[pytest.param(EstadoEnMemoria, id="memoria"), pytest.param(_estado_mongo, id="mongomock")])
-def estado(request):
-    return request.param()
+@pytest.fixture
+def estado_en_memoria():
+    return EstadoEnMemoria()
 
 
 @pytest.fixture
-def procesos_de_prueba():
-    return f"PRUEBA-{uuid4()}", f"PRUEBA-{uuid4()}"
+def estado_mongo_azure(coleccion_mongo_de_prueba):
+    return EstadoMongo(coleccion_mongo_de_prueba)
+
+
+# Cada implementación agrega su fixture como un parámetro de este fixture.
+@pytest.fixture(params=[
+    pytest.param("estado_en_memoria", id="memoria"),
+    pytest.param("estado_mongomock", id="mongomock"),
+    pytest.param("estado_mongo_azure", id="azure", marks=pytest.mark.azure),
+])
+def estado(request):
+    return request.getfixturevalue(request.param)
 
 
 @pytest.fixture

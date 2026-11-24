@@ -61,7 +61,7 @@ En el **orquestador**, al lado de las versiones en memoria: `servicios/orquestad
   - **Límite de RU:** Cosmos responde el error 16500 (`TooManyRequests`), a veces con el tiempo de espera en el mensaje (`RetryAfterMs`). Se convierte en `ErrorTransitorio` con ese `espera_s` en segundos, para que el bucle lo reprograme sin contar intento (R19). Si no viene el tiempo, se usa una espera por defecto (parámetro, 1 s), para que el límite de RU nunca gaste intentos. Puede llegar también al recorrer un cursor de `find`. Los errores de red de `pymongo` son `ErrorTransitorio` sin espera.
   - La cadena de conexión de Cosmos trae `retrywrites=false`: no cambiarlo.
 
-- [ ] **T03 — `EstadoMongo` contra la base de desarrollo.** Correr la batería de T01 con la marca `azure` contra la base real (`ESTADO_MONGO_URL` del entorno). Repetir contra Mongo las pruebas de mensajes repetidos y de cambio condicional, con dos hilos que intentan crear o reemplazar lo mismo a la vez: gana uno y el otro recibe `False` o `Conflicto`. La corre el usuario.
+- [ ] **T03 — `EstadoMongo` contra la base de desarrollo.** Correr la batería de T01 con la marca `azure` contra la base real (`ESTADO_MONGO_URL` del entorno). Repetir contra Mongo las pruebas de mensajes repetidos y de cambio condicional, con dos hilos que intentan crear o reemplazar lo mismo a la vez: gana uno y el otro recibe `False` o `Conflicto`. (pendiente: la corre el usuario)
   - Si una consulta por `tipo` falla o cuesta mucho por falta de índice, anotarlo: el índice se agrega en la infraestructura (`infra/recursos.bicep`, rama `infra-azure-inicial`), no en el código.
   - Anotar el costo en RU de cada operación (`db.command("getLastRequestStatistics")`), para tener una idea del consumo, fuera de la prueba con hilos.
   - Confirmar que Cosmos acepta el `_id` en subdocumento, las claves con `.` y `$` en `datos`, y que `distinct` devuelve procesos de varias particiones.
@@ -115,3 +115,38 @@ Cada prueba usa IDs de proceso propios y `procesos()` se comprueba sobre esos ID
 `EstadoMongo` valida el BSON completo, usa `id_proceso` en las operaciones por partición y reemplaza por versión. El límite de RU se traduce a una espera con un valor configurable cuando Cosmos no indica el tiempo.
 La batería de T01 también corre con `mongomock`, que acepta el `_id` en subdocumento y conserva las claves con `.` y `$` en `datos`. Como `mongomock` funciona en memoria, la clave de partición y las fallas de red y de RU se prueban con envoltorios y colecciones falsas.
 T03 confirmará estos formatos y el `distinct` entre particiones en Cosmos, probará la concurrencia real y medirá el consumo de RU.
+
+### T03 — EstadoMongo contra la base de desarrollo
+
+Desde `servicios/orquestador`, en Bash, pega la cadena de desarrollo cuando `read` esté esperando. La entrada queda oculta y fuera del historial.
+
+```bash
+read -rs ESTADO_MONGO_URL
+printf '\n'
+export ESTADO_MONGO_URL
+uv run pytest -m azure -v
+uv run python scripts/medir_ru_estado.py
+unset ESTADO_MONGO_URL
+```
+
+Las 36 pruebas hacen unas 230 solicitudes, incluidos los borrados. Con 60–70 ms por solicitud, son unos 14–16 s de ida y vuelta en serie. Reserva unos 20–35 s para las pruebas, contando la conexión inicial y la carga de la base. El script hace unas 22 solicitudes, incluidas las de estadísticas y limpieza. Reserva unos 2–5 s.
+
+Revisa que Cosmos guarde y encuentre el `_id` en subdocumento y que las claves de `datos.esperados` con `.` y `$` inicial se conserven al crear, leer y reemplazar. `distinct` debe devolver los procesos de prueba de varias particiones en el orden que aplica `procesos()`. En cada una de las diez carreras de creación debe haber un `True` y una copia del registro ganador para cada hilo. En las diez carreras de reemplazo, un hilo debe guardar la versión 2 y el otro recibir `Conflicto`.
+
+Si Cosmos rechaza el `_id` en subdocumento, aplica el plan acordado de usar un texto con separador escapado y repite las pruebas. Si falla la ida y vuelta de las claves o `distinct`, anota la operación y el código de error sin copiar datos de conexión. Si la consulta por `tipo` falla o resulta costosa por falta de índice, anótalo y agrega el índice en `infra/recursos.bicep` de `infra-azure-inicial`.
+
+El script mide los milisegundos de la operación completa. La RU corresponde a la última solicitud de esa operación. `crear repetido` y `reemplazar con conflicto` hacen también una lectura interna, así que en esas filas la RU corresponde a esa lectura.
+
+| Operación | RU |
+|---|---|
+| Leer inexistente | |
+| Crear | |
+| Crear repetido | |
+| Leer | |
+| Reemplazar | |
+| Reemplazar con conflicto | |
+| Listar | |
+| Listar por tipo | |
+| Procesos | |
+
+La última línea del script cuenta los documentos cuyo `id_proceso` empieza por `PRUEBA-`, con una consulta entre particiones. El conteo esperado es `0` cuando no hay otras corridas de prueba activas. Si quedan documentos, revisa el resultado del borrado y verifica con el equipo si hay otra corrida en curso antes de intervenir en la base compartida.

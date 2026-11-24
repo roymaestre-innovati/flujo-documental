@@ -42,7 +42,8 @@ packages = ["src/orquestador"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "-ra --strict-markers"
+addopts = '-ra --strict-markers -m "not azure"'
 markers = [
     "libreoffice: necesita el comando soffice; se salta si no está instalado",
+    "azure: usa recursos de desarrollo; acepta variable para indicar el requisito de entorno",
 ]
