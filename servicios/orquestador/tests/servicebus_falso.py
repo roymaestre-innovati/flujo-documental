@@ -160,6 +160,29 @@ class ReceptorFalso:
         self.cerrado = True
 
 
+class RenovadorFalso:
+    def __init__(self, cliente: "ServiceBusFalso", *, max_lock_renewal_duration: float,
+                 on_lock_renew_failure, max_workers: int):
+        self.cliente = cliente
+        self.max_lock_renewal_duration = max_lock_renewal_duration
+        self.on_lock_renew_failure = on_lock_renew_failure
+        self.max_workers = max_workers
+        self.registros: list[tuple[ReceptorFalso, MensajeRecibidoFalso]] = []
+        self.cerrado = False
+
+    def register(self, receptor: ReceptorFalso, mensaje: MensajeRecibidoFalso) -> None:
+        assert not self.cerrado and mensaje._receptor is receptor
+        self.registros.append((receptor, mensaje))
+
+    def fallar(self, mensaje: MensajeRecibidoFalso, error: Exception | None) -> None:
+        assert (mensaje._receptor, mensaje) in self.registros
+        self.on_lock_renew_failure(mensaje, error)
+
+    def close(self) -> None:
+        self.cliente.operar("close_renewer")
+        self.cerrado = True
+
+
 class ServiceBusFalso:
     def __init__(self, *, tope_peek: int = 100):
         self.colas = defaultdict(list)
@@ -167,6 +190,7 @@ class ServiceBusFalso:
         self.tope_peek = tope_peek
         self.emisores = []
         self.receptores = []
+        self.renovadores: list[RenovadorFalso] = []
         self.envios = []
         self.fallas: dict[str, Exception] = {}
         self.operaciones: list[str] = []
@@ -191,6 +215,11 @@ class ServiceBusFalso:
         receptor = ReceptorFalso(self, queue_name, sub_queue, receive_mode, prefetch_count, max_wait_time)
         self.receptores.append(receptor)
         return receptor
+
+    def crear_renovador(self, **opciones) -> RenovadorFalso:
+        renovador = RenovadorFalso(self, **opciones)
+        self.renovadores.append(renovador)
+        return renovador
 
     def close(self) -> None:
         self.operar("close_client")

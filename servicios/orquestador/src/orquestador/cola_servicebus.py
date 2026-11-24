@@ -5,10 +5,13 @@ El comando local usa ColaEnMemoria.
 """
 
 import json
+import logging
 import os
 from collections.abc import Callable, Iterator
 from contextlib import ExitStack, contextmanager, suppress
+from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
+from threading import Lock
 from typing import Self
 from uuid import uuid4
 
@@ -20,6 +23,7 @@ from azure.core.exceptions import (
 )
 from azure.identity import DefaultAzureCredential
 from azure.servicebus import (
+    AutoLockRenewer,
     ServiceBusClient,
     ServiceBusMessage,
     ServiceBusReceivedMessage,
@@ -45,10 +49,15 @@ from azure.servicebus.exceptions import (
 
 from .cola import COLAS, BloqueoPerdido, Cola, ErrorCola, Mensaje, MensajeEnErrores
 from .errores import ErrorDeConfiguracion, ErrorTransitorio
+from .parametros import PARAMETROS, Parametros
+
+registro = logging.getLogger(__name__)
 
 PREFIJO_COLAS = "evaluacion-ofertas-"
 ESPERA_SERVICIO_OCUPADO_S = 10
 ESPERA_REENVIO_S = 1
+# Un hilo para el despachador del SDK y otro para renovar la entrega del worker.
+HILOS_RENOVADOR = 2
 TAMANO_PAGINA = 100
 # Standard admite 256 KiB por mensaje. Dejamos margen para las cabeceras y el motivo de errores.
 LIMITE_MENSAJE_BYTES = 248_000
@@ -127,14 +136,35 @@ def _mensaje(cola: str, original: ServiceBusReceivedMessage, *, en_errores: bool
                    entregas=(original.delivery_count or 0) + 1, bloqueo=str(bloqueo) if bloqueo is not None else None)
 
 
+@dataclass
+class _Entrega:
+    cola: str
+    original: ServiceBusReceivedMessage
+    receptor: ServiceBusReceiver
+    perdida: bool = False
+
+
 class ColaServiceBus(Cola):
-    def __init__(self, cliente: ServiceBusClient, prefijo: str = PREFIJO_COLAS, espera_recibir_s: float = 5) -> None:
+    """Renueva los bloqueos de la cola principal con un renovador por instancia.
+
+    Al completar, abandonar o mandar a errores, el receptor del SDK marca el
+    mensaje como `_settled` y `AutoLockRenewer` deja de renovarlo automáticamente.
+    """
+
+    def __init__(
+        self, cliente: ServiceBusClient, prefijo: str = PREFIJO_COLAS, espera_recibir_s: float = 5, *,
+        parametros: Parametros = PARAMETROS, crear_renovador: Callable[..., AutoLockRenewer] = AutoLockRenewer,
+    ) -> None:
         self._cliente = cliente
         self._prefijo = prefijo
         self._espera_recibir_s = espera_recibir_s
+        self._parametros = parametros
+        self._crear_renovador = crear_renovador
+        self._renovador: AutoLockRenewer | None = None
         self._emisores: dict[str, ServiceBusSender] = {}
         self._receptores: dict[tuple[str, ServiceBusSubQueue | None], ServiceBusReceiver] = {}
-        self._bloqueados: dict[str, tuple[str, ServiceBusReceivedMessage, ServiceBusReceiver]] = {}
+        self._bloqueados: dict[str, _Entrega] = {}
+        self._candado_bloqueados = Lock()
         self._abandonados: dict[tuple[str, str], set[str]] = {}
         self._recursos = ExitStack()
         self._recursos.callback(_cerrar, cliente, "cerrar cliente")
@@ -206,8 +236,35 @@ class ColaServiceBus(Cola):
         mensaje = _mensaje(cola, original)
         if mensaje.bloqueo is None:
             raise ErrorCola(f"Service Bus recibir en {cola}: entrega sin bloqueo")
-        self._bloqueados[mensaje.bloqueo] = (cola, original, receptor)
+        with self._candado_bloqueados:
+            self._bloqueados[mensaje.bloqueo] = _Entrega(cola, original, receptor)
+        try:
+            with _traducir_fallas("registrar renovación", cola):
+                if self._renovador is None:
+                    self._renovador = self._crear_renovador(
+                        max_lock_renewal_duration=self._parametros.renovacion_bloqueo_max_s,
+                        on_lock_renew_failure=self._marcar_bloqueo_perdido,
+                        max_workers=HILOS_RENOVADOR,
+                    )
+                self._renovador.register(receptor, original)
+        except Exception:
+            with self._candado_bloqueados:
+                self._bloqueados.pop(mensaje.bloqueo, None)
+            raise
         return mensaje
+
+    def _marcar_bloqueo_perdido(self, original: ServiceBusReceivedMessage, error: Exception | None) -> None:
+        bloqueo = original.lock_token
+        if bloqueo is None:
+            return
+        with self._candado_bloqueados:
+            entrega = self._bloqueados.get(str(bloqueo))
+            if entrega is None or entrega.perdida:
+                return
+            entrega.perdida = True
+        tipo_error = type(error).__name__ if error is not None else "sin excepción"
+        registro.warning("Falló la renovación del bloqueo del mensaje %s en %s (%s)",
+                         original.message_id, entrega.cola, tipo_error)
 
     @staticmethod
     def _resolver_sdk(cola: str, receptor: ServiceBusReceiver, original: ServiceBusReceivedMessage,
@@ -218,14 +275,16 @@ class ColaServiceBus(Cola):
     def _resolver(self, mensaje: Mensaje, operacion: str, **opciones) -> None:
         bloqueo = mensaje.bloqueo
         clave = (mensaje.cola, mensaje.id)
-        entrega = self._bloqueados.pop(bloqueo, None) if bloqueo is not None else None
+        with self._candado_bloqueados:
+            entrega = self._bloqueados.pop(bloqueo, None) if bloqueo is not None else None
         if entrega is None:
             if bloqueo in self._abandonados.get(clave, ()):
                 raise BloqueoPerdido(f"Service Bus {operacion} en {mensaje.cola}: entrega abandonada")
             raise ErrorCola("La entrega ya se resolvió o nunca se recibió")
-        cola, original, receptor = entrega
-        self._resolver_sdk(cola, receptor, original, operacion, **opciones)
-        clave_original = (cola, original.message_id)
+        if entrega.perdida:
+            raise BloqueoPerdido(f"Service Bus {operacion} en {entrega.cola}: falló la renovación del bloqueo")
+        self._resolver_sdk(entrega.cola, entrega.receptor, entrega.original, operacion, **opciones)
+        clave_original = (entrega.cola, entrega.original.message_id)
         if operacion == "abandon_message":
             # Conservamos solo el token anterior, para distinguir una copia obsoleta de una entrega desconocida.
             self._abandonados.setdefault(clave_original, set()).add(bloqueo)
@@ -289,11 +348,15 @@ class ColaServiceBus(Cola):
 
     def cerrar(self) -> None:
         self._cerrada = True
-        self._bloqueados.clear()
+        with self._candado_bloqueados:
+            self._bloqueados.clear()
         self._abandonados.clear()
         self._receptores.clear()
         self._emisores.clear()
-        self._recursos.close()
+        renovador, self._renovador = self._renovador, None
+        with self._recursos:
+            if renovador is not None:
+                _cerrar(renovador, "cerrar renovador")
 
     def __enter__(self) -> Self:
         return self

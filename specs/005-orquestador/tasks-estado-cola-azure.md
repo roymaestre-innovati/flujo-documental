@@ -87,7 +87,7 @@ En el **orquestador**, al lado de las versiones en memoria: `servicios/orquestad
   - `recibir` usa `max_wait_time` configurable (5 s por defecto). `None` quiere decir que no llegó nada en ese tiempo, aunque queden mensajes programados o bloqueados.
   - Una instancia por hilo: los receptores del SDK no son seguros entre hilos. El comando local sigue con `ColaEnMemoria`.
 
-- [ ] **T06 — Renovación del bloqueo.**
+- [x] **T06 — Renovación del bloqueo.**
   - **Renovación:** el bloqueo dura 5 minutos y una normalización puede tardar más. `ColaServiceBus` registra cada mensaje recibido en un `AutoLockRenewer` (uno por instancia, con un máximo configurable, por defecto 30 minutos). El renovador no tiene cómo soltar un mensaje: deja de renovarlo cuando se completa, abandona o manda a errores, y se cierra al cerrar la cola. La interfaz no cambia. Probarlo con el cliente falso: un mensaje recibido queda registrado una sola vez.
   - [x] **Reenvío seguro en Service Bus, hecho en T05.** `reenviar_errores` recibe con bloqueo en la cola de errores, completa y cuenta cada original después de republicarlo. La prueba con el falso comprueba que un fallo de envío deja el original en errores.
 
@@ -181,3 +181,8 @@ En memoria, el reenvío publica y retira los mensajes de errores en orden bajo e
 El adaptador reusa emisores y receptores por cola, resuelve por token y pagina el diagnóstico con `peek`. Limita el cuerpo y las propiedades a 248 000 bytes medidos en JSON para dejar margen a las cabeceras. El reenvío publica con un id nuevo antes de completar el original, por lo que una caída entre ambas operaciones puede dejar un duplicado.
 En el SDK 7.15, `delivery_count` lee el encabezado AMQP y el adaptador suma uno. El cuerpo DATA puede llegar en fragmentos de bytes y el SDK entrega las propiedades de texto como bytes. Python pasa los campos de errores al servicio sin recortarlos. El adaptador usa hasta 200 caracteres en `reason` y conserva el motivo en `error_description` hasta las 4096 unidades de texto documentadas para .NET. [AMQP 1.0](https://docs.oasis-open.org/amqp/core/v1.0/amqp-core-messaging-v1.0.html), [documentación de Service Bus](https://learn.microsoft.com/en-us/dotnet/api/azure.messaging.servicebus.servicebusreceiver.deadlettermessageasync).
 T07 queda para repetir el contrato contra Azure y confirmar la primera entrega, la demora, `peek`, los permisos y el reenvío. También verifica la renovación después de T06.
+
+### T06 — Renovación del bloqueo
+
+Cada instancia crea un `AutoLockRenewer` al recibir la primera entrega de la cola principal. El máximo es configurable (30 minutos por defecto) y el SDK usa dos hilos. La pérdida se marca por token bajo un candado y la resolución devuelve `BloqueoPerdido` sin llamar al SDK. La subcola de errores se procesa sin renovación.
+El receptor del SDK marca el mensaje con `_settled` al resolverlo y el renovador deja de renovarlo. La cola cierra el renovador antes que los receptores y el cliente. T07 queda para correr el contrato en Azure y comprobar la renovación con una entrega de más de cinco minutos.

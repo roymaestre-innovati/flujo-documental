@@ -18,7 +18,8 @@ def cola_en_memoria():
 
 @pytest.fixture
 def cola_servicebus_falso():
-    with ColaServiceBus(ServiceBusFalso(), espera_recibir_s=0.05) as cola:
+    cliente = ServiceBusFalso()
+    with ColaServiceBus(cliente, espera_recibir_s=0.05, crear_renovador=cliente.crear_renovador) as cola:
         yield cola, 0.3, 2
 
 
