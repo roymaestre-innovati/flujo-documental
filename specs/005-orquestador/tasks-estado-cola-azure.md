@@ -18,8 +18,8 @@ Están en `specs/005-orquestador/pendientes-azure.md` de la rama `infra-azure-in
 Decidido al revisar este plan (2026-11-24, con una segunda opinión de Codex):
 
 - **`_id` de Mongo con el proceso adentro.** Cosmos exige `_id` único solo dentro de cada partición, pero `mongomock` y un Mongo normal lo exigen en toda la colección, y los ids de oferente (`PROCESO`, `OF-001`) se repiten entre procesos. Se usa un subdocumento `{"p": id_proceso, "t": tipo, "i": id}`, sin separadores que puedan chocar con un `:` del id. Si Cosmos no lo acepta como `_id`, se pasa a un texto con separador escapado (T03 lo confirma).
-- **Bloqueo perdido.** Un `MessageLockLostError` no se traga: `ColaServiceBus` lo convierte en una excepción propia (`BloqueoPerdido`, distinta de `ErrorCola`) y `procesar_uno` la maneja: no republica, no cuenta el mensaje como hecho y no avisa que fue a errores. Service Bus lo vuelve a entregar.
-- **El reenvío de errores se define en T04**, no en T06, para que T05 no implemente `sacar_de_errores` solo para retirarlo después.
+- **Bloqueo perdido.** `ColaServiceBus` convierte `MessageLockLostError` en `BloqueoPerdido`, distinta de `ErrorCola`. `procesar_uno` registra un aviso y devuelve `bloqueo_perdido`. Service Bus vuelve a entregar el original. Si el bucle ya publicó una copia para reintentar, esa copia queda en la cola.
+- **El reenvío de errores se define en T04.** T05 parte de la interfaz con `reenviar_errores`.
 - **Las colas de desarrollo las usa solo este equipo** (2026-11-24). Las pruebas contra Service Bus revisan con *peek* al empezar que la cola y su cola de errores estén vacías y, si no, se detienen con un mensaje claro. No hacen falta colas exclusivas de prueba.
 
 ## Dónde va
@@ -66,14 +66,14 @@ En el **orquestador**, al lado de las versiones en memoria: `servicios/orquestad
   - Anotar el costo en RU de cada operación (`db.command("getLastRequestStatistics")`), para tener una idea del consumo, fuera de la prueba con hilos.
   - Confirmar que Cosmos acepta el `_id` en subdocumento, las claves con `.` y `$` en `datos`, y que `distinct` devuelve procesos de varias particiones.
 
-- [ ] **T04 — Batería de contrato de `Cola`.** Igual que T01, para las pruebas de `Cola`. Las que usan `RelojManual` para la demora quedan solo para la versión en memoria. La batería general prueba la demora con el reloj real y una espera corta: que no se vea antes y que se vea después, con margen. Agregar:
+- [x] **T04 — Batería de contrato de `Cola`.** Igual que T01, para las pruebas de `Cola`. Las que usan `RelojManual` para la demora quedan solo para la versión en memoria. La batería general prueba la demora con el reloj real y una espera corta: que no se vea antes y que se vea después, con margen. Agregar:
   - las propiedades (`intento`, `esperas`) viajan aparte del cuerpo y vuelven igual;
   - `entregas` sube con cada entrega. Service Bus cuenta desde 1 en la primera: confirmar que coincida con la versión en memoria;
-  - completar, abandonar o mandar a errores un mensaje que no está bloqueado da `ErrorCola`;
+  - completar, abandonar o mandar a errores un mensaje ya completado o que nunca se recibió da `ErrorCola`;
   - el cuerpo debe ser JSON;
   - el motivo llega a la cola de errores;
-  - `reenviar_errores(cola)` reemplaza a `sacar_de_errores`: republica en la cola original el mismo cuerpo y las propiedades sin `intento` ni `esperas`, deja vacía la cola de errores y devuelve cuántos reenvió. `errores.reenviar_errores(cola, nombre)` conserva su firma y la usa;
-  - completar con una entrega vieja (el mismo mensaje se abandonó y se volvió a recibir) da error.
+  - `reenviar_errores(cola)` republica en la cola original el mismo cuerpo y las propiedades sin `intento` ni `esperas`, deja vacía la cola de errores y devuelve cuántos reenvió. `errores.reenviar_errores(cola, nombre)` conserva su firma y la usa;
+  - completar con una entrega vieja (el mismo mensaje se abandonó y se volvió a recibir) da `BloqueoPerdido` y deja intacta la entrega vigente.
 
 - [ ] **T05 — `ColaServiceBus`.** Implementa `Cola` con `azure-servicebus` y `DefaultAzureCredential`. Recibe el namespace (`SERVICEBUS_NAMESPACE`, el nombre completo `<namespace>.servicebus.windows.net`) y el prefijo (`COLAS_PREFIJO`, por defecto `evaluacion-ofertas-`). Pasa la batería de T04 con un cliente falso.
   - **Los nombres del código no cambian.** `cola.py` sigue con `normalizar`, `clasificar`, etc., y `ColaServiceBus` les antepone el prefijo. Así la versión en memoria, las pruebas y el comando local quedan igual. Se agrega `resultados` a `COLAS`, porque la cola ya existe en Azure y la usará la entrega 2.
@@ -87,9 +87,9 @@ En el **orquestador**, al lado de las versiones en memoria: `servicios/orquestad
   - `recibir` usa `max_wait_time` configurable (5 s por defecto). `None` quiere decir que no llegó nada en ese tiempo, aunque queden mensajes programados o bloqueados.
   - Una instancia por hilo: los receptores del SDK no son seguros entre hilos. El comando local sigue con `ColaEnMemoria`.
 
-- [ ] **T06 — Renovar el bloqueo y reenviar de errores.**
+- [ ] **T06 — Renovación del bloqueo y reenvío en Service Bus.**
   - **Renovación:** el bloqueo dura 5 minutos y una normalización puede tardar más. `ColaServiceBus` registra cada mensaje recibido en un `AutoLockRenewer` (uno por instancia, con un máximo configurable, por defecto 30 minutos). El renovador no tiene cómo soltar un mensaje: deja de renovarlo cuando se completa, abandona o manda a errores, y se cierra al cerrar la cola. La interfaz no cambia. Probarlo con el cliente falso: un mensaje recibido queda registrado una sola vez.
-  - **Reenviar en Service Bus:** recibir de la cola de errores con bloqueo, publicar el mismo cuerpo sin `intento` ni `esperas` en la cola original y solo después completar. Se cuenta solo lo que se completó. Probar con el falso que si falla el envío el original sigue en errores.
+  - **Reenvío seguro en Service Bus:** implementar `reenviar_errores` con recepción con bloqueo en la cola de errores. Completar y contar cada original después de republicarlo. Probar con el falso que, si falla el envío, el original sigue en errores.
 
 - [ ] **T07 — `ColaServiceBus` contra las colas de desarrollo.** Correr la batería de T04 con la marca `azure` contra las colas reales, con `az login`. **Necesita que el administrador haya asignado los roles** de Service Bus al usuario (`infra/roles.bicep`, rama `infra-azure-inicial`). Mientras tanto, la tarea queda en espera. Probar además la renovación con un mensaje que se tiene bloqueado más de 5 minutos. La corre el usuario.
 
@@ -169,3 +169,9 @@ La última línea del script cuenta los documentos cuyo `id_proceso` empieza por
 - La batería verifica la lectura de tipos desconocidos, la validación antes de llamar a Mongo y los mensajes repetidos y conflictos en memoria y con `mongomock`. Azure exige `--azure` y su variable. La limpieza reintenta borrados transitorios por partición y el script suma las RU de cada solicitud de las operaciones compuestas.
 - Con `DEBUG`, el registrador `pymongo.command` muestra el host y el documento. El punto de entrada del worker, en la pieza siguiente, debe dejarlo en `WARNING` o más.
 - Si el registro no existe durante `replace_one` y otro trabajador lo crea antes de la lectura, `reemplazar` puede devolver un `Conflicto` aparente. En este flujo se reemplazan registros leídos previamente y nunca se borran.
+
+### T04 — Batería de contrato de Cola
+
+La batería usa una cola conocida, verifica que quede vacía junto con la de errores y recibe la demora y el plazo de cada implementación. La prueba con reloj manual queda en `test_interfaces.py`.
+Cada entrega en memoria recibe su propio token. El bucle devuelve `bloqueo_perdido` con un aviso, conserva cualquier copia de reintento ya publicada y reserva la alerta a operación para un paso a errores confirmado.
+En memoria, el reenvío publica y retira los mensajes de errores en orden bajo el mismo candado. Cada copia empieza con un id nuevo y con la primera entrega.

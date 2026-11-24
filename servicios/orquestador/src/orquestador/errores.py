@@ -16,6 +16,7 @@ lanza una de estas excepciones y el bucle decide qué hacer:
 | ErrorDeConfiguracion   | 4     | Falta un permiso, una credencial o una opción del entorno  |
 |                        |       | (por ejemplo, OneLake responde 403): sin reintento, a      |
 |                        |       | operación, con un motivo que dice qué revisar              |
+| BloqueoPerdido         | —     | Registra un aviso. La cola vuelve a entregar el mensaje    |
 | cualquier otra         | 4     | Un bug: sin reintento                                      |
 
 Cuando se agotan los reintentos, o con un bug, el bucle llama a `al_fallar` del
@@ -32,7 +33,7 @@ import logging
 from dataclasses import dataclass
 from typing import Protocol
 
-from .cola import Cola, Mensaje
+from .cola import BloqueoPerdido, Cola, Mensaje
 from .parametros import PARAMETROS, Parametros
 from .registros import alertas, contexto_de, lugar_de_la_excepcion
 
@@ -90,7 +91,7 @@ class Manejador(Protocol):
 class Resultado:
     id_mensaje: str
     desenlace: str
-    """ok, error_documento, reintento, espera, a_errores."""
+    """ok, error_documento, reintento, espera, a_errores, bloqueo_perdido."""
     motivo: str | None = None
 
 
@@ -114,40 +115,48 @@ def procesar_uno(cola: Cola, manejador: Manejador, parametros: Parametros = PARA
     mensaje = cola.recibir(manejador.cola)
     if mensaje is None:
         return None
-    intento = mensaje.propiedades.get("intento", 1)
-    esperas = mensaje.propiedades.get("esperas", 0)
     with contexto_de(mensaje.cuerpo):
         try:
-            manejador.procesar(mensaje.cuerpo)
-        except ErrorDelDocumento as error:
-            cola.completar(mensaje)
-            registro.info("Error del documento, para el evaluador: %s", type(error).__name__)
-            return Resultado(mensaje.id, "error_documento")
-        except ErrorTransitorio as error:
-            motivo = lugar_de_la_excepcion(error)
-            if error.espera_s is not None and esperas < parametros.max_esperas:
-                _reintentar(cola, mensaje, error.espera_s, esperas=esperas + 1)
-                registro.warning("El servicio pidió esperar %s s: %s", error.espera_s, motivo)
-                return Resultado(mensaje.id, "espera", motivo)
-            if intento <= parametros.reintentos_transitorio:
-                demora = parametros.demora_base_s * 2 ** (intento - 1)
-                _reintentar(cola, mensaje, demora, intento=intento + 1)
-                registro.warning("Falla transitoria, intento %s; se reintenta en %s s: %s", intento, demora, motivo)
-                return Resultado(mensaje.id, "reintento", motivo)
-            return _fallar(cola, manejador, mensaje, f"Transitoria sin resolver tras {intento} intentos: {motivo}")
-        except RespuestaInvalida as error:
-            motivo = lugar_de_la_excepcion(error)
-            if intento <= parametros.reintentos_respuesta_invalida:
-                _reintentar(cola, mensaje, 0, intento=intento + 1)
-                registro.warning("Respuesta inválida, intento %s; se reintenta: %s", intento, motivo)
-                return Resultado(mensaje.id, "reintento", motivo)
-            return _fallar(cola, manejador, mensaje, f"Respuesta inválida tras {intento} intentos: {motivo}")
-        except MensajeRechazado as error:
-            return _fallar(cola, manejador, mensaje, f"Rechazado: {error}")
-        except ErrorDeConfiguracion as error:
-            return _fallar(cola, manejador, mensaje, f"Configuración: {error}")
-        except Exception as error:  # noqa: BLE001 - clase 4: cualquier otra cosa es un bug
-            return _fallar(cola, manejador, mensaje, f"Bug: {lugar_de_la_excepcion(error)}")
+            return _procesar_mensaje(cola, manejador, mensaje, parametros)
+        except BloqueoPerdido:
+            registro.warning("Bloqueo perdido para el mensaje %s de la cola %s", mensaje.id, mensaje.cola)
+            return Resultado(mensaje.id, "bloqueo_perdido")
+
+
+def _procesar_mensaje(cola: Cola, manejador: Manejador, mensaje: Mensaje, parametros: Parametros) -> Resultado:
+    intento = mensaje.propiedades.get("intento", 1)
+    esperas = mensaje.propiedades.get("esperas", 0)
+    try:
+        manejador.procesar(mensaje.cuerpo)
+    except ErrorDelDocumento as error:
+        cola.completar(mensaje)
+        registro.info("Error del documento, para el evaluador: %s", type(error).__name__)
+        return Resultado(mensaje.id, "error_documento")
+    except ErrorTransitorio as error:
+        motivo = lugar_de_la_excepcion(error)
+        if error.espera_s is not None and esperas < parametros.max_esperas:
+            _reintentar(cola, mensaje, error.espera_s, esperas=esperas + 1)
+            registro.warning("El servicio pidió esperar %s s: %s", error.espera_s, motivo)
+            return Resultado(mensaje.id, "espera", motivo)
+        if intento <= parametros.reintentos_transitorio:
+            demora = parametros.demora_base_s * 2 ** (intento - 1)
+            _reintentar(cola, mensaje, demora, intento=intento + 1)
+            registro.warning("Falla transitoria, intento %s; se reintenta en %s s: %s", intento, demora, motivo)
+            return Resultado(mensaje.id, "reintento", motivo)
+        return _fallar(cola, manejador, mensaje, f"Transitoria sin resolver tras {intento} intentos: {motivo}")
+    except RespuestaInvalida as error:
+        motivo = lugar_de_la_excepcion(error)
+        if intento <= parametros.reintentos_respuesta_invalida:
+            _reintentar(cola, mensaje, 0, intento=intento + 1)
+            registro.warning("Respuesta inválida, intento %s; se reintenta: %s", intento, motivo)
+            return Resultado(mensaje.id, "reintento", motivo)
+        return _fallar(cola, manejador, mensaje, f"Respuesta inválida tras {intento} intentos: {motivo}")
+    except MensajeRechazado as error:
+        return _fallar(cola, manejador, mensaje, f"Rechazado: {error}")
+    except ErrorDeConfiguracion as error:
+        return _fallar(cola, manejador, mensaje, f"Configuración: {error}")
+    except Exception as error:  # noqa: BLE001 - clase 4: cualquier otra cosa es un bug
+        return _fallar(cola, manejador, mensaje, f"Bug: {lugar_de_la_excepcion(error)}")
     cola.completar(mensaje)
     return Resultado(mensaje.id, "ok")
 
@@ -156,10 +165,6 @@ def reenviar_errores(cola: Cola, nombre: str) -> int:
     """Vuelve a publicar todo lo que está en la cola de errores de `nombre`,
     desde el primer intento. Lo usa operación después de corregir la causa (R21).
     Devuelve cuántos mensajes reenvió."""
-    sacados = cola.sacar_de_errores(nombre)
-    for en_errores in sacados:
-        propiedades = {k: v for k, v in en_errores.mensaje.propiedades.items() if k not in ("intento", "esperas")}
-        cola.publicar(nombre, en_errores.mensaje.cuerpo, 0, propiedades)
-    if sacados:
-        registro.info("Reenviados %s mensajes de errores de la cola %s", len(sacados), nombre)
-    return len(sacados)
+    reenviados = cola.reenviar_errores(nombre)
+    registro.info("Reenviados %s mensajes de errores de la cola %s", reenviados, nombre)
+    return reenviados

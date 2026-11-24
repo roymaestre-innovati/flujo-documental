@@ -35,28 +35,6 @@ def cola(reloj):
     return c.ColaEnMemoria(reloj)
 
 
-def test_cola_entrega_en_orden_y_bloquea(cola):
-    cola.publicar(c.NORMALIZAR, {"n": 1})
-    cola.publicar(c.NORMALIZAR, {"n": 2})
-    primero = cola.recibir(c.NORMALIZAR)
-    segundo = cola.recibir(c.NORMALIZAR)
-    assert (primero.cuerpo, segundo.cuerpo) == ({"n": 1}, {"n": 2})
-    assert cola.recibir(c.NORMALIZAR) is None
-    assert cola.pendientes(c.NORMALIZAR) == 2
-    cola.completar(primero)
-    cola.completar(segundo)
-    assert cola.pendientes(c.NORMALIZAR) == 0
-
-
-def test_cola_abandonar_vuelve_a_entregar(cola):
-    cola.publicar(c.CLASIFICAR, {"n": 1})
-    m = cola.recibir(c.CLASIFICAR)
-    cola.abandonar(m)
-    otra_vez = cola.recibir(c.CLASIFICAR)
-    assert otra_vez.id == m.id
-    assert otra_vez.entregas == 2
-
-
 def test_cola_demora(cola, reloj):
     cola.publicar(c.CLASIFICAR, {"n": 1}, demora_s=120)
     assert cola.recibir(c.CLASIFICAR) is None
@@ -65,36 +43,6 @@ def test_cola_demora(cola, reloj):
     assert cola.recibir(c.CLASIFICAR) is None
     reloj.adelantar(1)
     assert cola.recibir(c.CLASIFICAR).cuerpo == {"n": 1}
-
-
-def test_cola_errores_y_reenvio(cola):
-    cola.publicar(c.EXTRAER, {"n": 1})
-    m = cola.recibir(c.EXTRAER)
-    cola.a_errores(m, "bug")
-    assert cola.pendientes(c.EXTRAER) == 0
-    [en_errores] = cola.errores(c.EXTRAER)
-    assert (en_errores.mensaje.cuerpo, en_errores.motivo) == ({"n": 1}, "bug")
-    assert [e.mensaje.id for e in cola.sacar_de_errores(c.EXTRAER)] == [m.id]
-    assert cola.errores(c.EXTRAER) == []
-
-
-def test_cola_no_deja_completar_dos_veces(cola):
-    cola.publicar(c.EXTRAER, {})
-    m = cola.recibir(c.EXTRAER)
-    cola.completar(m)
-    with pytest.raises(c.ErrorCola):
-        cola.completar(m)
-
-
-def test_cola_copia_el_cuerpo_y_exige_json(cola):
-    cuerpo = {"lista": [1]}
-    cola.publicar(c.EXTRAER, cuerpo)
-    cuerpo["lista"].append(2)
-    assert cola.recibir(c.EXTRAER).cuerpo == {"lista": [1]}
-    with pytest.raises(TypeError):
-        cola.publicar(c.EXTRAER, {"no_json": object()})
-    with pytest.raises(c.ErrorCola):
-        cola.publicar("otra", {})
 
 
 # --- Estado ---

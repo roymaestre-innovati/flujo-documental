@@ -22,8 +22,9 @@ import datetime
 import itertools
 import json
 from abc import ABC, abstractmethod
-from collections import defaultdict
+from collections import defaultdict, deque
 from dataclasses import dataclass, field
+from uuid import uuid4
 
 from .reloj import Reloj, RelojSistema
 
@@ -38,6 +39,10 @@ class ErrorCola(Exception):
     """Uso incorrecto de la cola: un bug (clase 4)."""
 
 
+class BloqueoPerdido(Exception):
+    """El bloqueo de esta entrega venció o el mensaje se volvió a entregar."""
+
+
 @dataclass
 class Mensaje:
     id: str
@@ -47,6 +52,8 @@ class Mensaje:
     entregas: int = 0
     """Cuántas veces se recibió. Service Bus lo lleva como DeliveryCount."""
     visible_desde: datetime.datetime | None = None
+    bloqueo: str | None = None
+    """Identifica la entrega actual del mensaje."""
 
 
 @dataclass
@@ -57,6 +64,12 @@ class MensajeEnErrores:
 
 
 class Cola(ABC):
+    """Completar, abandonar o mandar a errores requiere el bloqueo de la entrega.
+
+    Si se perdió el bloqueo, da BloqueoPerdido. Si el mensaje ya salió de la cola
+    o nunca se recibió, da ErrorCola.
+    """
+
     @abstractmethod
     def publicar(self, cola: str, cuerpo: dict, demora_s: float = 0, propiedades: dict | None = None) -> str:
         """Publica un mensaje y devuelve su id. Con demora, no se ve hasta que pase."""
@@ -82,8 +95,12 @@ class Cola(ABC):
         """Los mensajes en la cola de errores, del más viejo al más nuevo."""
 
     @abstractmethod
-    def sacar_de_errores(self, cola: str) -> list[MensajeEnErrores]:
-        """Vacía la cola de errores y devuelve lo que tenía, para reenviarlo."""
+    def reenviar_errores(self, cola: str) -> int:
+        """Republica los mensajes de errores desde el más viejo y devuelve cuántos reenvió.
+
+        Conserva el cuerpo y las propiedades salvo `intento` y `esperas`. Cada
+        mensaje reenviado es nuevo y se quita de errores tras publicarlo.
+        """
 
     @abstractmethod
     def pendientes(self, cola: str) -> int:
@@ -109,7 +126,7 @@ class ColaEnMemoria(Cola):
         self._reloj = reloj or RelojSistema()
         self._colas: dict[str, list[Mensaje]] = defaultdict(list)
         self._bloqueados: dict[str, Mensaje] = {}
-        self._errores: dict[str, list[MensajeEnErrores]] = defaultdict(list)
+        self._errores: dict[str, deque[MensajeEnErrores]] = defaultdict(deque)
         self._ids = itertools.count(1)
         self._candado = threading.RLock()
 
@@ -142,14 +159,20 @@ class ColaEnMemoria(Cola):
         mensaje = min(visibles, key=lambda m: (m.visible_desde, m.id))
         self._colas[cola].remove(mensaje)
         mensaje.entregas += 1
+        mensaje.bloqueo = uuid4().hex
         self._bloqueados[mensaje.id] = mensaje
         return copy.deepcopy(mensaje)
 
     def _soltar(self, mensaje: Mensaje) -> Mensaje:
-        try:
-            return self._bloqueados.pop(mensaje.id)
-        except KeyError:
-            raise ErrorCola(f"El mensaje {mensaje.id} no está bloqueado: ya se completó o nunca se recibió") from None
+        if mensaje.bloqueo is not None:
+            vigente = self._bloqueados.get(mensaje.id)
+            if vigente is not None and mensaje.bloqueo == vigente.bloqueo:
+                return self._bloqueados.pop(mensaje.id)
+            if vigente is not None or any(
+                pendiente.id == mensaje.id and pendiente.entregas > 0 for pendiente in self._colas.get(mensaje.cola, ())
+            ):
+                raise BloqueoPerdido(f"Se perdió el bloqueo del mensaje {mensaje.id}")
+        raise ErrorCola(f"El mensaje {mensaje.id} no está bloqueado: ya salió de la cola o nunca se recibió")
 
     @_con_candado
     def completar(self, mensaje: Mensaje) -> None:
@@ -169,13 +192,20 @@ class ColaEnMemoria(Cola):
     @_con_candado
     def errores(self, cola: str) -> list[MensajeEnErrores]:
         self._revisar_cola(cola)
-        return copy.deepcopy(self._errores[cola])
+        return copy.deepcopy(list(self._errores[cola]))
 
     @_con_candado
-    def sacar_de_errores(self, cola: str) -> list[MensajeEnErrores]:
+    def reenviar_errores(self, cola: str) -> int:
         self._revisar_cola(cola)
-        sacados, self._errores[cola] = self._errores[cola], []
-        return sacados
+        en_errores = self._errores[cola]
+        reenviados = 0
+        while en_errores:
+            mensaje = en_errores[0].mensaje
+            propiedades = {k: v for k, v in mensaje.propiedades.items() if k not in ("intento", "esperas")}
+            self.publicar(cola, mensaje.cuerpo, propiedades=propiedades)
+            en_errores.popleft()
+            reenviados += 1
+        return reenviados
 
     @_con_candado
     def pendientes(self, cola: str) -> int:
