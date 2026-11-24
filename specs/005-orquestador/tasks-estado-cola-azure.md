@@ -68,17 +68,17 @@ En el **orquestador**, al lado de las versiones en memoria: `servicios/orquestad
 
 - [x] **T04 — Batería de contrato de `Cola`.** Igual que T01, para las pruebas de `Cola`. Las que usan `RelojManual` para la demora quedan solo para la versión en memoria. La batería general prueba la demora con el reloj real y una espera corta: que no se vea antes y que se vea después, con margen. Agregar:
   - las propiedades (`intento`, `esperas`) viajan aparte del cuerpo y vuelven igual;
-  - `entregas` sube con cada entrega. Service Bus cuenta desde 1 en la primera: confirmar que coincida con la versión en memoria;
+  - `entregas` sube con cada entrega y vale 1 en la primera para ambas implementaciones;
   - completar, abandonar o mandar a errores un mensaje ya completado o que nunca se recibió da `ErrorCola`;
   - el cuerpo debe ser JSON;
   - el motivo llega a la cola de errores;
   - `reenviar_errores(cola)` republica en la cola original el mismo cuerpo y las propiedades sin `intento` ni `esperas`, deja vacía la cola de errores y devuelve cuántos reenvió. `errores.reenviar_errores(cola, nombre)` conserva su firma y la usa;
   - completar con una entrega vieja (el mismo mensaje se abandonó y se volvió a recibir) da `BloqueoPerdido` y deja intacta la entrega vigente.
 
-- [ ] **T05 — `ColaServiceBus`.** Implementa `Cola` con `azure-servicebus` y `DefaultAzureCredential`. Recibe el namespace (`SERVICEBUS_NAMESPACE`, el nombre completo `<namespace>.servicebus.windows.net`) y el prefijo (`COLAS_PREFIJO`, por defecto `evaluacion-ofertas-`). Pasa la batería de T04 con un cliente falso.
+- [x] **T05 — `ColaServiceBus`.** Implementa `Cola` con `azure-servicebus` y `DefaultAzureCredential`. Recibe el namespace (`SERVICEBUS_NAMESPACE`, el nombre completo `<namespace>.servicebus.windows.net`) y el prefijo (`COLAS_PREFIJO`, por defecto `evaluacion-ofertas-`). Pasa la batería de T04 con un cliente falso.
   - **Los nombres del código no cambian.** `cola.py` sigue con `normalizar`, `clasificar`, etc., y `ColaServiceBus` les antepone el prefijo. Así la versión en memoria, las pruebas y el comando local quedan igual. Se agrega `resultados` a `COLAS`, porque la cola ya existe en Azure y la usará la entrega 2.
   - `publicar`: el cuerpo va como JSON y las propiedades como *application properties*. Con demora, se usa `scheduled_enqueue_time_utc`. El id del mensaje lo genera la clase, como hoy.
-  - `recibir`: modo PeekLock, de a un mensaje. Se guarda el mensaje original del SDK por id, porque `completar`, `abandonar` y `a_errores` lo necesitan y deben pasar por el mismo receptor que lo recibió. Hay que mantener un receptor abierto por cola mientras haya mensajes bloqueados.
+  - `recibir` usa PeekLock y recibe de a un mensaje. Guarda el original del SDK por token de bloqueo junto al receptor que lo recibió para que `completar`, `abandonar` y `a_errores` usen ese mismo receptor.
   - `a_errores`: `dead_letter_message`, con el motivo en `reason` y su detalle en `error_description`.
   - `errores(cola)` y `pendientes(cola)`: con *peek*, que solo pide el rol de recibir. Solo los usa el resumen de la corrida local (`local.py`), pero la interfaz los pide.
   - Mensajes de más de 256 KB: Service Bus Standard los rechaza. Que el error sea claro (`ErrorCola`) y diga el tamaño, no el contenido.
@@ -87,9 +87,9 @@ En el **orquestador**, al lado de las versiones en memoria: `servicios/orquestad
   - `recibir` usa `max_wait_time` configurable (5 s por defecto). `None` quiere decir que no llegó nada en ese tiempo, aunque queden mensajes programados o bloqueados.
   - Una instancia por hilo: los receptores del SDK no son seguros entre hilos. El comando local sigue con `ColaEnMemoria`.
 
-- [ ] **T06 — Renovación del bloqueo y reenvío en Service Bus.**
+- [ ] **T06 — Renovación del bloqueo.**
   - **Renovación:** el bloqueo dura 5 minutos y una normalización puede tardar más. `ColaServiceBus` registra cada mensaje recibido en un `AutoLockRenewer` (uno por instancia, con un máximo configurable, por defecto 30 minutos). El renovador no tiene cómo soltar un mensaje: deja de renovarlo cuando se completa, abandona o manda a errores, y se cierra al cerrar la cola. La interfaz no cambia. Probarlo con el cliente falso: un mensaje recibido queda registrado una sola vez.
-  - **Reenvío seguro en Service Bus:** implementar `reenviar_errores` con recepción con bloqueo en la cola de errores. Completar y contar cada original después de republicarlo. Probar con el falso que, si falla el envío, el original sigue en errores.
+  - [x] **Reenvío seguro en Service Bus, hecho en T05.** `reenviar_errores` recibe con bloqueo en la cola de errores, completa y cuenta cada original después de republicarlo. La prueba con el falso comprueba que un fallo de envío deja el original en errores.
 
 - [ ] **T07 — `ColaServiceBus` contra las colas de desarrollo.** Correr la batería de T04 con la marca `azure` contra las colas reales, con `az login`. **Necesita que el administrador haya asignado los roles** de Service Bus al usuario (`infra/roles.bicep`, rama `infra-azure-inicial`). Mientras tanto, la tarea queda en espera. Probar además la renovación con un mensaje que se tiene bloqueado más de 5 minutos. La corre el usuario.
 
@@ -175,3 +175,9 @@ La última línea del script cuenta los documentos cuyo `id_proceso` empieza por
 La batería usa una cola conocida, verifica que quede vacía junto con la de errores y recibe la demora y el plazo de cada implementación. La prueba con reloj manual queda en `test_interfaces.py`.
 Cada entrega en memoria recibe su propio token. El bucle devuelve `bloqueo_perdido` con un aviso, conserva cualquier copia de reintento ya publicada y reserva la alerta a operación para un paso a errores confirmado.
 En memoria, el reenvío publica y retira los mensajes de errores en orden bajo el mismo candado. Cada copia empieza con un id nuevo y con la primera entrega.
+
+### T05 — ColaServiceBus
+
+El adaptador reusa emisores y receptores por cola, resuelve por token y pagina el diagnóstico con `peek`. Limita el cuerpo y las propiedades a 248 000 bytes medidos en JSON para dejar margen a las cabeceras. El reenvío publica con un id nuevo antes de completar el original, por lo que una caída entre ambas operaciones puede dejar un duplicado.
+En el SDK 7.15, `delivery_count` lee el encabezado AMQP y el adaptador suma uno. El cuerpo DATA puede llegar en fragmentos de bytes y el SDK entrega las propiedades de texto como bytes. Python pasa los campos de errores al servicio sin recortarlos. El adaptador usa hasta 200 caracteres en `reason` y conserva el motivo en `error_description` hasta las 4096 unidades de texto documentadas para .NET. [AMQP 1.0](https://docs.oasis-open.org/amqp/core/v1.0/amqp-core-messaging-v1.0.html), [documentación de Service Bus](https://learn.microsoft.com/en-us/dotnet/api/azure.messaging.servicebus.servicebusreceiver.deadlettermessageasync).
+T07 queda para repetir el contrato contra Azure y confirmar la primera entrega, la demora, `peek`, los permisos y el reenvío. También verifica la renovación después de T06.

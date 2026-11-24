@@ -4,8 +4,9 @@ from copy import deepcopy
 from time import monotonic, sleep
 
 import pytest
-
 from orquestador import cola as c
+from orquestador.cola_servicebus import ColaServiceBus
+from servicebus_falso import ServiceBusFalso
 
 NOMBRE = c.CLASIFICAR
 
@@ -15,11 +16,18 @@ def cola_en_memoria():
     return c.ColaEnMemoria(), 0.3, 2
 
 
+@pytest.fixture
+def cola_servicebus_falso():
+    with ColaServiceBus(ServiceBusFalso(), espera_recibir_s=0.05) as cola:
+        yield cola, 0.3, 2
+
+
 # Cada implementación agrega un fixture con la cola, la demora y el plazo en segundos.
 # Si recibir espera, su tiempo máximo debe ser menor que la demora de la prueba.
 # Para Azure, ese fixture hará el peek inicial y la limpieza aun si falla la prueba.
 @pytest.fixture(params=[
     pytest.param("cola_en_memoria", id="memoria"),
+    pytest.param("cola_servicebus_falso", id="servicebus_falso"),
 ])
 def implementacion_cola(request):
     return request.getfixturevalue(request.param)
