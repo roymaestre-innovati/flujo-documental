@@ -39,7 +39,7 @@ En el **orquestador**, al lado de las versiones en memoria: `servicios/orquestad
 
 ## Tareas
 
-- [ ] **T01 — Batería de contrato de `Estado`.** Pasar las pruebas de `Estado` de `test_interfaces.py` a una batería que reciba la implementación por fixture, para correr las mismas pruebas sobre cualquier versión. Hoy corre solo sobre `EstadoEnMemoria`. No cambia ninguna regla. Agregar las que falten para lo que promete la interfaz:
+- [x] **T01 — Batería de contrato de `Estado`.** Pasar las pruebas de `Estado` de `test_interfaces.py` a una batería que reciba la implementación por fixture, para correr las mismas pruebas sobre cualquier versión. Hoy corre solo sobre `EstadoEnMemoria`. No cambia ninguna regla. Agregar las que falten para lo que promete la interfaz:
   - `crear_si_no_existe` devuelve lo que quedó y `False` si ya existía, sin cambiarlo;
   - `reemplazar` sube `version` y da `Conflicto` si el registro cambió, o `ErrorEstado` si no existe;
   - `listar` ordena por tipo (en el orden de `TIPOS`) y por id, y no mezcla procesos;
@@ -104,4 +104,8 @@ En el **orquestador**, al lado de las versiones en memoria: `servicios/orquestad
 
 ## Notas de implementación
 
-(Vacío.)
+### T01 — Batería de contrato de Estado
+
+`test_estado_contrato.py` parametriza el fixture `estado` por fábrica, con `memoria` como primer caso.
+Cada prueba usa IDs de proceso propios y `procesos()` se comprueba sobre esos IDs para que la batería pueda correr en una base compartida.
+`guardar()` se sigue probando con `EstadoEnMemoria` en `test_interfaces.py`. La implementación en memoria cumple los casos agregados sin cambios.

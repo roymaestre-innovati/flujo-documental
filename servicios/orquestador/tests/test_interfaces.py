@@ -6,7 +6,7 @@ import pytest
 from orquestador import cola as c
 from orquestador import datos
 from orquestador.clasificador import ClasificadorFalso, ErrorClasificadorFalso
-from orquestador.estado import Conflicto, ErrorEstado, EstadoEnMemoria
+from orquestador.estado import EstadoEnMemoria
 from orquestador.origen import ErrorOrigen, OrigenLocal
 from orquestador.reloj import RelojManual
 
@@ -100,43 +100,14 @@ def test_cola_copia_el_cuerpo_y_exige_json(cola):
 # --- Estado ---
 
 
-def test_estado_crear_si_no_existe_gana_el_primero():
-    estado = EstadoEnMemoria()
-    primero, creado = estado.crear_si_no_existe("SR1", "proceso", "SR1", {"v": 1})
-    segundo, creado_otra_vez = estado.crear_si_no_existe("SR1", "proceso", "SR1", {"v": 2})
-    assert creado and not creado_otra_vez
-    assert segundo.datos == {"v": 1}
-    assert primero.version == segundo.version == 1
-
-
-def test_estado_reemplazo_condicional():
-    estado = EstadoEnMemoria()
-    leido, _ = estado.crear_si_no_existe("SR1", "documento", "D1", {"estado": "pendiente"})
-    nuevo = estado.reemplazar(leido, {"estado": "normalizado"})
-    assert nuevo.version == 2
-    with pytest.raises(Conflicto):
-        estado.reemplazar(leido, {"estado": "error_entrada"})
-    assert estado.leer("SR1", "documento", "D1").datos == {"estado": "normalizado"}
-
-
-def test_estado_lista_por_proceso_y_tipo(tmp_path):
+def test_estado_en_memoria_guarda_en_json(tmp_path):
     estado = EstadoEnMemoria()
     estado.crear_si_no_existe("SR1", "documento", "D2", {})
     estado.crear_si_no_existe("SR1", "proceso", "SR1", {})
     estado.crear_si_no_existe("SR1", "documento", "D1", {})
     estado.crear_si_no_existe("SR2", "documento", "D9", {})
-    assert [(r.tipo, r.id) for r in estado.listar("SR1")] == [("proceso", "SR1"), ("documento", "D1"), ("documento", "D2")]
-    assert [r.id for r in estado.listar("SR1", "documento")] == ["D1", "D2"]
     estado.guardar(tmp_path / "estado.json")
     assert (tmp_path / "estado.json").read_text(encoding="utf-8").count('"tipo"') == 4
-
-
-def test_estado_rechaza_tipos_desconocidos_y_lo_que_no_es_json():
-    estado = EstadoEnMemoria()
-    with pytest.raises(ErrorEstado):
-        estado.crear_si_no_existe("SR1", "otro", "X", {})
-    with pytest.raises(TypeError):
-        estado.crear_si_no_existe("SR1", "proceso", "SR1", {"x": object()})
 
 
 # --- Origen ---
