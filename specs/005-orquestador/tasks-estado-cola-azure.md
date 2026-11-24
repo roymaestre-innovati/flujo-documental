@@ -61,7 +61,7 @@ En el **orquestador**, al lado de las versiones en memoria: `servicios/orquestad
   - **Límite de RU:** Cosmos responde el error 16500 (`TooManyRequests`), a veces con el tiempo de espera en el mensaje (`RetryAfterMs`). Se convierte en `ErrorTransitorio` con ese `espera_s` en segundos, para que el bucle lo reprograme sin contar intento (R19). Si no viene el tiempo, se usa una espera por defecto (parámetro, 1 s), para que el límite de RU nunca gaste intentos. Puede llegar también al recorrer un cursor de `find`. Los errores de red de `pymongo` son `ErrorTransitorio` sin espera.
   - La cadena de conexión de Cosmos trae `retrywrites=false`: no cambiarlo.
 
-- [ ] **T03 — `EstadoMongo` contra la base de desarrollo.** Correr la batería de T01 con la marca `azure` contra la base real (`ESTADO_MONGO_URL` del entorno). Repetir contra Mongo las pruebas de mensajes repetidos y de cambio condicional, con dos hilos que intentan crear o reemplazar lo mismo a la vez: gana uno y el otro recibe `False` o `Conflicto`. (pendiente: la corre el usuario)
+- [x] **T03 — `EstadoMongo` contra la base de desarrollo.** Correr la batería de T01 con la marca `azure` contra la base real (`ESTADO_MONGO_URL` del entorno). Repetir contra Mongo las pruebas de mensajes repetidos y de cambio condicional, con dos hilos que intentan crear o reemplazar lo mismo a la vez: gana uno y el otro recibe `False` o `Conflicto`. La corrió el usuario el 2026-11-24.
   - Si una consulta por `tipo` falla o cuesta mucho por falta de índice, anotarlo: el índice se agrega en la infraestructura (`infra/recursos.bicep`, rama `infra-azure-inicial`), no en el código.
   - Anotar el costo en RU de cada operación (`db.command("getLastRequestStatistics")`), para tener una idea del consumo, fuera de la prueba con hilos.
   - Confirmar que Cosmos acepta el `_id` en subdocumento, las claves con `.` y `$` en `datos`, y que `distinct` devuelve procesos de varias particiones.
@@ -137,16 +137,26 @@ Si Cosmos rechaza el `_id` en subdocumento, aplica el plan acordado de usar un t
 
 El script mide los milisegundos de la operación completa. La RU corresponde a la última solicitud de esa operación. `crear repetido` y `reemplazar con conflicto` hacen también una lectura interna, así que en esas filas la RU corresponde a esa lectura.
 
-| Operación | RU |
-|---|---|
-| Leer inexistente | |
-| Crear | |
-| Crear repetido | |
-| Leer | |
-| Reemplazar | |
-| Reemplazar con conflicto | |
-| Listar | |
-| Listar por tipo | |
-| Procesos | |
+**Resultado (2026-11-24, corrida del usuario).** Las 36 pruebas `azure` pasaron en 36 s: Cosmos acepta el `_id` en subdocumento, conserva las claves con `.` y `$` en `datos`, `distinct` devuelve los procesos de varias particiones, y en las 20 carreras con dos hilos ganó siempre uno solo. No hace falta el plan B. La limpieza dejó 0 documentos `PRUEBA-`. `pymongo` avisa con un `UserWarning` que está conectado a Cosmos; es solo informativo.
+
+RU y tiempo de cada operación, con un oferente de 80 archivos en `esperados`:
+
+| Operación | RU | ms |
+|---|---|---|
+| Leer inexistente | 14,63 | 2970 (incluye abrir la conexión) |
+| Crear | 9,71 | 190 |
+| Crear repetido | 3,15 (la lectura posterior) | 310 |
+| Leer | 3,15 | 171 |
+| Reemplazar | 20,33 | 206 |
+| Reemplazar con conflicto | 3,15 (la lectura posterior) | 320 |
+| Listar | 3,05 | 195 |
+| Listar por tipo | 5,74 | 145 |
+| Procesos | 2,29 | 155 |
+
+Lo que sale de aquí:
+
+- **Latencia:** cada solicitud tarda de 150 a 200 ms desde la máquina del usuario, más que los 60 a 70 ms estimados entre regiones de Azure. Las operaciones que hacen dos solicitudes (crear repetido, conflicto) tardan el doble. Desde los jobs en Azure debería bajar; se mide cuando corran allá.
+- **Consumo:** escribir un documento de este tamaño cuesta de 10 a 20 RU y leerlo unos 3. Un proceso con unos cientos de operaciones de estado queda muy por debajo de las 100 RU/s mínimas de la base.
+- **Índice por `tipo`:** no hace falta por ahora; `listar` por tipo cuesta menos de 6 RU.
 
 La última línea del script cuenta los documentos cuyo `id_proceso` empieza por `PRUEBA-`, con una consulta entre particiones. El conteo esperado es `0` cuando no hay otras corridas de prueba activas. Si quedan documentos, revisa el resultado del borrado y verifica con el equipo si hay otra corrida en curso antes de intervenir en la base compartida.
