@@ -145,19 +145,19 @@ La medición usó un solo registro por partición, con un oferente de 80 archivo
 |---|---|---|
 | Leer inexistente | 14,63 | 2970 (incluye abrir la conexión) |
 | Crear | 9,71 | 190 |
-| Crear repetido | 3,15 (la lectura posterior) | 310 |
+| Crear repetido | 4,91 (`insert_one` 1,76 + `find_one` 3,15) | 345 |
 | Leer | 3,15 | 171 |
 | Reemplazar | 20,33 | 206 |
-| Reemplazar con conflicto | 3,15 (la lectura posterior) | 320 |
+| Reemplazar con conflicto | 8,90 (`replace_one` 5,75 + `find_one` 3,15) | 516 |
 | Listar | 3,05 | 195 |
 | Listar por tipo | 5,74 | 145 |
 | Procesos | 2,29 | 155 |
 
-Queda pendiente que el usuario vuelva a medir las RU de `crear repetido` y `reemplazar con conflicto` con el script corregido. Los valores históricos de la tabla corresponden a la lectura posterior.
+Las filas de `crear repetido` y `reemplazar con conflicto` son de una segunda corrida del mismo día, con el script corregido después de la revisión, que suma las dos solicitudes. En esa segunda corrida la batería `azure` (ya con `--azure` y la prueba de `NaN`) volvió a pasar completa, en 42 s, y la limpieza dejó 0 documentos. Las demás RU salieron iguales; los tiempos varían entre corridas.
 
 Lo que sale de aquí:
 
-- **Latencia:** cada solicitud tarda de 150 a 200 ms desde la máquina del usuario, más que los 60 a 70 ms estimados entre regiones de Azure. Las operaciones que hacen dos solicitudes (crear repetido, conflicto) tardan el doble. Desde los jobs en Azure debería bajar; se mide cuando corran allá.
+- **Latencia:** cada solicitud tarda de 150 a 200 ms desde la máquina del usuario, más que los 60 a 70 ms estimados entre regiones de Azure. Las operaciones que hacen dos solicitudes (crear repetido, conflicto) tardan el doble. Un mensaje repetido o un conflicto cuesta menos que una escritura normal (5 a 9 RU frente a 10 a 20). Desde los jobs en Azure debería bajar; se mide cuando corran allá.
 - **Consumo.** Escribir un documento de este tamaño cuesta de 10 a 20 RU y leerlo unas 3. Las RU/s dependen de cuántas operaciones caen en el mismo segundo. Cinco reemplazos de 20,33 RU en un segundo superan las 100 RU/s. Al alcanzar el límite, Cosmos responde con 16500 y el bucle aplica la espera.
 - **Índice por `tipo`.** `listar` por tipo costó menos de 6 RU en esa medición. El índice se revisará con un proceso real.
 
