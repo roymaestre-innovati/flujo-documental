@@ -12,6 +12,10 @@
 #           interfaz), fuentes y uv.
 #   pruebas base + dependencias de desarrollo, pruebas y contrato. Corre pytest.
 #   job     base + solo las dependencias del paquete. Corre `normalizar`.
+#   worker  base + el orquestador y la mensajería. Corre `orquestar-worker normalizar`,
+#           el worker de la cola `normalizar` (T10 de specs/005-orquestador/tasks-workers.md):
+#
+#             docker build -f servicios/normalizacion/Dockerfile --target worker -t worker-normalizar .
 #
 # Ubuntu 24.04 y no python:3.12-slim (Debian), como decía el plan: ver las notas
 # de T12 en specs/003-validacion-extraccion/tasks.md.
@@ -92,3 +96,25 @@ WORKDIR /home/normalizador
 
 ENTRYPOINT ["normalizar"]
 CMD ["--help"]
+
+# ---------------------------------------------------------------------------
+FROM base AS worker
+
+ENV ORQUESTADOR_CONTRATOS=/app/contracts
+COPY contracts/modulo5-orquestador /app/contracts/modulo5-orquestador
+COPY contracts/modulo3-extraccion /app/contracts/modulo3-extraccion
+COPY servicios/normalizacion/src ./src
+COPY servicios/mensajeria /app/servicios/mensajeria
+COPY servicios/orquestador /app/servicios/orquestador
+RUN cd /app/servicios/orquestador \
+    && uv sync --frozen --no-dev --no-editable \
+    && /usr/bin/python3.12 -m pip uninstall -y --break-system-packages uv \
+    && rm -rf /app/servicios/mensajeria /app/servicios/orquestador
+
+RUN useradd --uid 10001 --create-home --home-dir /home/normalizador normalizador
+USER normalizador
+ENV HOME=/home/normalizador
+WORKDIR /home/normalizador
+
+ENTRYPOINT ["orquestar-worker"]
+CMD ["normalizar"]

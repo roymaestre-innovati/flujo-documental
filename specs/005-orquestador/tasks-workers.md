@@ -56,7 +56,7 @@ Revisadas con el usuario y con una segunda opinión de Astra antes de empezar.
 - [x] **T07 — Pendientes del almacén** (de `tasks-almacen-blob.md`): subtipos públicos de `ErrorAlmacen` (URI inválida y objeto ausente) con su trato en cada consumidor, y `AlmacenBlob.cerrar()` que espera las operaciones activas.
 - [x] **T08 — Punta a punta con los workers:** los cuatro workers sobre los clientes falsos dan los mismos estados y solicitudes que `Corrida`, y los mismos sobres que `extraer_segmento`, con dobles y reloj controlado.
 - [x] **T09 — Comandos de operación:** `reenviar-errores <cola>` y `escalar-fallas`.
-- [ ] **T10 — Imágenes y configuración** (decisiones 8 y 13): imagen liviana, etapa de worker en la de LibreOffice, y la tabla de configuración por job en el README.
+- [x] **T10 — Imágenes y configuración** (decisiones 8 y 13): imagen liviana, etapa de worker en la de LibreOffice, y la tabla de configuración por job en el README.
 - [ ] **T11 — Contra Azure (en espera de los roles):** un worker contra las colas, la base y el contenedor de desarrollo, con datos inventados. La corre el usuario.
 - [ ] **T12 — Cierre.** Notas, `plan.md`, README e `inventario-codigo.md` (incluida su línea de estado, que todavía nombra la rama `almacen-blob`).
 
@@ -170,3 +170,10 @@ Pruebas: extracción 239.
 - `entorno.estado_desde_entorno` queda pública para que la usen los dos comandos.
 
 Pruebas: orquestador 524 (58 saltadas).
+
+### T10
+
+- **Imagen liviana** (`servicios/workers/Dockerfile`, sobre `python:3.12-slim-bookworm`): el orquestador y la extracción en entornos separados (`/opt/orquestador` y `/opt/extraccion`), cada uno con su lock y sin dependencias de desarrollo, y los esquemas en `/app/contracts` (`ORQUESTADOR_CONTRATOS` y `EXTRACCION_CONTRATOS`). Trae `orquestar-worker`, `orquestar-operar` y `extraer-worker`; cada job elige su comando. Corre con el usuario 10001. Construida y probada con podman el 2026-11-25: cada comando sin variables sale con 2 y las nombra, encuentra los 38 esquemas, y la extracción no carga el orquestador. Pesa 1,31 GB, sobre todo por deltalake y pyarrow del orquestador (los usa la entrada desde OneLake).
+- **Imagen con LibreOffice**: etapa nueva `worker` en `servicios/normalizacion/Dockerfile`, con el orquestador y la mensajería instalados sobre la base. `ENTRYPOINT ["orquestar-worker"]` y `CMD ["normalizar"]`. Las etapas `job` y `pruebas` no cambian. Construida y probada el mismo día: pide sus variables, y `normalizar` y LibreOffice 24.2 siguen disponibles.
+- Los `.dockerignore` dejan entrar solo lo que se copia; nunca documentos, la matriz ni `.env`.
+- **Configuración por job** en `servicios/workers/README.md`: comando, disparo, ejecuciones a la vez (`extraer` con una sola), variables, secretos, `replicaTimeout` 1800 s, `replicaRetryLimit` 0, escalador con `activationMessageCount: 0`, roles por cola y contenedor, alertas, y qué pasa con `resultados` mientras no tenga consumidor. Es la entrada para el repositorio de infraestructura.

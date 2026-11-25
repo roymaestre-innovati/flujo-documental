@@ -1,0 +1,20 @@
+# Contexto de la imagen: la raíz del repositorio. Solo entra lo que el Dockerfile copia.
+# Los documentos, la matriz y los .env nunca entran a la imagen (principio 6).
+*
+!contracts/modulo5-orquestador/**
+!contracts/modulo3-extraccion/**
+!servicios/normalizacion/pyproject.toml
+!servicios/normalizacion/uv.lock
+!servicios/normalizacion/src/**
+!servicios/mensajeria/pyproject.toml
+!servicios/mensajeria/uv.lock
+!servicios/mensajeria/src/**
+!servicios/orquestador/pyproject.toml
+!servicios/orquestador/uv.lock
+!servicios/orquestador/src/**
+!servicios/extraccion/pyproject.toml
+!servicios/extraccion/uv.lock
+!servicios/extraccion/src/**
+**/__pycache__
+**/*.pyc
+**/.env
