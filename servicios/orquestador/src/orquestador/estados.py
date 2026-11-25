@@ -176,6 +176,9 @@ def cambiar(
     motivo: str,
     datos: dict | None = None,
     intentos: int = 5,
+    *,
+    respetar_reserva: bool = False,
+    dueno: str | None = None,
 ) -> Cambio:
     """Pasa el registro de `de` (uno o varios estados) a `a`, y le suma `datos`.
 
@@ -184,6 +187,9 @@ def cambiar(
     - Si está en otro estado, `EstadoInesperado` (R26).
     - Si otro trabajador lo cambió entre la lectura y la escritura, lo vuelve a
       leer y decide de nuevo, hasta `intentos` veces.
+    - Con `respetar_reserva`, si el registro tiene una reserva vigente que no es de
+      `dueno`, `Reservado`. Se revisa sobre la misma versión que se reemplaza, así
+      que una reserva tomada entre la lectura y la escritura también cuenta.
     """
     maquina = _maquina(tipo)
     origenes = frozenset([de] if isinstance(de, str) else de)
@@ -203,6 +209,8 @@ def cambiar(
             return Cambio(registro, False)
         if actual not in origenes:
             raise EstadoInesperado(registro, origenes)
+        if respetar_reserva and (vigente := reserva_vigente(registro, reloj.ahora())) and vigente["dueno"] != dueno:
+            raise Reservado(registro, datetime.datetime.fromisoformat(vigente["vence"]))
         nuevos = {**registro.datos, **datos, "estado": a}
         nuevos["historial"] = registro.datos["historial"] + [_paso(actual, a, reloj.ahora().isoformat(), motivo)]
         try:

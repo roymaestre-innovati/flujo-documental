@@ -67,6 +67,10 @@ def ruta_en_la_entrega(archivo: str, entrega: str) -> str:
     return archivo
 
 
+class _YaNormalizada(Exception):
+    """Otra ejecución terminó la entrega antes de que esta la reservara."""
+
+
 class Normalizar:
     cola = NORMALIZAR
 
@@ -109,7 +113,11 @@ class Normalizar:
 
         dueno = uuid4().hex
         self._intento.dueno = dueno
-        self._reservar(id_proceso, entrega, dueno)
+        try:
+            self._reservar(id_proceso, entrega, dueno)
+        except _YaNormalizada:
+            registro.info("Entrega ya normalizada: mensaje repetido")
+            return
         try:
             self._normalizar(id_proceso, entrega, proceso, oferente, dueno)
         except BaseException:
@@ -129,6 +137,11 @@ class Normalizar:
         except estados.Reservado as reservado:
             espera = max((reservado.vence - self._reloj.ahora()).total_seconds(), 0) + 1
             raise ErrorTransitorio("La entrega la está normalizando otra ejecución", espera_s=espera) from None
+        except estados.EstadoInesperado as inesperado:
+            # Otra ejecución la terminó entre la lectura de `procesar` y la reserva.
+            if inesperado.registro.datos["estado"] == estados.PROCESANDO:
+                raise _YaNormalizada from None
+            raise
 
     def _sigue_siendo_mia(self, id_proceso: str, entrega: str, dueno: str) -> bool:
         oferente = self._estado.leer(id_proceso, estados.OFERENTE, entrega)
@@ -162,12 +175,17 @@ class Normalizar:
                                                  "id_documento": archivo["id_documento"]})
 
         uri_manifiesto = self._almacen.uri(f"{id_proceso}/{entrega}/manifiesto.json")
-        estados.cambiar(
-            self._estado, self._reloj, id_proceso, estados.OFERENTE, entrega,
-            estados.NORMALIZANDO, estados.PROCESANDO, "entrega normalizada",
-            {"manifiesto": uri_manifiesto, "documentos": len(manifiesto["archivos"]),
-             "descartados": len(manifiesto["descartados"]), "error": None, "reserva": None},
-        )
+        try:
+            estados.cambiar(
+                self._estado, self._reloj, id_proceso, estados.OFERENTE, entrega,
+                estados.NORMALIZANDO, estados.PROCESANDO, "entrega normalizada",
+                {"manifiesto": uri_manifiesto, "documentos": len(manifiesto["archivos"]),
+                 "descartados": len(manifiesto["descartados"]), "error": None, "reserva": None},
+                respetar_reserva=True, dueno=dueno,
+            )
+        except estados.Reservado:
+            registro.warning("Otra ejecución tomó la reserva mientras se publicaba: no se cierra la entrega")
+            return
         registro.info("Entrega normalizada: %s documentos, %s para clasificar",
                       len(manifiesto["archivos"]), normalizados)
 
@@ -222,16 +240,14 @@ class Normalizar:
 
     def al_fallar(self, cuerpo: dict, motivo: str) -> None:
         id_proceso, entrega = cuerpo["id_proceso"], cuerpo["entrega"]
-        oferente = self._estado.leer(id_proceso, estados.OFERENTE, entrega)
-        reserva = oferente and estados.reserva_vigente(oferente, self._reloj.ahora())
-        if reserva and reserva["dueno"] != getattr(self._intento, "dueno", None):
-            registro.warning("La entrega la está normalizando otra ejecución: no se marca el error")
-            return
         try:
             estados.cambiar(
                 self._estado, self._reloj, id_proceso, estados.OFERENTE, entrega,
                 (estados.RECIBIDO, estados.NORMALIZANDO), estados.ERROR_PROCESO, "falla al normalizar",
                 {"error": motivo, "error_desde": self._reloj.ahora().isoformat(), "reserva": None},
+                respetar_reserva=True, dueno=getattr(self._intento, "dueno", None),
             )
+        except estados.Reservado:
+            registro.warning("La entrega la está normalizando otra ejecución: no se marca el error")
         except estados.EstadoInesperado as e:
             registro.warning("La entrega ya estaba en %s: no se marca el error", e.registro.datos["estado"])

@@ -144,3 +144,61 @@ def test_el_paso_a_procesando_exige_la_reserva(mundo):
     with pytest.raises(estados.TransicionNoPermitida):
         estados.cambiar(mundo.estado, mundo.reloj, P, estados.OFERENTE, "OF-001",
                         estados.RECIBIDO, estados.PROCESANDO, "sin reservar")
+
+
+def test_cambiar_con_respetar_reserva_no_pisa_una_reserva_ajena(mundo):
+    _reservar_para(mundo, "otra")
+    with pytest.raises(estados.Reservado):
+        estados.cambiar(mundo.estado, mundo.reloj, P, estados.OFERENTE, "OF-001",
+                        estados.NORMALIZANDO, estados.ERROR_PROCESO, "falla", respetar_reserva=True, dueno="a")
+    estados.cambiar(mundo.estado, mundo.reloj, P, estados.OFERENTE, "OF-001",
+                    estados.NORMALIZANDO, estados.ERROR_PROCESO, "falla", respetar_reserva=True, dueno="otra")
+    assert _oferente(mundo).datos["estado"] == estados.ERROR_PROCESO
+
+
+def test_al_fallar_no_pisa_una_reserva_tomada_entre_la_lectura_y_la_escritura(mundo, monkeypatch):
+    original = mundo.estado.reemplazar
+    tomada = []
+
+    def reservar_antes(registro, nuevos):
+        if not tomada:
+            tomada.append(1)
+            _reservar_para(mundo, "otra")  # cambia la versión: este reemplazo da Conflicto
+        return original(registro, nuevos)
+
+    monkeypatch.setattr(mundo.estado, "reemplazar", reservar_antes)
+    _otra_ejecucion(mundo).al_fallar({"id_proceso": P, "entrega": "OF-001"}, "Bug: algo")
+
+    oferente = _oferente(mundo)
+    assert oferente.datos["estado"] == estados.NORMALIZANDO
+    assert oferente.datos["reserva"]["dueno"] == "otra"
+
+
+def test_el_cierre_no_pisa_una_reserva_tomada_mientras_se_publicaba(mundo, monkeypatch):
+    normalizar = _otra_ejecucion(mundo)
+    original = normalizar._registrar
+
+    def registrar_y_perder_la_reserva(*args, **kwargs):
+        original(*args, **kwargs)
+        mundo.reloj.adelantar(2401)
+        _reservar_para(mundo, "otra")
+
+    monkeypatch.setattr(normalizar, "_registrar", registrar_y_perder_la_reserva)
+    mundo.correr(normalizar)
+    oferente = _oferente(mundo)
+    assert oferente.datos["estado"] == estados.NORMALIZANDO
+    assert oferente.datos["reserva"]["dueno"] == "otra"
+
+
+def test_si_otra_ejecucion_termino_antes_de_reservar_es_un_mensaje_repetido(mundo, monkeypatch):
+    normalizar = _otra_ejecucion(mundo)
+    original = normalizar._reservar
+
+    def otra_termina_antes(*args):
+        _otra_ejecucion(mundo).procesar({"id_proceso": P, "entrega": "OF-001"})
+        return original(*args)
+
+    monkeypatch.setattr(normalizar, "_reservar", otra_termina_antes)
+    assert [r.desenlace for r in mundo.correr(normalizar)] == ["ok"]
+    assert _oferente(mundo).datos["estado"] == estados.PROCESANDO
+    assert len(mundo.sacar(c.CLASIFICAR)) == 1
