@@ -8,7 +8,17 @@ from limpiar_estado_prueba import limpiar_procesos
 from servicebus_azure import ESPERA_SERVICEBUS_AZURE_S, ids_en_colas, limpiar_colas, nombre_corto
 
 from orquestador.cola_servicebus import cola_desde_entorno
-from orquestador.estado_mongo import coleccion_desde_entorno
+from orquestador.errores import ErrorDeConfiguracion
+from orquestador.estado_mongo import EstadoMongo, coleccion_desde_entorno
+
+
+def _detener_si_falta_acceso(probar) -> None:
+    """Corta toda la corrida en la primera falla de permisos, con una sola línea,
+    en vez de repetir el mismo error en cada prueba."""
+    try:
+        probar()
+    except ErrorDeConfiguracion as error:
+        pytest.exit(f"Sin acceso a Azure: {error}", returncode=1)
 
 
 def pytest_addoption(parser):
@@ -44,6 +54,7 @@ def coleccion_mongo_azure(pytestconfig):
         pytest.skip("usa recursos de Azure; correr con --azure")
     coleccion = coleccion_desde_entorno()
     with coleccion.database.client:
+        _detener_si_falta_acceso(lambda: EstadoMongo(coleccion).leer("PRUEBA-acceso", "proceso", "PRUEBA-acceso"))
         yield coleccion
 
 
@@ -60,6 +71,7 @@ def cliente_cola_azure(pytestconfig):
     if not pytestconfig.getoption("--azure"):
         pytest.skip("usa recursos de Azure; correr con --azure")
     with cola_desde_entorno(espera_recibir_s=ESPERA_SERVICEBUS_AZURE_S) as cola:
+        _detener_si_falta_acceso(lambda: ids_en_colas(cola))
         yield cola
 
 

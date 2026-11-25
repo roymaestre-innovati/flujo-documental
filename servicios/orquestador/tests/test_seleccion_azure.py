@@ -18,6 +18,16 @@ from types import SimpleNamespace
 def coleccion_desde_entorno():
     assert os.environ.get("VARIABLE_AZURE_DE_PRUEBA") == "presente"
     return SimpleNamespace(database=SimpleNamespace(client=nullcontext()), nombre="falsa")
+
+def _sin_rol():
+    raise ErrorDeConfiguracion("sin rol de prueba")
+
+_detener_real = _detener_si_falta_acceso
+
+def _detener_si_falta_acceso(probar):
+    # La colección falsa no se puede consultar: solo se prueba el corte cuando se pide.
+    if os.environ.get("ACCESO_AZURE_DE_PRUEBA") == "negado":
+        _detener_real(_sin_rol)
 """)
     return pytester
 
@@ -62,3 +72,25 @@ def test_marca_azure_sin_variable_es_error_aunque_m_la_deseleccione(suite_azure)
 
     assert resultado.ret == pytest.ExitCode.USAGE_ERROR
     resultado.stderr.fnmatch_lines(["*test_azure: la marca azure requiere indicar variable=*"])
+
+
+def test_sin_acceso_a_azure_detiene_la_corrida_con_una_linea(suite_azure, monkeypatch):
+    monkeypatch.setenv("VARIABLE_AZURE_DE_PRUEBA", "presente")
+    monkeypatch.setenv("ACCESO_AZURE_DE_PRUEBA", "negado")
+    suite_azure.makepyfile("""
+        import pytest
+
+        @pytest.mark.azure(variable="VARIABLE_AZURE_DE_PRUEBA")
+        def test_uno(coleccion_mongo_azure):
+            pass
+
+        @pytest.mark.azure(variable="VARIABLE_AZURE_DE_PRUEBA")
+        def test_dos(coleccion_mongo_azure):
+            pass
+    """)
+
+    resultado = suite_azure.runpytest("-m", "azure", "--azure")
+
+    assert resultado.ret == 1
+    resultado.stdout.fnmatch_lines(["*Sin acceso a Azure: sin rol de prueba*"])
+    resultado.assert_outcomes()
