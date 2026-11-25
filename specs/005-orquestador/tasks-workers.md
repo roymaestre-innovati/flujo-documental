@@ -48,7 +48,7 @@ Revisadas con el usuario y con una segunda opinión de Astra antes de empezar.
 ## Tareas
 
 - [x] **T01 — Paquete `mensajeria`** (decisión 1). Mover `Cola`, `ColaEnMemoria`, `ColaServiceBus`, `procesar_uno`, sus excepciones, parámetros y contexto de registro, con sus pruebas. El orquestador reexporta; su suite pasa sin cambios.
-- [ ] **T02 — Bucle de un worker** (decisiones 5 y 10). Vacía una cola con un manejador hasta que no queda nada visible o se cumple el límite, atiende `SIGTERM`, devuelve conteos por desenlace y el código de salida. Con hilos, cada uno con su cola. Se prueba con `ColaEnMemoria`.
+- [x] **T02 — Bucle de un worker** (decisiones 5 y 10). Vacía una cola con un manejador hasta que no queda nada visible o se cumple el límite, atiende `SIGTERM`, devuelve conteos por desenlace y el código de salida. Con hilos, cada uno con su cola. Se prueba con `ColaEnMemoria`.
 - [ ] **T03 — Piezas desde el entorno** (decisiones 9 y 11). Arma `Cola`, `Estado`, `Almacen` y `Origen` con sus `*_desde_entorno`, valida todo antes de recibir, exige las versiones de Azure y cierra todo al terminar.
 - [ ] **T04 — Reserva por entrega** (decisión 6). Estado `NORMALIZANDO` con dueño y vencimiento, cambio condicional al principio de `Normalizar`, y `Apertura` que anota cada entrega publicada. Pruebas con dos workers sobre la misma entrega, incluida una reserva vencida y la caída de `Apertura` a la mitad.
 - [ ] **T05 — Workers del orquestador** (decisiones 2 y 8): `orquestar-worker apertura|normalizar|clasificar`, con el clasificador falso desde el almacén.
@@ -80,3 +80,15 @@ Revisadas con el usuario y con una segunda opinión de Astra antes de empezar.
 - `azure-servicebus` pasa del orquestador a la mensajería. La extracción todavía no la usa (T06).
 
 Pruebas: mensajería 2, orquestador 491 (58 saltadas), extracción 224.
+
+### T02
+
+`mensajeria/worker.py`, en la mensajería porque lo usan los workers del orquestador y el de la extracción.
+
+- `vaciar(colas, manejador, parametros=, limites=, detener=)` corre un hilo por cada `Cola` de `colas` (cada hilo con la suya, como pide la decisión 4) y comparte el manejador. Termina cuando una recepción vuelve vacía, al cumplirse `Limites.tomar_mensajes_s` (25 minutos por defecto) o `max_mensajes`, o cuando se pide terminar. No lanza: una falla de la cola corta todos los hilos y queda en `Resumen.falla`.
+- El turno se reserva antes de recibir y se devuelve si la recepción no trae nada, así `max_mensajes` es exacto entre hilos.
+- `atender_senales(detener)` convierte `SIGTERM` y `SIGINT` en el pedido de terminar: el mensaje en curso se termina y no se toma otro.
+- `Resumen.codigo_salida`: 0 normal (aunque haya mensajes en errores), 2 si la cola dio `ErrorDeConfiguracion`, 1 con cualquier otra falla. La configuración inválida antes de recibir la valida T03 con el mismo código 2.
+- `informar(resumen)` registra una línea con la cola, los conteos por desenlace, el motivo de fin y la duración; de una falla, solo el tipo y el lugar.
+
+Pruebas: mensajería 18.
