@@ -51,7 +51,7 @@ Revisadas con el usuario y con una segunda opinión de Astra antes de empezar.
 - [x] **T02 — Bucle de un worker** (decisiones 5 y 10). Vacía una cola con un manejador hasta que no queda nada visible o se cumple el límite, atiende `SIGTERM`, devuelve conteos por desenlace y el código de salida. Con hilos, cada uno con su cola. Se prueba con `ColaEnMemoria`.
 - [x] **T03 — Piezas desde el entorno** (decisiones 9 y 11). Arma `Cola`, `Estado`, `Almacen` y `Origen` con sus `*_desde_entorno`, valida todo antes de recibir, exige las versiones de Azure y cierra todo al terminar.
 - [x] **T04 — Reserva por entrega** (decisión 6). Estado `NORMALIZANDO` con dueño y vencimiento, cambio condicional al principio de `Normalizar`, y `Apertura` que anota cada entrega publicada. Pruebas con dos workers sobre la misma entrega, incluida una reserva vencida y la caída de `Apertura` a la mitad.
-- [ ] **T05 — Workers del orquestador** (decisiones 2 y 8): `orquestar-worker apertura|normalizar|clasificar`, con el clasificador falso desde el almacén.
+- [x] **T05 — Workers del orquestador** (decisiones 2 y 8): `orquestar-worker apertura|normalizar|clasificar`, con el clasificador falso desde el almacén.
 - [ ] **T06 — Worker de extracción** (decisiones 3 y 12): `extraer-worker`, con `Llamador` en modo worker, resultados en el almacén, publicación en `resultados` y `al_fallar` que publica el `error_proceso`.
 - [ ] **T07 — Pendientes del almacén** (de `tasks-almacen-blob.md`): subtipos públicos de `ErrorAlmacen` (URI inválida y objeto ausente) con su trato en cada consumidor, y `AlmacenBlob.cerrar()` que espera las operaciones activas.
 - [ ] **T08 — Punta a punta con los workers:** los cuatro workers sobre los clientes falsos dan los mismos estados y solicitudes que `Corrida`, y los mismos sobres que `extraer_segmento`, con dobles y reloj controlado.
@@ -116,3 +116,13 @@ Pruebas: orquestador 498 (58 saltadas).
 - Pruebas nuevas en `test_reserva.py`: dos ejecuciones a la vez (la segunda espera sin escribir en el almacén), la espera que queda, la reserva vencida que se toma y se termina, el intento fallido que suelta la reserva, `al_fallar` que respeta la reserva ajena, el bug que deja `error_proceso` y se puede reintentar, y la reserva perdida a la mitad que no publica nada.
 
 Pruebas: orquestador 507 (58 saltadas).
+
+### T05
+
+`orquestar-worker apertura|normalizar|clasificar [--hilos 1] [--tomar-mensajes-s 1500] [--soffice <ruta>]` (`orquestador/workers.py`).
+
+- Configura los registros en JSON por stderr (también los de `mensajeria`), arma las piezas con `piezas_desde_entorno` (OneLake solo para `apertura` y `normalizar`), crea una cola para publicar y una por hilo para recibir, y vacía la cola con `mensajeria.worker.vaciar` bajo `atender_senales`. Devuelve el código de salida de `informar`.
+- `clasificar` exige `CLASIFICADOR=falso` y `CLASIFICADOR_CSV` (ruta dentro del almacén), y revisa antes de recibir que el CSV exista, sea válido y tenga filas. `ClasificadorFalso` acepta ahora el contenido del CSV (`texto=`) además de una ruta.
+- Una configuración inválida o una variable que falta salen con 2 sin tocar la cola; un mensaje que va a errores no cambia el 0.
+
+Pruebas: orquestador 518 (58 saltadas).

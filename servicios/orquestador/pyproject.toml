@@ -18,6 +18,7 @@ dependencies = [
 
 [project.scripts]
 orquestar = "orquestador.cli:main"
+orquestar-worker = "orquestador.workers:main"
 visor = "orquestador.visor.servidor:main"
 
 [tool.uv.sources]
