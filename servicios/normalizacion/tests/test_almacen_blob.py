@@ -345,6 +345,17 @@ def test_presta_el_cliente_del_contenedor_hasta_cerrar(recursos_azure):
         almacen.cliente_contenedor()
 
 
+def test_despues_de_cerrar_no_se_crea_ningun_cliente(recursos_azure):
+    _, _, crear_cliente, _ = recursos_azure
+    almacen = almacen_blob_desde_entorno()
+    almacen.cerrar()
+    creados = crear_cliente.call_count
+    with ThreadPoolExecutor(max_workers=1) as hilo:
+        with pytest.raises(RuntimeError, match="está cerrado"):
+            hilo.submit(almacen._cliente_del_hilo).result()
+    assert crear_cliente.call_count == creados
+
+
 @pytest.mark.parametrize("valor", [None, "", "ab", "a" * 25, "CuentaFalsa", "cuenta-falsa", URL_CUENTA, " abc"])
 def test_el_entorno_exige_un_nombre_de_cuenta_valido(monkeypatch, recursos_azure, valor):
     _, crear_credencial, _, _ = recursos_azure
@@ -526,3 +537,45 @@ assert 'normalizacion.almacen_blob' not in sys.modules
     ejecucion = subprocess.run([sys.executable, "-c", programa, str(tmp_path / "almacen")],
                                capture_output=True, text=True)
     assert ejecucion.returncode == 0, ejecucion.stderr
+
+
+def test_los_errores_distinguen_uri_invalida_de_objeto_ausente(almacen):
+    from normalizacion.almacen import NoEncontrado, UriInvalida
+
+    with pytest.raises(NoEncontrado):
+        almacen.leer(almacen.uri("no-existe.json"))
+    with pytest.raises(UriInvalida):
+        almacen.leer("https://otracuenta.blob.core.windows.net/evaluacion-ofertas/a.json")
+    with pytest.raises(UriInvalida):
+        almacen.uri("../fuera.json")
+
+
+def test_cerrar_espera_las_operaciones_en_curso_de_otros_hilos(cliente):
+    import threading
+
+    empezo, seguir = threading.Event(), threading.Event()
+    leer = cliente.get_blob_client
+
+    def leer_despacio(nombre):
+        empezo.set()
+        assert seguir.wait(5)
+        return leer(nombre)
+
+    cliente.get_blob_client = leer_despacio
+    cliente.blobs["a.json"] = b"{}"
+    almacen = AlmacenBlob(CUENTA, CONTENEDOR, cliente=cliente)
+    resultado = {}
+    hilo = threading.Thread(target=lambda: resultado.setdefault("datos", almacen.leer(almacen.uri("a.json"))))
+    hilo.start()
+    assert empezo.wait(5)
+    cierre = threading.Thread(target=almacen.cerrar)
+    cierre.start()
+    cierre.join(0.2)
+    assert cierre.is_alive(), "cerrar debe esperar la lectura en curso"
+    with pytest.raises(RuntimeError, match="cerrado"):
+        almacen.existe(almacen.uri("a.json"))
+    seguir.set()
+    hilo.join(5)
+    cierre.join(5)
+    assert resultado["datos"] == b"{}"
+    assert not cierre.is_alive()

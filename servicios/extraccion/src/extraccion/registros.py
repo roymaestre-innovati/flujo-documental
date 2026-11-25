@@ -65,9 +65,11 @@ def configurar(nivel: int = logging.INFO, salida=None) -> None:
     logging.getLogger("azure").setLevel(max(nivel, logging.ERROR))
     manejador = logging.StreamHandler(salida or sys.stderr)
     manejador.setFormatter(FormatoExtraccion())
-    for anterior in list(registro.handlers):
-        if isinstance(anterior.formatter, FormatoJson):
-            registro.removeHandler(anterior)
-    registro.addHandler(manejador)
-    registro.setLevel(nivel)
-    registro.propagate = False
+    # El bucle y la cola del worker viven en la mensajería y escriben bajo `mensajeria`.
+    for paquete in (registro, logging.getLogger("mensajeria")):
+        for anterior in list(paquete.handlers):
+            if isinstance(anterior.formatter, FormatoJson):
+                paquete.removeHandler(anterior)
+        paquete.addHandler(manejador)
+        paquete.setLevel(nivel)
+        paquete.propagate = False

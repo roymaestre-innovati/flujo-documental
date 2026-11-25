@@ -54,3 +54,20 @@ def test_reemplazar_conserva_el_anterior(tmp_path, solicitud):
         "OF-002-4b7e21c90d3a-p1-2.TD-16.v21.anterior-ej-000000000002.json",
         "OF-002-4b7e21c90d3a-p1-2.TD-16.v21.json",
     ]
+
+
+def test_en_el_almacen_no_devuelve_el_sobre_de_otra_clave_con_la_misma_ruta(tmp_path, solicitud):
+    from dataclasses import replace
+
+    from normalizacion.almacen import AlmacenLocal
+
+    from extraccion.resultados import ResultadosEnAlmacen
+
+    resultados = ResultadosEnAlmacen(AlmacenLocal(tmp_path))
+    salida = cargar(EJEMPLOS / "salida_td16.json")
+    una = replace(Clave.de(solicitud), id_proceso="P/OF", entrega="X")
+    otra = replace(una, id_proceso="P", entrega="OF/X")
+    resultados.guardar(una, {**salida, "id_proceso": "P/OF", "id_oferente": "X"})
+
+    assert resultados.buscar(una)["id_proceso"] == "P/OF"
+    assert resultados.buscar(otra) is None

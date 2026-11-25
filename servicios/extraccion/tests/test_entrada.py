@@ -76,12 +76,12 @@ def test_lectura_que_falta_es_falla_tecnica_reintentable(corrida, documento):
     assert (error.value.estado, error.value.codigo, error.value.reintentable) == ("error_proceso", "ARCHIVO_NO_ENCONTRADO", True)
 
 
-def test_uri_de_otro_almacen_no_se_encuentra(corrida, documento):
+def test_uri_de_otro_almacen_es_invalida_y_no_se_reintenta(corrida, documento):
     solicitud = corrida.solicitud(documento, 1, 1)
     solicitud["archivo"]["uri"] = "https://cuenta.blob.core.windows.net/flujo/x.pdf"
     with pytest.raises(ErrorDeSolicitud) as error:
         preparar(solicitud, corrida.almacen)
-    assert error.value.codigo == "ARCHIVO_NO_ENCONTRADO"
+    assert (error.value.codigo, error.value.reintentable) == ("URI_INVALIDA", False)
 
 
 def test_lectura_de_otro_documento(corrida, documento):
@@ -123,3 +123,17 @@ def test_mensajes_de_error_sin_datos_del_documento(corrida, documento):
         preparar(solicitud, corrida.almacen)
     texto = json.dumps(error.value.como_error())
     assert documento["id_documento"] not in texto and "certificado" not in texto
+
+
+def test_el_almacen_no_disponible_conserva_la_espera_que_pidio():
+    from normalizacion.almacen import AlmacenNoDisponible
+
+    from extraccion import entrada
+
+    class Almacen:
+        def leer(self, uri):
+            raise AlmacenNoDisponible("Blob pidió esperar", espera_s=42)
+
+    with pytest.raises(entrada.ErrorDeSolicitud) as error:
+        entrada._leer(Almacen(), "https://cuentafalsa.blob.core.windows.net/c/x.pdf", "el PDF")
+    assert (error.value.codigo, error.value.espera_s) == ("ALMACEN_NO_DISPONIBLE", 42)

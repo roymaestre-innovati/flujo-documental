@@ -8,6 +8,14 @@
 !servicios/normalizacion/src/**
 !servicios/normalizacion/tests/**
 !servicios/normalizacion/scripts/**
+!contracts/modulo5-orquestador/**
+!contracts/modulo3-extraccion/**
+!servicios/mensajeria/pyproject.toml
+!servicios/mensajeria/uv.lock
+!servicios/mensajeria/src/**
+!servicios/orquestador/pyproject.toml
+!servicios/orquestador/uv.lock
+!servicios/orquestador/src/**
 **/__pycache__
 **/*.pyc
 **/.pytest_cache

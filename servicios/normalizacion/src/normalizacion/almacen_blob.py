@@ -9,7 +9,7 @@ from contextlib import ExitStack, contextmanager, nullcontext
 from enum import Enum
 from math import isfinite
 from pathlib import PurePosixPath
-from threading import Lock, local
+from threading import Condition, Lock, local
 from typing import Self
 from urllib.parse import quote, unquote, urlsplit
 
@@ -25,7 +25,7 @@ from azure.core.utils import CaseInsensitiveDict
 from azure.identity import DefaultAzureCredential
 from azure.storage.blob import ContainerClient, ContentSettings
 
-from .almacen import Almacen, AlmacenNoDisponible, AlmacenSinPermiso, ErrorAlmacen
+from .almacen import Almacen, AlmacenNoDisponible, AlmacenSinPermiso, NoEncontrado, UriInvalida
 
 _CONTENEDOR_PREDETERMINADO = "evaluacion-ofertas"
 _CODIGOS_PUBLICOS = frozenset({
@@ -37,7 +37,7 @@ _CODIGOS_PUBLICOS = frozenset({
 _registro = logging.getLogger(__name__)
 
 
-class _BlobNoEncontrado(ErrorAlmacen):
+class _BlobNoEncontrado(NoEncontrado):
     """El contenedor respondió que falta el blob pedido."""
 
 
@@ -114,7 +114,7 @@ def _validar_configuracion(cuenta: str, contenedor: str) -> None:
 def _ruta_relativa(ruta: str) -> PurePosixPath:
     relativa = PurePosixPath(ruta)
     if relativa.is_absolute() or ".." in relativa.parts or not relativa.parts:
-        raise ErrorAlmacen("La ruta debe ser relativa y no puede salir del almacén.")
+        raise UriInvalida("La ruta debe ser relativa y no puede salir del almacén.")
     return relativa
 
 
@@ -151,8 +151,28 @@ class AlmacenBlob(Almacen):
         self._candado_clientes = Lock()
         self._recursos = ExitStack()
         self._cerrado = False
+        self._activas = 0
+        self._sin_activas = Condition(self._candado_clientes)
+        self.espera_cierre_s = 120
+        """Cuánto espera `cerrar` a que terminen las operaciones de otros hilos."""
+
+    @contextmanager
+    def _operacion(self) -> Iterator[None]:
+        """Cuenta la operación en curso, para que `cerrar` la espere."""
+        with self._sin_activas:
+            if self._cerrado:
+                raise RuntimeError("El almacén Blob está cerrado.")
+            self._activas += 1
+        try:
+            yield
+        finally:
+            with self._sin_activas:
+                self._activas -= 1
+                self._sin_activas.notify_all()
 
     def _cliente_del_hilo(self) -> ContainerClient:
+        # La revisión del cierre va bajo el mismo candado que la creación: si no, un
+        # `cerrar()` entre las dos dejaría un cliente nuevo que nadie cierra.
         with self._candado_clientes:
             if self._cerrado:
                 raise RuntimeError("El almacén Blob está cerrado.")
@@ -169,13 +189,20 @@ class AlmacenBlob(Almacen):
             return cliente
 
     def cliente_contenedor(self) -> ContainerClient:
-        """Presta el cliente SDK del hilo actual mientras el almacén esté abierto."""
+        """Presta el cliente SDK del hilo actual mientras el almacén esté abierto.
+
+        El préstamo no cuenta como operación activa: quien lo usa no debe cerrar el
+        almacén mientras tanto."""
         return self._cliente_del_hilo()
 
     def cerrar(self) -> None:
-        """Cierra los recursos propios y avisa si falla alguno de los cierres."""
-        with self._proteger_cliente, self._candado_clientes:
+        """No acepta operaciones nuevas, espera las que están en curso en otros hilos
+        (hasta `espera_cierre_s`) y cierra los recursos propios. Un cierre que falla
+        se registra como aviso y no interrumpe los demás."""
+        with self._sin_activas:
             self._cerrado = True
+            if not self._sin_activas.wait_for(lambda: self._activas == 0, timeout=self.espera_cierre_s):
+                _registro.warning("Blob cerrar: %s operaciones seguían en curso", self._activas)
             self._recursos.close()
 
     def __enter__(self) -> Self:
@@ -193,31 +220,31 @@ class AlmacenBlob(Almacen):
 
     def _nombre_blob(self, uri: str, *, listar: bool = False) -> str:
         if not uri or ord(uri[0]) <= 32 or any(caracter in uri for caracter in "?#\r\n\t"):
-            raise ErrorAlmacen("La URI del almacén Blob es inválida.")
+            raise UriInvalida("La URI del almacén Blob es inválida.")
         try:
             partes = urlsplit(uri)
             if re.search(r"%(?![0-9a-fA-F]{2})", partes.path):
                 raise ValueError
             ruta = unquote(partes.path, errors="strict")
         except ValueError:
-            raise ErrorAlmacen("La URI del almacén Blob es inválida.") from None
+            raise UriInvalida("La URI del almacén Blob es inválida.") from None
         if partes.scheme != "https" or partes.netloc.lower() != self._host:
-            raise ErrorAlmacen("La URI está fuera del almacén Blob.")
+            raise UriInvalida("La URI está fuera del almacén Blob.")
 
         contenedor, _, nombre = ruta.removeprefix("/").partition("/")
         if listar:
             nombre = nombre.rstrip("/")
         if contenedor != self._contenedor or ".." in nombre.split("/"):
-            raise ErrorAlmacen("La URI está fuera del almacén Blob.")
+            raise UriInvalida("La URI está fuera del almacén Blob.")
         if self._prefijo and nombre != self._prefijo and not nombre.startswith(self._prefijo + "/"):
-            raise ErrorAlmacen("La URI está fuera del almacén Blob.")
+            raise UriInvalida("La URI está fuera del almacén Blob.")
         if not listar and nombre.rstrip("/") in ("", self._prefijo):
-            raise ErrorAlmacen("La URI del almacén Blob debe indicar un archivo.")
+            raise UriInvalida("La URI del almacén Blob debe indicar un archivo.")
         return nombre
 
     def leer(self, uri: str) -> bytes:
         nombre = self._nombre_blob(uri)
-        with _traducir_fallas("leer"), self._proteger_cliente:
+        with self._operacion(), _traducir_fallas("leer"), self._proteger_cliente:
             cliente = self._cliente_del_hilo().get_blob_client(nombre)
             return cliente.download_blob().readall()
 
@@ -225,14 +252,14 @@ class AlmacenBlob(Almacen):
         nombre = self._nombre_blob(uri)
         tipo, _ = mimetypes.guess_type(f"/{nombre}")
         opciones = ContentSettings(content_type=tipo or "application/octet-stream")
-        with _traducir_fallas("escribir"), self._proteger_cliente:
+        with self._operacion(), _traducir_fallas("escribir"), self._proteger_cliente:
             cliente = self._cliente_del_hilo().get_blob_client(nombre)
             cliente.upload_blob(datos, overwrite=True, content_settings=opciones)
 
     def existe(self, uri: str) -> bool:
         nombre = self._nombre_blob(uri)
         try:
-            with _traducir_fallas("existe"), self._proteger_cliente:
+            with self._operacion(), _traducir_fallas("existe"), self._proteger_cliente:
                 self._cliente_del_hilo().get_blob_client(nombre).get_blob_properties()
         except _BlobNoEncontrado:
             return False
@@ -241,7 +268,7 @@ class AlmacenBlob(Almacen):
     def listar(self, prefijo: str) -> list[str]:
         base = self._nombre_blob(prefijo, listar=True)
         carpeta = base + "/" if base else ""
-        with _traducir_fallas("listar"), self._proteger_cliente:
+        with self._operacion(), _traducir_fallas("listar"), self._proteger_cliente:
             cliente = self._cliente_del_hilo()
             nombres = [blob.name for blob in cliente.list_blobs(name_starts_with=base)
                        if blob.name == base or blob.name.startswith(carpeta)]

@@ -2,7 +2,7 @@
 
 Lleva cada proceso de selección desde el aviso del módulo 1 hasta las solicitudes de extracción (iniciativa 005, entrega 1). La spec, el plan y las tareas están en `specs/005-orquestador/`; los contratos, en `contracts/modulo5-orquestador/v0.2/` y `contracts/modulo3-extraccion/v0.2/`.
 
-**Estado**. Entrega 1 cerrada (T01 a T11), en local. El resultado con la muestra real está en la nota de T11 de `tasks.md`. De la entrega 2 está cerrada la entrada desde OneLake (`tasks-entrada-onelake.md`, 2026-11-23): `orquestar` arma el aviso con las tablas del módulo 1, lee los originales de OneLake y ya corrió un evento real. También están las versiones de Azure de `Estado` (Cosmos con la API de MongoDB, ya probada contra la base de desarrollo) y de `Cola` (Service Bus, lista para probar cuando estén los roles), en `tasks-estado-cola-azure.md`. `AlmacenBlob` ya está implementado y falta probarlo contra el contenedor de desarrollo (T04 de `tasks-almacen-blob.md`). Los workers en Container Apps siguen pendientes.
+**Estado**. Entrega 1 cerrada (T01 a T11), en local. El resultado con la muestra real está en la nota de T11 de `tasks.md`. De la entrega 2 está cerrada la entrada desde OneLake (`tasks-entrada-onelake.md`, 2026-11-23): `orquestar` arma el aviso con las tablas del módulo 1, lee los originales de OneLake y ya corrió un evento real. También están las versiones de Azure de `Estado` (Cosmos con la API de MongoDB, ya probada contra la base de desarrollo) y de `Cola` (Service Bus, lista para probar cuando estén los roles), en `tasks-estado-cola-azure.md`. `AlmacenBlob` ya está implementado y falta probarlo contra el contenedor de desarrollo (T04 de `tasks-almacen-blob.md`). Los workers (`orquestar-worker`, `extraer-worker` y `orquestar-operar`) están hechos y probados con clientes falsos, y esperan los roles para correr contra Azure (`tasks-workers.md`). Su configuración está en `servicios/workers/README.md`.
 
 ## Cómo funciona
 
@@ -135,19 +135,17 @@ Las corridas traen datos personales: el servidor solo escucha en 127.0.0.1 y sol
 
 | Archivo | Qué hace |
 |---|---|
-| `cola.py` | Colas (`procesos-listos`, `normalizar`, `clasificar`, `extraer`, `resultados`), la interfaz `Cola` y `ColaEnMemoria`, que imita Service Bus: bloqueo por entrega, reentrega, demora, cola de errores y reenvío. `BloqueoPerdido` cuando una entrega ya no vale |
-| `cola_servicebus.py` | `ColaServiceBus`: la `Cola` en Service Bus, con `DefaultAzureCredential`, el prefijo de las colas, renovación del bloqueo y reenvío seguro de errores. Traduce las fallas del SDK a las clases de error |
+| `cola.py`, `cola_servicebus.py`, `errores.py`, `reloj.py` | Alias de los módulos de `servicios/mensajeria` (las colas, `ColaServiceBus`, el bucle y sus clases de error, y el reloj), que comparte con la extracción |
 | `estado.py` | Almacén del estado y `EstadoEnMemoria`, con creación idempotente y escritura condicional, como Cosmos |
 | `estado_mongo.py` | `EstadoMongo`: el `Estado` en Cosmos con la API de MongoDB (`pymongo`), con `id_proceso` como partición. Traduce el límite de RU a una espera |
-| `estados.py` | Las cinco entidades (proceso, oferente, documento, segmento y tarea), sus transiciones, el historial y `consultar` |
-| `errores.py` | Clases de error y el bucle común: reintentos, esperas, cola de errores y alertas. `ErrorDeConfiguracion` va a errores sin reintento, con motivo propio |
+| `estados.py` | Las cinco entidades (proceso, oferente, documento, segmento y tarea), sus transiciones, el historial, `consultar` y la reserva con dueño y vencimiento (`reservar`, `liberar`) |
 | `origen.py` | Dónde están los originales: la interfaz `Origen` y `OrigenLocal`, una carpeta. `bajar` revisa el tamaño y el MD5 si se los dan |
 | `origen_onelake.py` | `OrigenOneLake`: los originales en `Files/` de un lakehouse, con `DefaultAzureCredential`. Traduce las fallas de OneLake a las clases de error |
 | `entrada_modulo1.py` | Arma el aviso de un evento con las tablas Delta del módulo 1 hasta que exista su vista |
 | `clasificador.py` | `ClasificadorFalso`, con un CSV opcional |
 | `contratos.py` | Valida mensajes contra los esquemas de `contracts/` |
 | `datos.py` y `datos/` | Versiones vigentes, umbrales y tipos documentales, con un archivo por versión |
-| `parametros.py` | Reintentos, demoras, escalamiento y paralelo de normalización y descargas |
+| `parametros.py` | Los de la mensajería (reintentos, demoras, bloqueo) más escalamiento, paralelo de normalización y descargas, y la duración de la reserva |
 | `registros.py` | Registros en JSON, solo con identificadores |
 | `apertura.py` | Manejador de `procesos-listos`: valida el aviso, reparte las entregas y fija las versiones |
 | `normalizar.py` | Manejador de `normalizar`: baja los originales, llama a la normalización y registra los documentos |
@@ -157,6 +155,9 @@ Las corridas traen datos personales: el servidor solo escucha en 127.0.0.1 y sol
 | `resolucion.py` | Resolver una tarea de clasificación |
 | `local.py` | Una corrida completa sobre las versiones en memoria, con la normalización en paralelo |
 | `cli.py` | El comando `orquestar` |
+| `entorno.py` | Las piezas de Azure de un worker, armadas desde el entorno, sin caer a lo local |
+| `workers.py` | El comando `orquestar-worker apertura\|normalizar\|clasificar` |
+| `operacion.py` | El comando `orquestar-operar reenviar-errores\|escalar-fallas` |
 | `visor/` | El comando `visor`: servidor local y página para revisar corridas |
 
 ## Datos personales

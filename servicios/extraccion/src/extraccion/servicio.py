@@ -49,6 +49,9 @@ class Servicio:
     resultados: Resultados
     reloj: Reloj
     nuevo_id: Callable[[], str] = field(default=id_de_ejecucion)
+    relanzar_reintentables: bool = False
+    """En el worker: un `error_proceso` reintentable se lanza en vez de devolverse,
+    para que lo reintente el bucle de la cola (decisión 3 de `tasks-workers.md`)."""
 
 
 @dataclass
@@ -137,6 +140,9 @@ def extraer_segmento(solicitud: dict, servicio: Servicio) -> dict:
             armar = _extraer(servicio, solicitud, gasto)
             resultado = armar(_ejecucion(servicio, id_ejecucion, inicio, comienzo, gasto))
         except ErrorDeSolicitud as error:
+            if servicio.relanzar_reintentables and error.estado == ERROR_PROCESO and error.reintentable:
+                registro.info("Segmento sin extraer, se reintenta: %s", error.codigo)
+                raise
             if isinstance(error, LlamadaFallida):
                 gasto = _Gasto(error.tokens_entrada, error.tokens_salida, error.reintentos, error.modelo)
             resultado = sobre_de_error(solicitud, error, _ejecucion(servicio, id_ejecucion, inicio, comienzo, gasto))
@@ -145,3 +151,16 @@ def extraer_segmento(solicitud: dict, servicio: Servicio) -> dict:
             servicio.resultados.guardar(clave, resultado)
         registro.info("Segmento extraído", extra={"datos": resumen(resultado)})
         return resultado
+
+
+def resultado_de_error(solicitud: dict, servicio: Servicio, error: ErrorDeSolicitud) -> dict:
+    """El sobre de un segmento que no se pudo extraer, con una `ejecucion` nueva.
+
+    Lo usa el worker cuando se agotan los reintentos de un `error_proceso`. Si el
+    error viene del LLM, lleva lo que gastó el último intento.
+    """
+    inicio, comienzo = servicio.reloj.ahora(), servicio.reloj.monotono()
+    gasto = _Gasto()
+    if isinstance(error, LlamadaFallida):
+        gasto = _Gasto(error.tokens_entrada, error.tokens_salida, error.reintentos, error.modelo)
+    return sobre_de_error(solicitud, error, _ejecucion(servicio, servicio.nuevo_id(), inicio, comienzo, gasto))

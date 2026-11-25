@@ -84,9 +84,9 @@ def test_una_solicitud_con_uri_de_blob_y_local_no_reubica_la_uri_local(corrida_b
 
     assert error.value.estado == "error_proceso"
     assert error.value.como_error() == {
-        "codigo": "ARCHIVO_NO_ENCONTRADO",
-        "mensaje": "No se encontró el PDF normalizado en el almacén.",
-        "reintentable": True,
+        "codigo": "URI_INVALIDA",
+        "mensaje": "No se puede leer el PDF normalizado: su URI no es del almacén que se usa.",
+        "reintentable": False,
     }
 
 

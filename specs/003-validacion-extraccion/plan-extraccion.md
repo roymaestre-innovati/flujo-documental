@@ -92,6 +92,7 @@ El contrato `modulo3-extraccion/0.2` ya está publicado y no cambia. Los ejemplo
 | La solicitud no cumple `entrada.schema.json` | `SolicitudInvalida` (bug de quien la manda, clase 4). En el comando, la línea se informa y se sigue con la siguiente |
 | `paginas.hasta` mayor que las páginas de la lectura, o `desde > hasta` | `error_entrada`, `PAGINAS_FUERA_DE_RANGO`, no reintentable |
 | La lectura o el PDF no están en el almacén | `error_proceso`, `ARCHIVO_NO_ENCONTRADO`, reintentable |
+| La URI no es del almacén que se usa (por ejemplo, `file://` con Blob) | `error_proceso`, `URI_INVALIDA`, no reintentable |
 | El almacén sufre una falla transitoria | `error_proceso`, `ALMACEN_NO_DISPONIBLE`, reintentable |
 | El almacén deniega el acceso o está mal configurado | `error_proceso`, `ALMACEN_SIN_PERMISO`, no reintentable |
 | La huella del PDF no coincide con `archivo.sha256` o con `hash_pdf` de la lectura | `error_proceso`, `ARCHIVO_DISTINTO`, no reintentable (R28) |

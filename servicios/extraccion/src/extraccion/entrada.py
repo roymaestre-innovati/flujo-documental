@@ -11,7 +11,7 @@ import json
 from dataclasses import dataclass
 
 from normalizacion.almacen import (
-    Almacen, AlmacenLocal, AlmacenNoDisponible, AlmacenSinPermiso, ErrorAlmacen, ruta_en_el_almacen,
+    Almacen, AlmacenLocal, AlmacenNoDisponible, AlmacenSinPermiso, ErrorAlmacen, UriInvalida, ruta_en_el_almacen,
 )
 
 from . import contratos
@@ -82,10 +82,15 @@ def ubicar(almacen: Almacen, uri: str) -> str:
 def _leer(almacen: Almacen, uri: str, que: str) -> bytes:
     try:
         return almacen.leer(ubicar(almacen, uri))
+    except UriInvalida:
+        # La URI no es del almacén que se usa (por ejemplo, `file://` con Blob): repetir no la arregla.
+        raise _proceso("URI_INVALIDA", f"No se puede leer {que}: su URI no es del almacén que se usa.", reintentable=False) from None
     except ErrorAlmacen:
         raise _proceso("ARCHIVO_NO_ENCONTRADO", f"No se encontró {que} en el almacén.", reintentable=True) from None
     except AlmacenNoDisponible as error:
-        raise _proceso("ALMACEN_NO_DISPONIBLE", str(error), reintentable=True) from None
+        fallida = _proceso("ALMACEN_NO_DISPONIBLE", str(error), reintentable=True)
+        fallida.espera_s = error.espera_s  # la que pidió el almacén, para que el worker la respete
+        raise fallida from None
     except AlmacenSinPermiso as error:
         raise _proceso("ALMACEN_SIN_PERMISO", str(error), reintentable=False) from None
 

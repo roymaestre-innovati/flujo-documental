@@ -1,6 +1,6 @@
 # Inventario del código: lo que hay y lo que falta
 
-Estado al 2026-11-25, revisando `main` y la rama `almacen-blob`. Tareas: `tasks-estado-cola-azure.md` (`Estado` y `Cola`) y `tasks-almacen-blob.md` (`Almacen`). Las decisiones de Azure (colas con prefijo `evaluacion-ofertas-`, estado en Mongo con `pymongo`, workers como Container Apps Jobs) están en la rama `infra-azure-inicial` (`pendientes-azure.md`), que todavía no está en `main`.
+Estado al 2026-11-25, revisando `main` y la rama `workers`. Tareas: `tasks-estado-cola-azure.md` (`Estado` y `Cola`), `tasks-almacen-blob.md` (`Almacen`) y `tasks-workers.md` (los workers). Las decisiones de Azure (colas con prefijo `evaluacion-ofertas-`, estado en Mongo con `pymongo`, workers como Container Apps Jobs) están en la rama `infra-azure-inicial` (`pendientes-azure.md`), que todavía no está en `main`.
 
 ## Lo que hay
 
@@ -9,13 +9,14 @@ Estado al 2026-11-25, revisando `main` y la rama `almacen-blob`. Tareas: `tasks-
 | Normalización y lectura | `servicios/normalizacion/` (0.2.0) | Cerrada. Tiene `Dockerfile` |
 | Orquestador, entrega 1: aviso, apertura, normalizar, clasificar y pedir extracción | `servicios/orquestador/` (0.1.0) | Cerrada, en local |
 | Entrada desde OneLake: `OrigenOneLake`, aviso 0.2 armado con las tablas del módulo 1 y descarga en paralelo | `origen_onelake.py`, `entrada_modulo1.py` | Primera versión cerrada; corrió con un evento real |
-| Bucle de mensajes: reintentos, 429, clases de error y cola de errores | `errores.py` (`procesar_uno`) | Hecho, sobre la interfaz `Cola` |
-| Interfaces `Cola`, `Estado` y `Almacen` | `cola.py`, `estado.py`, `normalizacion/almacen.py` | Tienen versiones en memoria o en disco local y sus versiones de Azure: `ColaServiceBus`, `EstadoMongo` y `AlmacenBlob` (abajo) |
+| Mensajería compartida: `Cola`, `ColaServiceBus`, el bucle `procesar_uno` y el bucle de un worker | `servicios/mensajeria/` | Hecha. El orquestador la usa con alias de sus módulos de antes; la extracción, directo |
+| Workers: `orquestar-worker apertura\|normalizar\|clasificar`, `extraer-worker` y `orquestar-operar` | `orquestador/workers.py`, `extraccion/worker.py`, `orquestador/operacion.py` | Hechos y probados de punta a punta con clientes falsos (`tasks-workers.md`). Falta correrlos contra Azure (T11) |
+| Interfaces `Cola`, `Estado` y `Almacen` | `mensajeria/cola.py`, `estado.py`, `normalizacion/almacen.py` | Tienen versiones en memoria o en disco local y sus versiones de Azure: `ColaServiceBus`, `EstadoMongo` y `AlmacenBlob` (abajo) |
 | `Estado` en Cosmos (API de MongoDB) | `estado_mongo.py` | Hecho y probado contra la base de desarrollo (`tasks-estado-cola-azure.md`, T01 a T03) |
-| `Cola` en Service Bus | `cola_servicebus.py` | Hecha con un cliente falso, con renovación del bloqueo y reenvío seguro. Falta correrla contra las colas reales (T07), que espera los roles de datos |
+| `Cola` en Service Bus | `mensajeria/cola_servicebus.py` | Hecha con un cliente falso, con renovación del bloqueo y reenvío seguro. Falta correrla contra las colas reales (T07), que espera los roles de datos |
 | Clasificador | `clasificador.py` | Solo el falso. El real es de otro equipo |
-| Extracción | `servicios/extraccion/` (0.1.0) | Construida: corre en local, con LLM falso o gpt-5.4 y ficha de archivo o del MCP. Lee las solicitudes de un archivo, no de una cola |
-| Tareas humanas y escalamiento | `tareas.py` (`crear_tarea`, `escalar_fallas`) | Se crean en el estado. `escalar_fallas` y `reenviar_errores` (ahora de la cola) existen, pero nada los llama |
+| Extracción | `servicios/extraccion/` (0.1.0) | Construida: corre en local con `extraer`, o como worker con `extraer-worker`, que lee de la cola `extraer` y publica en `resultados` |
+| Tareas humanas y escalamiento | `tareas.py` (`crear_tarea`, `escalar_fallas`) | Se crean en el estado. `orquestar-operar escalar-fallas` y `reenviar-errores` los corren; falta el job con horario en la infraestructura |
 
 ## Lo que falta
 
@@ -27,14 +28,16 @@ Cada una con las mismas pruebas que su versión en memoria o en disco local.
 - [x] **`Cola` en Service Bus** (`azure-servicebus`, `DefaultAzureCredential`), en `cola_servicebus.py`, con la renovación del bloqueo. Falta solo correrla contra Azure (T07). Los nombres de `cola.py` no cambian: la versión de Service Bus les antepone el prefijo `evaluacion-ofertas-`, que es configuración. Hay que agregar `resultados`. Las propiedades `intento` y `esperas` van como application properties, y la demora como `scheduled_enqueue_time`. Falta la renovación del bloqueo, que hoy no existe porque en memoria no hay bloqueo que venza. Se escribe ya; probarlo contra Azure espera los roles.
 - [x] **`Almacen` en Blob** (`AlmacenBlob`, extra `azure` de la normalización). Pasó las pruebas con un contenedor falso, incluida una corrida con lectura desde la extracción. Falta correr la batería contra el contenedor de desarrollo (T04), a la espera del rol. Ver el [README de la normalización](../../servicios/normalizacion/README.md#almacén-en-blob-storage).
 - [x] Repetir contra Mongo las pruebas de mensajes repetidos y de cambio condicional (T03).
-- [ ] Decidir si dos trabajadores pueden normalizar la misma entrega a la vez con Blob, o si hace falta un lease por entrega.
+- [x] Dos trabajadores no normalizan la misma entrega a la vez: reserva por entrega en el estado (`tasks-workers.md`, decisión 6).
 
 ### 2. Workers que corren en Azure
 
-- [ ] **Un comando por worker**: toma mensajes de su cola hasta vaciarla y termina (Container Apps Jobs). Arma las versiones de Azure con la configuración del entorno. Hoy solo existe `orquestar`, que corre todo junto en memoria.
-- [ ] **La extracción como worker:** que lea de la cola `extraer` en vez de un archivo y publique en `resultados`. Hoy guarda sus resultados en un almacén propio (`resultados.py`).
-- [ ] **Imagen liviana** para los manejadores que no necesitan LibreOffice (la de normalización ya existe).
-- [ ] **Tareas programadas:** `escalar_fallas` (24 horas) necesita algo que la corra cada cierto tiempo, por ejemplo un job con horario. `reenviar_errores` necesita un comando para operación.
+- [x] **Un comando por worker** (`orquestar-worker`), que vacía su cola y termina, con las versiones de Azure armadas desde el entorno y la reserva por entrega en `normalizar` (`tasks-workers.md`).
+- [x] **La extracción como worker** (`extraer-worker`): lee de `extraer`, publica en `resultados` y guarda sus resultados en el almacén.
+- [x] **Imagen liviana** (`servicios/workers/Dockerfile`) y etapa `worker` en la de normalización. La configuración de cada job está en `servicios/workers/README.md`.
+- [x] **Comandos de operación:** `orquestar-operar escalar-fallas` y `reenviar-errores <cola>`. Falta el job con horario, en la infraestructura.
+- [ ] **Correr los workers contra Azure** (T11 de `tasks-workers.md`), cuando estén los roles.
+- [ ] **Definir los jobs** en el repositorio de infraestructura, con la tabla de `servicios/workers/README.md`.
 - [ ] **gpt-5.4 con identidad** (`Cognitive Services OpenAI User`) en vez de la clave, si se decide así. Cambia `llm_azure.py`.
 
 ### 3. Entrega 2 del orquestador: funcionalidad nueva
@@ -70,6 +73,6 @@ Todavía sin spec ni tareas: `spec.md` cubre solo la entrega 1.
 
 1. ~~`Estado` en Mongo~~ (hecho).
 2. ~~`Cola` en Service Bus y `Almacen` en Blob~~ (hechos y probados con clientes falsos).
-3. Probar `Cola` (T07) y `Almacen` (T04) contra Azure cuando estén los roles.
-4. El comando de worker que vacía su cola, con las tres versiones de Azure.
-5. La spec de la entrega 2 del orquestador (sección 3), antes de escribir su código.
+3. ~~Los workers~~ (hechos y probados de punta a punta con clientes falsos).
+4. Probar `Cola` (T07), `Almacen` (T04) y los workers (T11) contra Azure cuando estén los roles, y definir los jobs en la infraestructura.
+5. La spec de la entrega 2 del orquestador (sección 3), antes de escribir su código; empieza por el manejador de `resultados`.

@@ -392,6 +392,7 @@ source = { editable = "." }
 dependencies = [
     { name = "jsonschema" },
     { name = "mcp" },
+    { name = "mensajeria" },
     { name = "normalizacion", extra = ["azure"] },
     { name = "openai" },
     { name = "openpyxl" },
@@ -414,6 +415,7 @@ dev = [
 requires-dist = [
     { name = "jsonschema", specifier = ">=4.23" },
     { name = "mcp", specifier = ">=2.3,<3" },
+    { name = "mensajeria", editable = "../mensajeria" },
     { name = "normalizacion", extras = ["azure"], editable = "../normalizacion" },
     { name = "openai", specifier = ">=3.49.0" },
     { name = "openpyxl", specifier = ">=3.1.5" },
@@ -663,6 +665,25 @@ wheels = [
 ]
 
 [[package]]
+name = "mensajeria"
+source = { editable = "../mensajeria" }
+dependencies = [
+    { name = "azure-identity" },
+    { name = "azure-servicebus" },
+    { name = "normalizacion" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "azure-identity", specifier = ">=1.19" },
+    { name = "azure-servicebus", specifier = ">=7.14" },
+    { name = "normalizacion", editable = "../normalizacion" },
+]
+
+[package.metadata.requires-dev]
+dev = [{ name = "pytest", specifier = ">=8" }]
+
+[[package]]
 name = "msal"
 version = "1.39.0"
 source = { registry = "https://pypi.org/simple" }
@@ -819,10 +840,10 @@ name = "orquestador"
 source = { editable = "../orquestador" }
 dependencies = [
     { name = "azure-identity" },
-    { name = "azure-servicebus" },
     { name = "azure-storage-file-datalake" },
     { name = "deltalake" },
     { name = "jsonschema" },
+    { name = "mensajeria" },
     { name = "normalizacion", extra = ["azure"] },
     { name = "pyarrow" },
     { name = "pymongo" },
@@ -833,10 +854,10 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "azure-identity", specifier = ">=1.19" },
-    { name = "azure-servicebus", specifier = ">=7.14" },
     { name = "azure-storage-file-datalake", specifier = ">=12.18" },
     { name = "deltalake", specifier = ">=1.6" },
     { name = "jsonschema", specifier = ">=4.23" },
+    { name = "mensajeria", editable = "../mensajeria" },
     { name = "normalizacion", extras = ["azure"], editable = "../normalizacion" },
     { name = "pyarrow", specifier = ">=18" },
     { name = "pymongo", specifier = ">=4.10" },

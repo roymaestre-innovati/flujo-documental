@@ -24,7 +24,8 @@ import logging
 import tempfile
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path, PurePosixPath
-from threading import Lock
+from threading import Lock, local
+from uuid import uuid4
 
 import normalizacion
 from normalizacion.almacen import Almacen
@@ -66,6 +67,10 @@ def ruta_en_la_entrega(archivo: str, entrega: str) -> str:
     return archivo
 
 
+class _YaNormalizada(Exception):
+    """Otra ejecución terminó la entrega antes de que esta la reservara."""
+
+
 class Normalizar:
     cola = NORMALIZAR
 
@@ -86,6 +91,8 @@ class Normalizar:
         self._reloj = reloj
         self._soffice = soffice
         self._parametros = parametros
+        self._intento = local()
+        """El dueño de la reserva del intento en curso, por hilo (lo usa `al_fallar`)."""
 
     def procesar(self, cuerpo: dict) -> None:
         id_proceso, entrega = cuerpo["id_proceso"], cuerpo["entrega"]
@@ -104,6 +111,44 @@ class Normalizar:
                 f"El proceso fijó el normalizador {versiones['normalizador']} con parámetros "
                 f"{versiones['parametros_normalizacion']}, y está instalado {instaladas[0]} con {instaladas[1]}")
 
+        dueno = uuid4().hex
+        self._intento.dueno = dueno
+        try:
+            self._reservar(id_proceso, entrega, dueno)
+        except _YaNormalizada:
+            registro.info("Entrega ya normalizada: mensaje repetido")
+            return
+        try:
+            self._normalizar(id_proceso, entrega, proceso, oferente, dueno)
+        except BaseException:
+            # Un intento que falla en esta ejecución suelta la reserva y devuelve la
+            # entrega a su estado, para que el reintento no espere a que venza.
+            estados.liberar(self._estado, self._reloj, id_proceso, estados.OFERENTE, entrega, dueno,
+                            "intento fallido")
+            raise
+
+    def _reservar(self, id_proceso: str, entrega: str, dueno: str) -> None:
+        """Una sola ejecución normaliza la entrega a la vez (decisión 6 de `tasks-workers.md`)."""
+        try:
+            estados.reservar(
+                self._estado, self._reloj, id_proceso, estados.OFERENTE, entrega,
+                (estados.RECIBIDO, estados.ERROR_PROCESO), estados.NORMALIZANDO, dueno,
+                self._parametros.reserva_normalizar_s, "normalización empezada")
+        except estados.Reservado as reservado:
+            espera = max((reservado.vence - self._reloj.ahora()).total_seconds(), 0) + 1
+            raise ErrorTransitorio("La entrega la está normalizando otra ejecución", espera_s=espera) from None
+        except estados.EstadoInesperado as inesperado:
+            # Otra ejecución la terminó entre la lectura de `procesar` y la reserva.
+            if inesperado.registro.datos["estado"] == estados.PROCESANDO:
+                raise _YaNormalizada from None
+            raise
+
+    def _sigue_siendo_mia(self, id_proceso: str, entrega: str, dueno: str) -> bool:
+        oferente = self._estado.leer(id_proceso, estados.OFERENTE, entrega)
+        reserva = oferente.datos.get("reserva") or {}
+        return oferente.datos["estado"] == estados.NORMALIZANDO and reserva.get("dueno") == dueno
+
+    def _normalizar(self, id_proceso: str, entrega: str, proceso, oferente, dueno: str) -> None:
         with tempfile.TemporaryDirectory(prefix="entrega-") as temporal:
             carpeta = Path(temporal)
             try:
@@ -115,6 +160,11 @@ class Normalizar:
                 carpeta, id_proceso, None if entrega == ENTREGA_DEL_PROCESO else entrega, self._almacen,
                 soffice=self._soffice)
 
+        if not self._sigue_siendo_mia(id_proceso, entrega, dueno):
+            # Solo pasa si esta ejecución duró más que su reserva y otra la tomó.
+            registro.warning("La reserva de la entrega venció y la tomó otra ejecución: no se publica nada")
+            return
+
         manifiesto = resultado.manifiesto
         normalizados = 0
         for archivo in manifiesto["archivos"]:
@@ -125,12 +175,17 @@ class Normalizar:
                                                  "id_documento": archivo["id_documento"]})
 
         uri_manifiesto = self._almacen.uri(f"{id_proceso}/{entrega}/manifiesto.json")
-        estados.cambiar(
-            self._estado, self._reloj, id_proceso, estados.OFERENTE, entrega,
-            (estados.RECIBIDO, estados.ERROR_PROCESO), estados.PROCESANDO, "entrega normalizada",
-            {"manifiesto": uri_manifiesto, "documentos": len(manifiesto["archivos"]),
-             "descartados": len(manifiesto["descartados"]), "error": None},
-        )
+        try:
+            estados.cambiar(
+                self._estado, self._reloj, id_proceso, estados.OFERENTE, entrega,
+                estados.NORMALIZANDO, estados.PROCESANDO, "entrega normalizada",
+                {"manifiesto": uri_manifiesto, "documentos": len(manifiesto["archivos"]),
+                 "descartados": len(manifiesto["descartados"]), "error": None, "reserva": None},
+                respetar_reserva=True, dueno=dueno,
+            )
+        except estados.Reservado:
+            registro.warning("Otra ejecución tomó la reserva mientras se publicaba: no se cierra la entrega")
+            return
         registro.info("Entrega normalizada: %s documentos, %s para clasificar",
                       len(manifiesto["archivos"]), normalizados)
 
@@ -184,11 +239,15 @@ class Normalizar:
                         error["codigo"], {"detalle": error["detalle"], "id_documento": id_documento})
 
     def al_fallar(self, cuerpo: dict, motivo: str) -> None:
+        id_proceso, entrega = cuerpo["id_proceso"], cuerpo["entrega"]
         try:
             estados.cambiar(
-                self._estado, self._reloj, cuerpo["id_proceso"], estados.OFERENTE, cuerpo["entrega"],
-                estados.RECIBIDO, estados.ERROR_PROCESO, "falla al normalizar",
-                {"error": motivo, "error_desde": self._reloj.ahora().isoformat()},
+                self._estado, self._reloj, id_proceso, estados.OFERENTE, entrega,
+                (estados.RECIBIDO, estados.NORMALIZANDO), estados.ERROR_PROCESO, "falla al normalizar",
+                {"error": motivo, "error_desde": self._reloj.ahora().isoformat(), "reserva": None},
+                respetar_reserva=True, dueno=getattr(self._intento, "dueno", None),
             )
+        except estados.Reservado:
+            registro.warning("La entrega la está normalizando otra ejecución: no se marca el error")
         except estados.EstadoInesperado as e:
             registro.warning("La entrega ya estaba en %s: no se marca el error", e.registro.datos["estado"])

@@ -44,8 +44,10 @@ class LlamadaFallida(ErrorDeSolicitud):
     """Se agotaron los reintentos. Lleva lo gastado, para la `ejecucion` del resultado."""
 
     def __init__(self, codigo: str, mensaje: str, reintentos: int, tokens_entrada: int, tokens_salida: int,
-                 modelo: str | None) -> None:
+                 modelo: str | None, espera_s: float | None = None) -> None:
         super().__init__(ERROR_PROCESO, codigo, mensaje, reintentable=True)
+        self.espera_s = espera_s
+        """Lo que pidió esperar el LLM en el último 429, para que el worker lo reprograme."""
         self.reintentos = reintentos
         self.tokens_entrada = tokens_entrada
         self.tokens_salida = tokens_salida
@@ -84,8 +86,9 @@ class Llamador:
         modelo = None
         enviados = list(mensajes)
 
-        def fallida(codigo: str, mensaje: str) -> LlamadaFallida:
-            return LlamadaFallida(codigo, mensaje, pasajeras + invalidas, tokens_entrada, tokens_salida, modelo)
+        def fallida(codigo: str, mensaje: str, espera_s: float | None = None) -> LlamadaFallida:
+            return LlamadaFallida(codigo, mensaje, pasajeras + invalidas, tokens_entrada, tokens_salida, modelo,
+                                  espera_s)
 
         while True:
             try:
@@ -93,10 +96,14 @@ class Llamador:
                     respuesta = self._cliente.responder(enviados)
             except LimiteDeUso as limite:
                 espera = limite.espera if limite.espera is not None else a["espera_limite_uso_s"]
-                if espera_por_limite + espera > a["espera_limite_uso_total_s"]:
+                # Una espera de 0 cuenta como 1 s: si no, un `Retry-After: 0` repetido
+                # no agota nunca el presupuesto. Con presupuesto 0 (el worker), el 429
+                # vuelve enseguida al bucle de la cola con la espera que se pidió.
+                if espera_por_limite + max(espera, 1) > a["espera_limite_uso_total_s"]:
                     raise fallida("LLM_NO_DISPONIBLE",
-                                  f"El LLM siguió pidiendo esperar después de {espera_por_limite:.0f} s") from None
-                espera_por_limite += espera
+                                  f"El LLM siguió pidiendo esperar después de {espera_por_limite:.0f} s",
+                                  espera) from None
+                espera_por_limite += max(espera, 1)
                 self._reloj.dormir(espera)
                 continue
             except FallaPasajera as falla:
