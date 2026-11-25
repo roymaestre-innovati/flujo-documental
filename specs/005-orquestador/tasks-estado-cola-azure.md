@@ -4,7 +4,7 @@ Es una pieza de la entrega 2 del orquestador: las interfaces `Estado` y `Cola` d
 
 **Meta:** `EstadoMongo` y `ColaServiceBus` pasan la misma batería de pruebas que `EstadoEnMemoria` y `ColaEnMemoria`, en local sin Azure y, cuando se pida, contra los recursos reales de desarrollo.
 
-**Estado al 2026-11-24:** en curso, rama `estado-cola-azure`.
+**Estado al 2026-11-25:** T01 a T06 y T08 hechas, en la rama `estado-cola-azure`. `EstadoMongo` ya corrió contra la base de desarrollo (T03). T07 está lista y espera los roles de datos de Service Bus.
 
 ## Decisiones ya tomadas
 
@@ -91,9 +91,9 @@ En el **orquestador**, al lado de las versiones en memoria: `servicios/orquestad
   - **Renovación:** el bloqueo dura 5 minutos y una normalización puede tardar más. `ColaServiceBus` registra cada mensaje recibido en un `AutoLockRenewer` (uno por instancia, con un máximo configurable, por defecto 30 minutos). El renovador no tiene cómo soltar un mensaje: deja de renovarlo cuando se completa, abandona o manda a errores, y se cierra al cerrar la cola. La interfaz no cambia. Probarlo con el cliente falso: un mensaje recibido queda registrado una sola vez.
   - [x] **Reenvío seguro en Service Bus, hecho en T05.** `reenviar_errores` recibe con bloqueo en la cola de errores, completa y cuenta cada original después de republicarlo. La prueba con el falso comprueba que un fallo de envío deja el original en errores.
 
-- [ ] **T07 — `ColaServiceBus` contra las colas de desarrollo.** Correr la batería de T04 con la marca `azure` contra las colas reales, con `az login`. **Necesita que el administrador haya asignado los roles** de Service Bus al usuario (`infra/roles.bicep`, rama `infra-azure-inicial`). Mientras tanto, la tarea queda en espera. Probar además la renovación con un mensaje que se tiene bloqueado más de 5 minutos. La corre el usuario.
+- [ ] **T07 — `ColaServiceBus` contra las colas de desarrollo.** Correr la batería de T04 con la marca `azure` contra las colas reales, con `az login`. **Necesita que el administrador haya asignado los roles** de Service Bus al usuario (`infra/roles.bicep`, rama `infra-azure-inicial`). Mientras tanto, la tarea queda en espera. Probar además la renovación con un mensaje que se tiene bloqueado más de 5 minutos. La corre el usuario. **2026-11-25:** las pruebas están listas (ver "T07 — preparación"); el primer intento se detuvo en el *peek* inicial con `ServiceBusAuthorizationError`, porque el usuario aún no tiene los roles de datos.
 
-- [ ] **T08 — Cierre.** Notas de lo encontrado. Actualizar la tabla de interfaces de `plan.md` ("Lo que cambió al implementar"), el README del orquestador (variables de entorno y cómo correr las pruebas contra Azure) y `inventario-codigo.md`.
+- [x] **T08 — Cierre.** Notas de lo encontrado. Actualizar la tabla de interfaces de `plan.md` ("Lo que cambió al implementar"), el README del orquestador (variables de entorno y cómo correr las pruebas contra Azure) y `inventario-codigo.md`.
 
 ## Fuera de esta versión
 
@@ -213,3 +213,22 @@ SERVICEBUS_PRUEBA_LARGA=1 uv run pytest --azure -m azure -v -s tests/test_cola_s
 Reserva entre 6 y 7 minutos. Con `-s` se ve el avance cada minuto. El segundo receptor debe seguir sin recibir el mensaje, incluso después de los 5 minutos del bloqueo inicial. Al final, el primer receptor debe completarlo con el mismo token.
 
 La limpieza revisa ambas colas y completa los ids publicados por cada prueba, incluidos los del reenvío. Dispone de 40 s para buscar las entregas de la prueba. Si falla el chequeo inicial, revisa los conteos y coordina con el equipo antes de volver a correr. Si quedan mensajes al finalizar, revisa en el explorador de Service Bus la cola corta y los ids indicados. Espera a que venzan los bloqueos, si los hay, y retira únicamente los mensajes que confirmes que son de la prueba. Si hay mensajes ajenos, coordina con sus responsables antes de intervenir.
+
+**Primer intento (2026-11-25).** Con `az login` y el namespace, la batería se detuvo en el *peek* inicial: `ServiceBusAuthorizationError` en `clasificar`. Es lo esperado mientras el administrador no asigne los roles de datos: Contributor administra las colas pero no envía ni recibe. No se publicó nada. Desde entonces, la primera falla de permisos (`ErrorDeConfiguracion`) en las pruebas contra Azure detiene toda la corrida con una sola línea, en vez de repetir el traceback en cada prueba. Para revisar los roles propios:
+
+```bash
+az role assignment list --assignee "$(az ad signed-in-user show --query id -o tsv)" --all \
+  --query "[?contains(roleDefinitionName,'Service Bus')].{rol:roleDefinitionName, alcance:scope}" -o table
+```
+
+### T08 — Cierre
+
+Lo que dejó esta pieza, además de lo que dicen las notas de cada tarea:
+
+- **Las dos versiones de Azure pasan la misma batería que las de memoria.** `EstadoMongo` la pasó también contra la base de desarrollo; `ColaServiceBus`, con un cliente falso que imita al SDK y, cuando estén los roles, contra las colas reales (T07).
+- **Cambios en las interfaces:** `Cola.sacar_de_errores` se reemplazó por `Cola.reenviar_errores`, que republica y solo después completa; `Mensaje` lleva `bloqueo` (una entrega); nueva excepción `BloqueoPerdido`, que `procesar_uno` maneja sin publicar dos veces ni avisar de un paso a errores que no ocurrió; `publicar` exige un `dict` y valida las propiedades igual en las dos versiones; nueva cola `resultados`.
+- **Parámetros nuevos:** `espera_limite_estado_s` (1 s, cuando Cosmos limita las RU sin decir cuánto esperar) y `renovacion_bloqueo_max_s` (30 minutos).
+- **Registros:** `registros.configurar` deja `azure` y `pymongo` en `WARNING` como mínimo, porque en `DEBUG` escriben el contenido de los mensajes y los documentos.
+- **Dos revisiones de Codex** (T01 a T03 y T04 a T06) encontraron 27 hallazgos. Se corrigieron casi todos; los que quedaron solo anotados están en "Revisión de T01 a T03" y en las notas de T05 y T06.
+- **Pendiente para la pieza siguiente (workers):** el comando que vacía su cola y termina, armar `EstadoMongo` y `ColaServiceBus` desde el entorno, revisar qué registra en `ERROR` el transporte de Service Bus, y medir la latencia de Cosmos desde Azure.
+
