@@ -98,7 +98,7 @@ Detalles de la cola `normalizar` (acordados el 2026-11-06):
 - **Máximo 8 descargas en paralelo por entrega** (`paralelo_bajar`). La entrega pasa a normalización cuando están todos los archivos en su carpeta temporal.
 - **Quién mira OneLake.** Si el aviso trae `archivos`, la apertura reparte con esa lista sin leer nada. Si no, lista las carpetas de `ruta`, con la misma identidad que usa la normalización. Se anota en A-1.
 - **Mensaje repetido o trabajador caído:** la normalización reusa lo que ya quedó escrito y los `clasificar` repetidos se ignoran por su clave. No hace falta lógica nueva.
-- **Imagen aparte.** Solo este manejador necesita LibreOffice (1,2 GB). En la entrega 2 va en su propia imagen y los demás manejadores en una liviana. El código no cambia.
+- **Imagen aparte.** Solo este manejador necesita LibreOffice (1,2 GB). Va en la etapa `worker` de la imagen de la normalización, y los demás manejadores en la imagen liviana de `servicios/workers/` (`tasks-workers.md`).
 
 ## Estado
 
@@ -107,7 +107,7 @@ Un documento por entidad, todos con `id_proceso` (será la partición en Cosmos)
 | Entidad | Identificador | Estados en esta entrega | Además guarda |
 |---|---|---|---|
 | Proceso | `id_proceso` | `abierto` | Versiones fijadas, ruta de origen, fecha del aviso |
-| Oferente (su entrega) | `id_oferente` o `PROCESO` | `recibido` → `procesando`; `error_proceso` si la normalización de la entrega falla entera | Conteos se calculan; no se guardan (decisión 15) |
+| Oferente (su entrega) | `id_oferente` o `PROCESO` | `recibido` → `normalizando` (reservada por una ejecución, con dueño y vencimiento; vuelve a `recibido` si el intento falla) → `procesando`; `error_proceso` si la normalización de la entrega falla entera (`tasks-workers.md`, decisión 6) | Conteos se calculan; no se guardan (decisión 15) |
 | Documento | `id_documento` (el de la normalización) | Nace `normalizado`, `duplicado` o `error_entrada`; `normalizado` → `clasificado`, `esperando_clasificacion_humana` (respuesta inválida) o `error_proceso` | Hash, URI del PDF y la lectura, `duplicado_de` |
 | Segmento | `id_segmento` = `<id_documento>-p<inicio>-<fin>` | `pendiente` (publicado a `extraer`); `sin_extraccion` (TD-98, TD-99); `esperando_clasificacion_humana` (confianza baja) → `pendiente` o `sin_extraccion` | TD, subtipo, confianza, `clasificacion_dudosa`, quién asignó el TD si fue humano |
 | Tarea humana | `<clase>-<id del documento o segmento>` | `abierta` → `resuelta` | Clase (`clasificacion`, `documento_con_error`, `falla_tecnica`), motivo, resolución |

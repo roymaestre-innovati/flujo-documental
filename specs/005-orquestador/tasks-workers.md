@@ -4,7 +4,7 @@ Es una pieza de la entrega 2 del orquestador: los manejadores que hoy corren jun
 
 **Meta:** una corrida de punta a punta con un worker por cola, sobre los clientes falsos de Service Bus, Mongo y Blob, da los mismos estados y solicitudes que `orquestar correr` y los mismos sobres que `extraer_segmento`; y cada worker queda listo para correr como job en Azure, con su imagen y su configuración documentada.
 
-**Estado al 2026-11-25:** en curso, rama `workers`. Implementa Claude (el usuario anda bajo en tokens de GPT); Astra revisa al final.
+**Estado al 2026-11-25:** T01 a T10 y T12 hechas, en la rama `workers`. T11 está preparada y espera los roles de datos de Service Bus y Blob. Implementó Claude (el usuario andaba bajo en tokens de GPT); Astra revisa al final.
 
 ## Decisiones ya tomadas
 
@@ -58,7 +58,7 @@ Revisadas con el usuario y con una segunda opinión de Astra antes de empezar.
 - [x] **T09 — Comandos de operación:** `reenviar-errores <cola>` y `escalar-fallas`.
 - [x] **T10 — Imágenes y configuración** (decisiones 8 y 13): imagen liviana, etapa de worker en la de LibreOffice, y la tabla de configuración por job en el README.
 - [ ] **T11 — Contra Azure (en espera de los roles):** un worker contra las colas, la base y el contenedor de desarrollo, con datos inventados. La corre el usuario.
-- [ ] **T12 — Cierre.** Notas, `plan.md`, README e `inventario-codigo.md` (incluida su línea de estado, que todavía nombra la rama `almacen-blob`).
+- [x] **T12 — Cierre.** Notas, `plan.md`, README e `inventario-codigo.md` (incluida su línea de estado, que todavía nombra la rama `almacen-blob`).
 
 ## Fuera de esta versión
 
@@ -177,3 +177,37 @@ Pruebas: orquestador 524 (58 saltadas).
 - **Imagen con LibreOffice**: etapa nueva `worker` en `servicios/normalizacion/Dockerfile`, con el orquestador y la mensajería instalados sobre la base. `ENTRYPOINT ["orquestar-worker"]` y `CMD ["normalizar"]`. Las etapas `job` y `pruebas` no cambian. Construida y probada el mismo día: pide sus variables, y `normalizar` y LibreOffice 24.2 siguen disponibles.
 - Los `.dockerignore` dejan entrar solo lo que se copia; nunca documentos, la matriz ni `.env`.
 - **Configuración por job** en `servicios/workers/README.md`: comando, disparo, ejecuciones a la vez (`extraer` con una sola), variables, secretos, `replicaTimeout` 1800 s, `replicaRetryLimit` 0, escalador con `activationMessageCount: 0`, roles por cola y contenedor, alertas, y qué pasa con `resultados` mientras no tenga consumidor. Es la entrada para el repositorio de infraestructura.
+
+### T11 (preparada)
+
+Contra los recursos de desarrollo, con `az login` y las variables en el entorno (nunca en el repositorio). Necesita los roles de datos de Service Bus y Blob (T07 de `tasks-estado-cola-azure.md` y T04 de `tasks-almacen-blob.md`). Las colas de desarrollo deben estar vacías.
+
+Primero, cada worker sobre su cola vacía: tiene que salir con 0 en unos segundos, lo que prueba la identidad, las variables y el permiso de recibir de cada pieza, sin datos.
+
+```bash
+export SERVICEBUS_NAMESPACE=<namespace>.servicebus.windows.net ALMACEN_BLOB_CUENTA=<cuenta>
+export ESTADO_MONGO_URL='<cadena de conexión>' ONELAKE_WORKSPACE=<workspace> ONELAKE_LAKEHOUSE=<lakehouse>
+cd servicios/orquestador
+uv run orquestar-worker apertura; echo $?
+uv run orquestar-worker normalizar; echo $?
+CLASIFICADOR=falso CLASIFICADOR_CSV=config/clasificacion.csv uv run orquestar-worker clasificar; echo $?
+uv run orquestar-operar escalar-fallas; echo $?
+```
+
+`clasificar` sale con 2 si no está el CSV en el almacén: subir antes uno inventado (`id_oferente,ruta_origen,pagina_inicio,pagina_fin,tipo_documental,confianza,subtipo` y una fila). Con los cuatro en 0 queda probado el acceso. Una corrida con documentos va después, con un evento de prueba del módulo 1 y datos inventados, cuando cumplimiento lo permita (S2).
+
+### T12
+
+Cierre: `plan.md` (estados del oferente con `normalizando` e imágenes), `inventario-codigo.md` (mensajería, workers, sección 2 y orden sugerido), el README del orquestador (estado y tabla de módulos), el de la extracción (`extraer-worker`) y los nuevos de `servicios/mensajeria` y `servicios/workers`.
+
+Lo encontrado en la pieza:
+
+- `Apertura` publicaba los `normalizar` antes de marcar el proceso: una caída a la mitad republicaba todas las entregas. Ahora marca cada una al publicarla.
+- Dos conversiones de LibreOffice del mismo archivo no dan los mismos bytes (fecha de creación), así que la idempotencia de la normalización no alcanzaba para dos ejecuciones a la vez: de ahí la reserva.
+- En modo worker, los reintentos internos de `Llamador` se sumaban a los del bucle (hasta 16 llamadas por solicitud). Ahora el bucle lleva las fallas pasajeras y los 429.
+- La extracción guardaba sus resultados en disco local, que en un job se pierde al terminar. Ahora los guarda en el almacén.
+- El tope de 3 llamadas al LLM vale para todo el proceso solo con una ejecución de `extraer` a la vez: queda en la configuración del job.
+
+Queda fuera, como estaba previsto: el manejador de `resultados` (spec de la entrega 2), el clasificador real (A-5), gpt-5.4 con identidad y la definición de los jobs en la infraestructura.
+
+Pruebas al cerrar: mensajería 18, normalización 643 (23 saltadas), orquestador 524 (58 saltadas), extracción 239.

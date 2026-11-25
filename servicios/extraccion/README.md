@@ -43,6 +43,20 @@ uv run --project ~/GEB/flujo-documental-repo/servicios/extraccion probar-ficha-m
 
 **Con gpt-5.4 (`--llm azure`):** manda el contenido de los documentos a Azure OpenAI. Solo con documentos autorizados. Lee `AZURE_OPENAI_ENDPOINT`, `AZURE_OPENAI_API_KEY` y `AZURE_OPENAI_DEPLOYMENT` del entorno o del `.env` de la carpeta actual, sin imprimirlos, y rechaza un deployment `mini`. Antes de mandar nada pregunta si seguir, salvo con `--si-mando-documentos`.
 
+## Como worker (`extraer-worker`)
+
+En Azure, la extracción corre como Container Apps Job: toma solicitudes de la cola `extraer`, extrae cada segmento y publica el sobre en `resultados` (`specs/005-orquestador/tasks-workers.md`, T06). Usa la mensajería compartida (`servicios/mensajeria`), no el orquestador.
+
+```bash
+SERVICEBUS_NAMESPACE=<namespace> ALMACEN_BLOB_CUENTA=<cuenta> EXTRACCION_MODELO=mcp \
+    uv run extraer-worker --hilos 3
+```
+
+- Los resultados se guardan en el almacén, en `extraccion/<id_proceso>/<entrega>/`: un mensaje repetido publica lo guardado sin llamar al LLM.
+- Las fallas pasajeras y los 429 los reintenta la cola, con la espera pedida; `Llamador` solo repite las respuestas mal formadas. Al agotarse los reintentos se publica el `error_proceso`.
+- Un solo job a la vez, con 3 hilos que comparten el tope de llamadas al LLM.
+- La configuración del job (variables, secretos y roles) está en `servicios/workers/README.md`.
+
 ## Medir contra el gold (`medir-gold`)
 
 Extrae los documentos de un TD con gold y compara campo a campo con `gold_TD-NN.xlsx`, al lado de la última corrida de `lote.py` de la misma carpeta. **Manda los documentos a gpt-5.4:** solo con autorización. Imprime solo conteos por campo, tokens y tiempo: nunca valores ni nombres de documentos. Sale con 1 si algún campo baja frente a `lote.py`.
