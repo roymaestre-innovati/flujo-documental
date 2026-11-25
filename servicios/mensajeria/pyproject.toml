@@ -1,0 +1,32 @@
+[project]
+name = "mensajeria"
+dynamic = ["version"]
+description = "Colas, Service Bus y el bucle de errores que comparten el orquestador y la extracción"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "normalizacion",
+    "azure-identity>=1.19",
+    "azure-servicebus>=7.14",
+]
+
+[tool.uv.sources]
+normalizacion = { path = "../normalizacion", editable = true }
+
+[dependency-groups]
+dev = [
+    "pytest>=8",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.version]
+path = "src/mensajeria/__init__.py"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/mensajeria"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra --strict-markers"

@@ -24,6 +24,7 @@ medir-gold = "extraccion.medicion:main"
 [tool.uv.sources]
 normalizacion = { path = "../normalizacion", editable = true }
 orquestador = { path = "../orquestador", editable = true }
+mensajeria = { path = "../mensajeria", editable = true }
 
 [dependency-groups]
 dev = [

@@ -94,22 +94,22 @@ def test_cola_vacia(cola):
     pytest.param(ValueError, False, id="a-errores"),
 ])
 def test_bloqueo_perdido_devuelve_el_mensaje_sin_alertar(reloj, caplog, monkeypatch, falla, reintenta):
-    # Otras pruebas configuran orquestador sin propagación al registrador raíz.
-    paquete = logging.getLogger("orquestador")
+    # Otras pruebas configuran la mensajería sin propagación al registrador raíz.
+    paquete = logging.getLogger("mensajeria")
     monkeypatch.setattr(paquete, "handlers", [caplog.handler])
     monkeypatch.setattr(paquete, "propagate", False)
     cola = ColaConBloqueoPerdido(reloj)
     id_original = cola.publicar(c.CLASIFICAR, CUERPO)
     manejador = Juguete(falla() if falla is not None else None)
 
-    with caplog.at_level(logging.WARNING, logger="orquestador"):
+    with caplog.at_level(logging.WARNING, logger="mensajeria"):
         resultado = procesar_uno(cola, manejador, Parametros(demora_base_s=0))
 
     assert (resultado.id_mensaje, resultado.desenlace) == (id_original, "bloqueo_perdido")
-    [aviso] = [r for r in caplog.records if r.name == "orquestador.bucle"]
+    [aviso] = [r for r in caplog.records if r.name == "mensajeria.bucle"]
     assert aviso.levelno == logging.WARNING
     assert id_original in aviso.getMessage()
-    assert not any(r.name == "orquestador.alertas" for r in caplog.records)
+    assert not any(r.name == "mensajeria.alertas" for r in caplog.records)
     assert bool(manejador.fallidos) == (falla is ValueError)
     assert cola.errores(c.CLASIFICAR) == []
     assert cola.pendientes(c.CLASIFICAR) == (2 if reintenta else 1)
@@ -283,14 +283,14 @@ def test_alerta_con_identificadores_y_sin_datos_personales(cola, reloj):
     finally:
         registros.configurar(logging.INFO, io.StringIO())
     lineas = [json.loads(l) for l in salida.getvalue().splitlines()]
-    [alerta] = [l for l in lineas if l["modulo"] == "orquestador.alertas"]
+    [alerta] = [l for l in lineas if l["modulo"] == "mensajeria.alertas"]
     assert alerta["nivel"] == "ERROR"
     assert (alerta["id_proceso"], alerta["id_oferente"], alerta["id_documento"]) == ("SR1", "OF-001", "OF-001-aaa")
     assert "Juan" not in salida.getvalue()
 
 
 def test_configurar_silencia_los_avisos_de_credenciales(caplog, monkeypatch):
-    for nombre in ("normalizacion", "orquestador", "azure", "pymongo"):
+    for nombre in ("normalizacion", "orquestador", "mensajeria", "azure", "pymongo"):
         paquete = logging.getLogger(nombre)
         for atributo in ("handlers", "level", "propagate"):
             monkeypatch.setattr(paquete, atributo, getattr(paquete, atributo))
