@@ -54,7 +54,7 @@ Revisadas con el usuario y con una segunda opinión de Astra antes de empezar.
 - [x] **T05 — Workers del orquestador** (decisiones 2 y 8): `orquestar-worker apertura|normalizar|clasificar`, con el clasificador falso desde el almacén.
 - [x] **T06 — Worker de extracción** (decisiones 3 y 12): `extraer-worker`, con `Llamador` en modo worker, resultados en el almacén, publicación en `resultados` y `al_fallar` que publica el `error_proceso`.
 - [x] **T07 — Pendientes del almacén** (de `tasks-almacen-blob.md`): subtipos públicos de `ErrorAlmacen` (URI inválida y objeto ausente) con su trato en cada consumidor, y `AlmacenBlob.cerrar()` que espera las operaciones activas.
-- [ ] **T08 — Punta a punta con los workers:** los cuatro workers sobre los clientes falsos dan los mismos estados y solicitudes que `Corrida`, y los mismos sobres que `extraer_segmento`, con dobles y reloj controlado.
+- [x] **T08 — Punta a punta con los workers:** los cuatro workers sobre los clientes falsos dan los mismos estados y solicitudes que `Corrida`, y los mismos sobres que `extraer_segmento`, con dobles y reloj controlado.
 - [ ] **T09 — Comandos de operación:** `reenviar-errores <cola>` y `escalar-fallas`.
 - [ ] **T10 — Imágenes y configuración** (decisiones 8 y 13): imagen liviana, etapa de worker en la de LibreOffice, y la tabla de configuración por job en el README.
 - [ ] **T11 — Contra Azure (en espera de los roles):** un worker contra las colas, la base y el contenedor de desarrollo, con datos inventados. La corre el usuario.
@@ -149,3 +149,13 @@ Pruebas: extracción 238.
 - **`AlmacenBlob.cerrar()`** no acepta operaciones nuevas (lanzan `RuntimeError`), espera las que están en curso en otros hilos hasta `espera_cierre_s` (120 s) y después cierra. Si no terminan a tiempo, registra un aviso con cuántas seguían.
 
 Pruebas: normalización 643 (23 saltadas), orquestador 519 (58 saltadas), extracción 238.
+
+### T08
+
+`servicios/extraccion/tests/test_workers_punta_a_punta.py`, en la extracción porque es el único servicio que puede importar los dos (el orquestador solo en `dev`). Un proceso con dos oferentes y un documento del proceso pasa por `apertura`, `normalizar`, `clasificar` y `extraer-worker` (con 2 hilos), con cola y estado en memoria, el almacén Blob sobre el contenedor falso (cada worker arma y cierra el suyo) y el LLM falso.
+
+- Los estados de todos los registros y las solicitudes (sin las URI, que cambian de `file://` a `https://`) son los mismos que da `orquestador.local.Corrida` con la misma entrada.
+- Los sobres que publica el worker en `resultados` son los mismos que da `extraer_segmento` llamado directo, salvo `ejecucion`.
+- El estado va en memoria y no en `mongomock`, que es dependencia de pruebas del orquestador y no de la extracción: `EstadoMongo` ya pasa la misma batería que `EstadoEnMemoria`. Lo mismo con la cola: `ColaServiceBus` pasa la batería de `Cola`.
+
+Pruebas: extracción 239.
