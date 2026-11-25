@@ -35,7 +35,8 @@ VARIABLES_COMUNES = ("SERVICEBUS_NAMESPACE", "ESTADO_MONGO_URL", "ALMACEN_BLOB_C
 VARIABLES_ORIGEN = ("ONELAKE_WORKSPACE", "ONELAKE_LAKEHOUSE")
 
 
-def _crear_estado():
+def estado_desde_entorno():
+    """`EstadoMongo` con la cadena del entorno, y el cliente que hay que cerrar al terminar."""
     from .estado_mongo import EstadoMongo, coleccion_desde_entorno
 
     coleccion = coleccion_desde_entorno()
@@ -68,7 +69,7 @@ class Fabricas:
     """Cómo se crea cada pieza. Las pruebas pasan versiones falsas."""
 
     cola: Callable[[], Cola] = cola_desde_entorno
-    estado: Callable[[], tuple[Estado, object]] = _crear_estado
+    estado: Callable[[], tuple[Estado, object]] = estado_desde_entorno
     """Devuelve el estado y el recurso que hay que cerrar al terminar (el cliente de Mongo)."""
     almacen: Callable[[], Almacen] = _crear_almacen
     origen: Callable[[], Origen] = _crear_origen

@@ -55,7 +55,7 @@ Revisadas con el usuario y con una segunda opinión de Astra antes de empezar.
 - [x] **T06 — Worker de extracción** (decisiones 3 y 12): `extraer-worker`, con `Llamador` en modo worker, resultados en el almacén, publicación en `resultados` y `al_fallar` que publica el `error_proceso`.
 - [x] **T07 — Pendientes del almacén** (de `tasks-almacen-blob.md`): subtipos públicos de `ErrorAlmacen` (URI inválida y objeto ausente) con su trato en cada consumidor, y `AlmacenBlob.cerrar()` que espera las operaciones activas.
 - [x] **T08 — Punta a punta con los workers:** los cuatro workers sobre los clientes falsos dan los mismos estados y solicitudes que `Corrida`, y los mismos sobres que `extraer_segmento`, con dobles y reloj controlado.
-- [ ] **T09 — Comandos de operación:** `reenviar-errores <cola>` y `escalar-fallas`.
+- [x] **T09 — Comandos de operación:** `reenviar-errores <cola>` y `escalar-fallas`.
 - [ ] **T10 — Imágenes y configuración** (decisiones 8 y 13): imagen liviana, etapa de worker en la de LibreOffice, y la tabla de configuración por job en el README.
 - [ ] **T11 — Contra Azure (en espera de los roles):** un worker contra las colas, la base y el contenedor de desarrollo, con datos inventados. La corre el usuario.
 - [ ] **T12 — Cierre.** Notas, `plan.md`, README e `inventario-codigo.md` (incluida su línea de estado, que todavía nombra la rama `almacen-blob`).
@@ -159,3 +159,14 @@ Pruebas: normalización 643 (23 saltadas), orquestador 519 (58 saltadas), extrac
 - El estado va en memoria y no en `mongomock`, que es dependencia de pruebas del orquestador y no de la extracción: `EstadoMongo` ya pasa la misma batería que `EstadoEnMemoria`. Lo mismo con la cola: `ColaServiceBus` pasa la batería de `Cola`.
 
 Pruebas: extracción 239.
+
+### T09
+
+`orquestar-operar` (`orquestador/operacion.py`), con dos subcomandos:
+
+- `reenviar-errores <cola>` vuelve a publicar la cola de errores de una de las cinco colas, desde el primer intento, con `reenviar_errores`. Solo pide `SERVICEBUS_NAMESPACE`.
+- `escalar-fallas` corre `escalar_fallas` sobre el estado y crea la tarea "falla técnica" de cada entrega o documento con más de 24 horas en `error_proceso`. Repetirlo no duplica tareas. Solo pide `ESTADO_MONGO_URL`. En Azure va como job con horario (cada hora), en el repositorio de infraestructura.
+- Por pantalla, solo conteos. 2 si falta configuración, 1 si otra falla corta el comando (solo el tipo y el lugar).
+- `entorno.estado_desde_entorno` queda pública para que la usen los dos comandos.
+
+Pruebas: orquestador 524 (58 saltadas).
