@@ -24,25 +24,37 @@ def almacen_local(tmp_path, uris_ajenas_local):
     return AlmacenLocal(tmp_path / "salida"), uris_ajenas_local
 
 
-@pytest.fixture
-def uris_ajenas_blob():
-    host = "cuentafalsa.blob.core.windows.net"
-    base = f"https://{host}/evaluacion-ofertas"
-    ruta = "/evaluacion-ofertas/pruebas/abc/a.json"
+def _uris_ajenas_blob(cuenta, contenedor, prefijo):
+    host = f"{cuenta}.blob.core.windows.net"
+    base = f"https://{host}/{contenedor}"
+    ruta = f"/{contenedor}/{prefijo}/a.json"
+    otra_cuenta = "otracuenta" if cuenta != "otracuenta" else "cuentafalsa"
+    otro_contenedor = "otro-contenedor" if contenedor != "otro-contenedor" else "contenedor-falso"
     return (
         f"http://{host}{ruta}",
-        f"https://otracuenta.blob.core.windows.net{ruta}",
-        f"https://{host}/otro-contenedor/pruebas/abc/a.json",
+        f"https://{otra_cuenta}.blob.core.windows.net{ruta}",
+        f"https://{host}/{otro_contenedor}/{prefijo}/a.json",
         f"https://{host}{ruta}?sig=firma-inventada",
         f"https://{host}{ruta}#fragmento",
         f"https://{host}{ruta}?",
         f"https://{host}{ruta}#",
         f"https://{host}:443{ruta}",
         f"https://usuario:clave@{host}{ruta}",
-        f"{base}/pruebas/abc/%2E%2E/a.json",
+        f"{base}/{prefijo}/%2E%2E/a.json",
         f"{base}/otra-carpeta/a.json",
-        f"{base}/pruebas/abcd/a.json",
+        f"{base}/{prefijo}d/a.json",
     )
+
+
+@pytest.fixture
+def uris_ajenas_blob():
+    return _uris_ajenas_blob("cuentafalsa", "evaluacion-ofertas", "pruebas/abc")
+
+
+@pytest.fixture
+def uris_ajenas_blob_azure(cliente_contenedor_blob_azure, prefijo_blob_azure):
+    cliente = cliente_contenedor_blob_azure
+    return _uris_ajenas_blob(cliente.account_name, cliente.container_name, prefijo_blob_azure)
 
 
 @pytest.fixture
@@ -51,8 +63,17 @@ def almacen_blob(uris_ajenas_blob):
         yield almacen, uris_ajenas_blob
 
 
+@pytest.fixture
+def almacen_blob_azure(almacen_blob_de_prueba, uris_ajenas_blob_azure):
+    return almacen_blob_de_prueba, uris_ajenas_blob_azure
+
+
 # Cada implementación agrega aquí su fixture con el almacén y sus URI ajenas.
-@pytest.fixture(params=[pytest.param("almacen_local", id="local"), pytest.param("almacen_blob", id="blob")])
+@pytest.fixture(params=[
+    pytest.param("almacen_local", id="local"),
+    pytest.param("almacen_blob", id="blob"),
+    pytest.param("almacen_blob_azure", id="azure", marks=pytest.mark.azure(variable="ALMACEN_BLOB_CUENTA")),
+])
 def implementacion_almacen(request):
     return request.getfixturevalue(request.param)
 

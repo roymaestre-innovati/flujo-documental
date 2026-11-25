@@ -50,4 +50,5 @@ testpaths = ["tests"]
 addopts = "-ra --strict-markers"
 markers = [
     "libreoffice: necesita el comando soffice; se salta si no está instalado",
+    "azure(variable): usa recursos de Azure; requiere --azure y declarar la variable de entorno",
 ]

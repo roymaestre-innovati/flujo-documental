@@ -97,3 +97,16 @@ Se reutiliza un cliente de contenedor por hilo con la misma credencial. El clien
 Los comandos eligen y cierran el almacén mediante la interfaz común. El bucle del orquestador y la entrada de extracción clasifican las fallas del almacén. Una prueba con el contenedor falso exporta las solicitudes del orquestador y comprueba que la extracción lee el PDF y la lectura desde Blob.
 
 El visor solo lee `file://`. `orquestar correr` con Blob real adelanta su reloj simulado y por eso no respeta en tiempo real las esperas de un 429.
+
+### T04 (preparada)
+
+Desde `servicios/normalizacion`, sustituye `<cuenta>` por el nombre de la cuenta de desarrollo y ejecuta estos comandos cuando tengas el rol `Storage Blob Data Contributor` sobre el contenedor.
+
+```bash
+az login
+ALMACEN_BLOB_CUENTA="<cuenta>" uv run pytest --azure -m azure -v
+```
+
+La corrida debería tardar entre 10 y 20 segundos. Son unas 105 peticiones, incluyendo la limpieza, que a unos 70 ms cada una suman 7 segundos. A eso se añade la obtención de la credencial y la transferencia de 5 MiB en cada dirección.
+
+Si la corrida se corta con `Sin acceso a Azure`, verifica que el inicio de sesión corresponde a la identidad con el rol sobre el contenedor. Si falta la asignación, pídesela al administrador y repite el comando cuando esté activa. El nombre de la cuenta va solo en la variable de entorno, nunca en el repositorio.

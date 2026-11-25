@@ -275,6 +275,17 @@ def test_el_cliente_inyectado_sigue_siendo_del_llamador(almacen, cliente):
     assert cliente.cierres == 0
 
 
+def test_presta_el_cliente_del_contenedor_hasta_cerrar(recursos_azure):
+    _, _, _, clientes = recursos_azure
+    with almacen_blob_desde_entorno() as almacen:
+        assert almacen.cliente_contenedor() is clientes[0]
+        assert clientes[0].cierres == 0
+
+    assert clientes[0].cierres == 1
+    with pytest.raises(RuntimeError, match="está cerrado"):
+        almacen.cliente_contenedor()
+
+
 @pytest.mark.parametrize("valor", [None, "", "ab", "a" * 25, "CuentaFalsa", "cuenta-falsa", URL_CUENTA, " abc"])
 def test_el_entorno_exige_un_nombre_de_cuenta_valido(monkeypatch, recursos_azure, valor):
     _, crear_credencial, _, _ = recursos_azure

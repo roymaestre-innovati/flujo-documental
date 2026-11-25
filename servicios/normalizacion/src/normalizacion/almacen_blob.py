@@ -153,6 +153,10 @@ class AlmacenBlob(Almacen):
                 self._clientes.cliente = cliente
             return cliente
 
+    def cliente_contenedor(self) -> ContainerClient:
+        """Presta el cliente SDK del hilo actual mientras el almacén esté abierto."""
+        return self._cliente_del_hilo()
+
     def cerrar(self) -> None:
         """Cierra los recursos propios al terminar las operaciones."""
         with self._proteger_cliente, self._candado_clientes:
