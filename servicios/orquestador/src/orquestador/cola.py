@@ -21,9 +21,11 @@ import threading
 import datetime
 import itertools
 import json
+import math
 from abc import ABC, abstractmethod
-from collections import defaultdict
+from collections import defaultdict, deque
 from dataclasses import dataclass, field
+from uuid import uuid4
 
 from .reloj import Reloj, RelojSistema
 
@@ -31,11 +33,17 @@ PROCESOS_LISTOS = "procesos-listos"
 NORMALIZAR = "normalizar"
 CLASIFICAR = "clasificar"
 EXTRAER = "extraer"
-COLAS = (PROCESOS_LISTOS, NORMALIZAR, CLASIFICAR, EXTRAER)
+RESULTADOS = "resultados"
+COLAS = (PROCESOS_LISTOS, NORMALIZAR, CLASIFICAR, EXTRAER, RESULTADOS)
+_METADATOS_ERRORES = {"DeadLetterReason", "DeadLetterErrorDescription"}
 
 
 class ErrorCola(Exception):
     """Uso incorrecto de la cola: un bug (clase 4)."""
+
+
+class BloqueoPerdido(Exception):
+    """El bloqueo de esta entrega venció o el mensaje se volvió a entregar."""
 
 
 @dataclass
@@ -47,6 +55,8 @@ class Mensaje:
     entregas: int = 0
     """Cuántas veces se recibió. Service Bus lo lleva como DeliveryCount."""
     visible_desde: datetime.datetime | None = None
+    bloqueo: str | None = None
+    """Identifica la entrega actual del mensaje."""
 
 
 @dataclass
@@ -54,12 +64,26 @@ class MensajeEnErrores:
     mensaje: Mensaje
     motivo: str
     cuando: datetime.datetime
+    """En memoria, cuándo pasó a errores. En Service Bus, cuándo entró a la
+    cola original, ya que el servicio no guarda la hora del paso a errores.
+    """
 
 
 class Cola(ABC):
+    """Completar, abandonar o mandar a errores requiere el bloqueo de la entrega.
+
+    Si se perdió el bloqueo, da BloqueoPerdido. Si el mensaje ya salió de la cola
+    o nunca se recibió, da ErrorCola.
+    """
+
     @abstractmethod
     def publicar(self, cola: str, cuerpo: dict, demora_s: float = 0, propiedades: dict | None = None) -> str:
-        """Publica un mensaje y devuelve su id. Con demora, no se ve hasta que pase."""
+        """Publica un dict serializable como JSON y devuelve su id.
+
+        Las propiedades usan claves de texto no vacías ni reservadas y valores
+        de texto, booleanos, enteros de 32 bits con signo o flotantes finitos.
+        Con demora, el mensaje se ve cuando pasa ese tiempo.
+        """
 
     @abstractmethod
     def recibir(self, cola: str) -> Mensaje | None:
@@ -82,13 +106,43 @@ class Cola(ABC):
         """Los mensajes en la cola de errores, del más viejo al más nuevo."""
 
     @abstractmethod
-    def sacar_de_errores(self, cola: str) -> list[MensajeEnErrores]:
-        """Vacía la cola de errores y devuelve lo que tenía, para reenviarlo."""
+    def reenviar_errores(self, cola: str) -> int:
+        """Republica los mensajes de errores desde el más viejo y devuelve cuántos reenvió.
+
+        Conserva el cuerpo y las propiedades salvo `intento` y `esperas`. Cada
+        mensaje reenviado es nuevo y se quita de errores tras publicarlo. Las
+        llegadas posteriores al listado inicial quedan para otra llamada.
+        """
 
     @abstractmethod
     def pendientes(self, cola: str) -> int:
         """Mensajes que faltan por completar, visibles o no, sin contar errores."""
 
+
+
+def _serializar_cuerpo(cuerpo: dict) -> str:
+    if not isinstance(cuerpo, dict):
+        raise TypeError("El cuerpo del mensaje debe ser un dict")
+    return json.dumps(cuerpo, ensure_ascii=False, allow_nan=False)
+
+
+def _validar_propiedades(propiedades: dict | None) -> dict:
+    if propiedades is None:
+        return {}
+    if not isinstance(propiedades, dict):
+        raise TypeError("Las propiedades deben ser un dict")
+    for clave, valor in propiedades.items():
+        if not isinstance(clave, str):
+            raise TypeError("Las claves de las propiedades deben ser de texto")
+        if not clave or clave in _METADATOS_ERRORES or clave.startswith("x-opt-"):
+            raise ValueError("Las claves de las propiedades no pueden estar vacías ni ser reservadas")
+        if not isinstance(valor, (str, bool, int, float)):
+            raise TypeError("Las propiedades requieren valores JSON simples")
+        if isinstance(valor, int) and not -(2**31) <= valor < 2**31:
+            raise ValueError("Los enteros de las propiedades deben caber en 32 bits con signo")
+        if isinstance(valor, float) and not math.isfinite(valor):
+            raise ValueError("Los flotantes de las propiedades deben ser finitos")
+    return propiedades
 
 
 def _con_candado(metodo):
@@ -109,7 +163,7 @@ class ColaEnMemoria(Cola):
         self._reloj = reloj or RelojSistema()
         self._colas: dict[str, list[Mensaje]] = defaultdict(list)
         self._bloqueados: dict[str, Mensaje] = {}
-        self._errores: dict[str, list[MensajeEnErrores]] = defaultdict(list)
+        self._errores: dict[str, deque[MensajeEnErrores]] = defaultdict(deque)
         self._ids = itertools.count(1)
         self._candado = threading.RLock()
 
@@ -124,8 +178,8 @@ class ColaEnMemoria(Cola):
         if demora_s < 0:
             raise ErrorCola("La demora no puede ser negativa")
         # Como en Service Bus, el mensaje viaja serializado: se copia y debe ser JSON.
-        cuerpo = json.loads(json.dumps(cuerpo, ensure_ascii=False))
-        propiedades = json.loads(json.dumps(propiedades or {}, ensure_ascii=False))
+        cuerpo = json.loads(_serializar_cuerpo(cuerpo))
+        propiedades = _validar_propiedades(propiedades).copy()
         visible = self._reloj.ahora() + datetime.timedelta(seconds=demora_s)
         mensaje = Mensaje(id=f"m{next(self._ids):06d}", cola=cola, cuerpo=cuerpo, propiedades=propiedades,
                           visible_desde=visible)
@@ -142,14 +196,20 @@ class ColaEnMemoria(Cola):
         mensaje = min(visibles, key=lambda m: (m.visible_desde, m.id))
         self._colas[cola].remove(mensaje)
         mensaje.entregas += 1
+        mensaje.bloqueo = uuid4().hex
         self._bloqueados[mensaje.id] = mensaje
         return copy.deepcopy(mensaje)
 
     def _soltar(self, mensaje: Mensaje) -> Mensaje:
-        try:
-            return self._bloqueados.pop(mensaje.id)
-        except KeyError:
-            raise ErrorCola(f"El mensaje {mensaje.id} no está bloqueado: ya se completó o nunca se recibió") from None
+        if mensaje.bloqueo is not None:
+            vigente = self._bloqueados.get(mensaje.id)
+            if vigente is not None and mensaje.bloqueo == vigente.bloqueo and mensaje.cola == vigente.cola:
+                return self._bloqueados.pop(mensaje.id)
+            if vigente is not None or any(
+                pendiente.id == mensaje.id and pendiente.entregas > 0 for pendiente in self._colas.get(mensaje.cola, ())
+            ):
+                raise BloqueoPerdido(f"Se perdió el bloqueo del mensaje {mensaje.id}")
+        raise ErrorCola(f"El mensaje {mensaje.id} no está bloqueado: ya salió de la cola o nunca se recibió")
 
     @_con_candado
     def completar(self, mensaje: Mensaje) -> None:
@@ -169,13 +229,20 @@ class ColaEnMemoria(Cola):
     @_con_candado
     def errores(self, cola: str) -> list[MensajeEnErrores]:
         self._revisar_cola(cola)
-        return copy.deepcopy(self._errores[cola])
+        return copy.deepcopy(list(self._errores[cola]))
 
     @_con_candado
-    def sacar_de_errores(self, cola: str) -> list[MensajeEnErrores]:
+    def reenviar_errores(self, cola: str) -> int:
         self._revisar_cola(cola)
-        sacados, self._errores[cola] = self._errores[cola], []
-        return sacados
+        en_errores = self._errores[cola]
+        reenviados = 0
+        while en_errores:
+            mensaje = en_errores[0].mensaje
+            propiedades = {k: v for k, v in mensaje.propiedades.items() if k not in ("intento", "esperas")}
+            self.publicar(cola, mensaje.cuerpo, propiedades=propiedades)
+            en_errores.popleft()
+            reenviados += 1
+        return reenviados
 
     @_con_candado
     def pendientes(self, cola: str) -> int:

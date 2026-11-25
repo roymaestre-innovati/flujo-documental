@@ -12,6 +12,8 @@ dependencies = [
     "azure-storage-file-datalake>=12.18",
     "deltalake>=1.6",
     "pyarrow>=18",
+    "pymongo>=4.10",
+    "azure-servicebus>=7.14",
 ]
 
 [project.scripts]
@@ -26,6 +28,7 @@ dev = [
     "pytest>=8",
     "reportlab>=5.1.0",
     "openpyxl>=3.1.5",
+    "mongomock>=4.3",
 ]
 
 [build-system]
@@ -41,6 +44,8 @@ packages = ["src/orquestador"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-ra --strict-markers"
+pythonpath = ["scripts"]
 markers = [
     "libreoffice: necesita el comando soffice; se salta si no está instalado",
+    "azure(variable): usa recursos de Azure; requiere --azure y declarar la variable de entorno",
 ]

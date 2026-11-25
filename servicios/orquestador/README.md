@@ -2,7 +2,7 @@
 
 Lleva cada proceso de selección desde el aviso del módulo 1 hasta las solicitudes de extracción (iniciativa 005, entrega 1). La spec, el plan y las tareas están en `specs/005-orquestador/`; los contratos, en `contracts/modulo5-orquestador/v0.2/` y `contracts/modulo3-extraccion/v0.2/`.
 
-**Estado**. Entrega 1 cerrada (T01 a T11), en local. El resultado con la muestra real está en la nota de T11 de `tasks.md`. De la entrega 2 está cerrada la entrada desde OneLake (`tasks-entrada-onelake.md`, 2026-11-23): `orquestar` arma el aviso con las tablas del módulo 1, lee los originales de OneLake y ya corrió un evento real. Service Bus, Cosmos, Blob y Container Apps siguen pendientes.
+**Estado**. Entrega 1 cerrada (T01 a T11), en local. El resultado con la muestra real está en la nota de T11 de `tasks.md`. De la entrega 2 está cerrada la entrada desde OneLake (`tasks-entrada-onelake.md`, 2026-11-23): `orquestar` arma el aviso con las tablas del módulo 1, lee los originales de OneLake y ya corrió un evento real. También están las versiones de Azure de `Estado` (Cosmos con la API de MongoDB, ya probada contra la base de desarrollo) y de `Cola` (Service Bus, lista para probar cuando estén los roles), en `tasks-estado-cola-azure.md`. Blob y los workers en Container Apps siguen pendientes.
 
 ## Cómo funciona
 
@@ -35,6 +35,32 @@ uv run pytest
 ```
 
 La normalización (`../normalizacion`) se instala como dependencia de ruta, editable: un cambio allá se ve aquí sin reinstalar. Las pruebas del orquestador no necesitan LibreOffice, salvo una marcada `libreoffice` (un Excel de punta a punta), que se salta si `soffice` no está instalado.
+
+### Pruebas contra Azure
+
+Las pruebas marcadas `azure` usan los recursos de desarrollo y nunca corren en la suite normal: piden `--azure` y su variable de entorno, y si falta alguna se saltan. Usan solo datos inventados (`PRUEBA-<uuid>` en el estado) y borran lo suyo al terminar. Si falta un permiso, la corrida se detiene en la primera prueba con una sola línea.
+
+| Variable | Para qué | Por defecto |
+|---|---|---|
+| `ESTADO_MONGO_URL` | Cadena de conexión de la cuenta de Cosmos (API de MongoDB). Es un secreto: nunca se imprime ni se guarda | — |
+| `ESTADO_MONGO_BASE`, `ESTADO_MONGO_COLECCION` | Base y colección del estado | `evaluacion_ofertas`, `estado` |
+| `SERVICEBUS_NAMESPACE` | Nombre completo del namespace (`<namespace>.servicebus.windows.net`). Se entra con `DefaultAzureCredential` (`az login` en local) | — |
+| `COLAS_PREFIJO` | Prefijo de las colas en Service Bus | `evaluacion-ofertas-` |
+
+```bash
+# Estado en Cosmos (unos 40 s) y medición de RU (unos 5 s)
+read -rs ESTADO_MONGO_URL; printf '\n'; export ESTADO_MONGO_URL
+uv run pytest --azure -m azure -v -k estado
+uv run python scripts/medir_ru_estado.py
+unset ESTADO_MONGO_URL
+
+# Cola en Service Bus (1 a 3 minutos). Necesita los roles Data Sender y Data Receiver
+# y que nadie más esté usando las colas de desarrollo.
+export SERVICEBUS_NAMESPACE='<namespace>.servicebus.windows.net'
+uv run pytest --azure -m azure -v -k cola
+# Renovación del bloqueo: mantiene un mensaje 6 minutos
+SERVICEBUS_PRUEBA_LARGA=1 uv run pytest --azure -m azure -v -s tests/test_cola_servicebus_azure.py
+```
 
 ## Correr un proceso en local
 
@@ -105,8 +131,10 @@ Las corridas traen datos personales: el servidor solo escucha en 127.0.0.1 y sol
 
 | Archivo | Qué hace |
 |---|---|
-| `cola.py` | Colas (`procesos-listos`, `normalizar`, `clasificar`, `extraer`) y `ColaEnMemoria`, que imita Service Bus: bloqueo, reentrega, demora y cola de errores |
+| `cola.py` | Colas (`procesos-listos`, `normalizar`, `clasificar`, `extraer`, `resultados`), la interfaz `Cola` y `ColaEnMemoria`, que imita Service Bus: bloqueo por entrega, reentrega, demora, cola de errores y reenvío. `BloqueoPerdido` cuando una entrega ya no vale |
+| `cola_servicebus.py` | `ColaServiceBus`: la `Cola` en Service Bus, con `DefaultAzureCredential`, el prefijo de las colas, renovación del bloqueo y reenvío seguro de errores. Traduce las fallas del SDK a las clases de error |
 | `estado.py` | Almacén del estado y `EstadoEnMemoria`, con creación idempotente y escritura condicional, como Cosmos |
+| `estado_mongo.py` | `EstadoMongo`: el `Estado` en Cosmos con la API de MongoDB (`pymongo`), con `id_proceso` como partición. Traduce el límite de RU a una espera |
 | `estados.py` | Las cinco entidades (proceso, oferente, documento, segmento y tarea), sus transiciones, el historial y `consultar` |
 | `errores.py` | Clases de error y el bucle común: reintentos, esperas, cola de errores y alertas. `ErrorDeConfiguracion` va a errores sin reintento, con motivo propio |
 | `origen.py` | Dónde están los originales: la interfaz `Origen` y `OrigenLocal`, una carpeta. `bajar` revisa el tamaño y el MD5 si se los dan |

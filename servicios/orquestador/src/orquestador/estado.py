@@ -68,7 +68,7 @@ def _revisar(tipo: str, datos: dict) -> dict:
     if tipo not in TIPOS:
         raise ErrorEstado(f"Tipo desconocido: {tipo}")
     # Como en Cosmos, se guarda JSON: se copia y debe poder serializarse.
-    return json.loads(json.dumps(datos, ensure_ascii=False))
+    return json.loads(json.dumps(datos, ensure_ascii=False, allow_nan=False))
 
 
 

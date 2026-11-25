@@ -39,8 +39,8 @@ Cada pieza externa queda detrás de una interfaz pequeña, como `Almacen` en la 
 
 | Interfaz | Qué hace | Versión local | Versión de la entrega 2 |
 |---|---|---|---|
-| `Cola` | `publicar(cola, mensaje, demora=0)`, `recibir(cola)`, `completar`, `a_errores(mensaje, motivo)` | `ColaEnMemoria`: listas por cola, con demora simulada por un reloj inyectable | Service Bus |
-| `Estado` | `leer`, `crear_si_no_existe`, `cambiar(id, de_estado, a_estado, motivo)` condicional, `consultar(id_proceso)` | `EstadoEnMemoria`, que puede guardarse en un JSON al terminar | Cosmos, con `id_proceso` como partición |
+| `Cola` | `publicar(cola, mensaje, demora=0)`, `recibir(cola)`, `completar`, `abandonar`, `a_errores(mensaje, motivo)`, `reenviar_errores(cola)` | `ColaEnMemoria`: listas por cola, con demora simulada por un reloj inyectable | `ColaServiceBus` (hecho, `tasks-estado-cola-azure.md`; falta correrla contra Azure) |
+| `Estado` | `leer`, `crear_si_no_existe`, `cambiar(id, de_estado, a_estado, motivo)` condicional, `consultar(id_proceso)` | `EstadoEnMemoria`, que puede guardarse en un JSON al terminar | `EstadoMongo`: Cosmos con la API de MongoDB, con `id_proceso` como partición (hecho y probado contra la base de desarrollo, `tasks-estado-cola-azure.md`) |
 | `Origen` | `listar(ruta)` y `bajar(ruta, destino, esperado)` | `OrigenLocal`: una carpeta | `OrigenOneLake` (hecho, `tasks-entrada-onelake.md`) |
 | `Clasificador` | `clasificar(documento) → segmentos` | `ClasificadorFalso`: lee un CSV | El clasificador del otro equipo (C1 a C3) |
 | `Almacen` | Lo que producimos | `AlmacenLocal` de la normalización | Blob Storage |
@@ -265,4 +265,15 @@ Se trabaja con `tasks-entrada-onelake.md`.
 - **Los archivos de una entrega se bajan en paralelo** (T04, `paralelo_bajar`, 8 por defecto). La primera falla corta las descargas y la entrega se reintenta completa. `OrigenOneLake` usa un cliente por hilo con una sola credencial.
 - **`orquestar` corre un evento de OneLake** (T05) con `--onelake-workspace`, `--onelake-lakehouse` y `--evento`. `--clasificacion` es opcional: sin él, todo sale TD-99.
 - **Primera corrida real** (T06): el evento más chico cuadra con las tablas del módulo 1. La descarga no es el cuello de botella (15,6 s de 3 minutos), la normalización sí.
+
+### Estado en Mongo y cola en Service Bus (2026-11-24 a 2026-11-25)
+
+Se trabaja con `tasks-estado-cola-azure.md`.
+
+- **`EstadoMongo`** (`estado_mongo.py`): un documento por registro con `_id` = `{p, t, i}` (proceso, tipo, id), porque Cosmos exige `_id` único solo por partición y los ids de oferente se repiten entre procesos. Todo filtro lleva `id_proceso`. El cambio condicional filtra por `version`. Corrió contra la base de desarrollo: Cosmos acepta el `_id` en subdocumento y las claves con `.` y `$` (las rutas de `esperados`), y en las carreras con dos hilos gana uno solo. Escribir un registro cuesta de 10 a 20 RU y leerlo unas 3.
+- **El límite de RU (16500) es `ErrorTransitorio` con espera**, que el bucle reprograma sin contar intento hasta `max_esperas`.
+- **`ColaServiceBus`** (`cola_servicebus.py`): antepone el prefijo `evaluacion-ofertas-` a los nombres de `cola.py`, que no cambian. Renueva el bloqueo con `AutoLockRenewer` hasta 30 minutos. Un mensaje ilegible va directo a errores. Se agregó la cola `resultados`.
+- **Bloqueo perdido:** nueva excepción `BloqueoPerdido`. Si la cola la da al resolver, `procesar_uno` termina con `bloqueo_perdido`, sin volver a publicar ni avisar de un paso a errores que no ocurrió. Service Bus vuelve a entregar el mensaje y los manejadores son idempotentes.
+- **`reenviar_errores` es de la cola**, no del bucle: en Service Bus recibe de errores con bloqueo, republica y solo después completa, para que una caída no pierda mensajes. `sacar_de_errores` ya no existe.
+- **Las pruebas contra Azure se piden con `--azure`** y cada una declara su variable de entorno. Cosmos ya se probó; Service Bus espera los roles de datos del usuario.
 

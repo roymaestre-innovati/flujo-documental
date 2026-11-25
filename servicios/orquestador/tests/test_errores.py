@@ -35,6 +35,18 @@ class Juguete:
         self.fallidos.append((cuerpo, motivo))
 
 
+class ColaConBloqueoPerdido(c.ColaEnMemoria):
+    """Devuelve el mensaje a la cola como si hubiera vencido su bloqueo."""
+
+    def completar(self, mensaje):
+        self.abandonar(mensaje)
+        raise c.BloqueoPerdido()
+
+    def a_errores(self, mensaje, motivo):
+        self.abandonar(mensaje)
+        raise c.BloqueoPerdido()
+
+
 @pytest.fixture
 def reloj():
     return RelojManual()
@@ -72,6 +84,43 @@ def test_sale_bien(cola, reloj):
 
 def test_cola_vacia(cola):
     assert procesar_uno(cola, Juguete()) is None
+
+
+@pytest.mark.parametrize(("falla", "reintenta"), [
+    pytest.param(None, False, id="exito"),
+    pytest.param(ErrorTransitorio, True, id="reintento"),
+    pytest.param(ErrorDelDocumento, False, id="error-documento"),
+    pytest.param(ValueError, False, id="a-errores"),
+])
+def test_bloqueo_perdido_devuelve_el_mensaje_sin_alertar(reloj, caplog, monkeypatch, falla, reintenta):
+    # Otras pruebas configuran orquestador sin propagación al registrador raíz.
+    paquete = logging.getLogger("orquestador")
+    monkeypatch.setattr(paquete, "handlers", [caplog.handler])
+    monkeypatch.setattr(paquete, "propagate", False)
+    cola = ColaConBloqueoPerdido(reloj)
+    id_original = cola.publicar(c.CLASIFICAR, CUERPO)
+    manejador = Juguete(falla() if falla is not None else None)
+
+    with caplog.at_level(logging.WARNING, logger="orquestador"):
+        resultado = procesar_uno(cola, manejador, Parametros(demora_base_s=0))
+
+    assert (resultado.id_mensaje, resultado.desenlace) == (id_original, "bloqueo_perdido")
+    [aviso] = [r for r in caplog.records if r.name == "orquestador.bucle"]
+    assert aviso.levelno == logging.WARNING
+    assert id_original in aviso.getMessage()
+    assert not any(r.name == "orquestador.alertas" for r in caplog.records)
+    assert bool(manejador.fallidos) == (falla is ValueError)
+    assert cola.errores(c.CLASIFICAR) == []
+    assert cola.pendientes(c.CLASIFICAR) == (2 if reintenta else 1)
+
+    original = cola.recibir(c.CLASIFICAR)
+    assert (original.id, original.entregas) == (id_original, 2)
+    assert original.propiedades == {}
+    if reintenta:
+        copia = cola.recibir(c.CLASIFICAR)
+        assert copia.id != id_original
+        assert copia.cuerpo == CUERPO
+        assert copia.propiedades == {"intento": 2}
 
 
 def test_error_del_documento_completa_sin_reintentar(cola, reloj):
@@ -206,3 +255,20 @@ def test_alerta_con_identificadores_y_sin_datos_personales(cola, reloj):
     assert alerta["nivel"] == "ERROR"
     assert (alerta["id_proceso"], alerta["id_oferente"], alerta["id_documento"]) == ("SR1", "OF-001", "OF-001-aaa")
     assert "Juan" not in salida.getvalue()
+
+
+def test_configurar_en_debug_silencia_debug_de_los_sdk(caplog, monkeypatch):
+    for nombre in ("normalizacion", "orquestador", "azure", "pymongo"):
+        paquete = logging.getLogger(nombre)
+        for atributo in ("handlers", "level", "propagate"):
+            monkeypatch.setattr(paquete, atributo, getattr(paquete, atributo))
+        paquete.handlers = paquete.handlers.copy()
+
+    with caplog.at_level(logging.DEBUG):
+        registros.configurar(logging.DEBUG, io.StringIO())
+        for nombre in ("azure.servicebus", "pymongo.command"):
+            sdk = logging.getLogger(nombre)
+            sdk.debug("datos privados")
+            sdk.warning("aviso del SDK")
+
+    assert caplog.messages == ["aviso del SDK", "aviso del SDK"]

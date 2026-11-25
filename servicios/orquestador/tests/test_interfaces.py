@@ -6,7 +6,7 @@ import pytest
 from orquestador import cola as c
 from orquestador import datos
 from orquestador.clasificador import ClasificadorFalso, ErrorClasificadorFalso
-from orquestador.estado import Conflicto, ErrorEstado, EstadoEnMemoria
+from orquestador.estado import EstadoEnMemoria
 from orquestador.origen import ErrorOrigen, OrigenLocal
 from orquestador.reloj import RelojManual
 
@@ -35,28 +35,6 @@ def cola(reloj):
     return c.ColaEnMemoria(reloj)
 
 
-def test_cola_entrega_en_orden_y_bloquea(cola):
-    cola.publicar(c.NORMALIZAR, {"n": 1})
-    cola.publicar(c.NORMALIZAR, {"n": 2})
-    primero = cola.recibir(c.NORMALIZAR)
-    segundo = cola.recibir(c.NORMALIZAR)
-    assert (primero.cuerpo, segundo.cuerpo) == ({"n": 1}, {"n": 2})
-    assert cola.recibir(c.NORMALIZAR) is None
-    assert cola.pendientes(c.NORMALIZAR) == 2
-    cola.completar(primero)
-    cola.completar(segundo)
-    assert cola.pendientes(c.NORMALIZAR) == 0
-
-
-def test_cola_abandonar_vuelve_a_entregar(cola):
-    cola.publicar(c.CLASIFICAR, {"n": 1})
-    m = cola.recibir(c.CLASIFICAR)
-    cola.abandonar(m)
-    otra_vez = cola.recibir(c.CLASIFICAR)
-    assert otra_vez.id == m.id
-    assert otra_vez.entregas == 2
-
-
 def test_cola_demora(cola, reloj):
     cola.publicar(c.CLASIFICAR, {"n": 1}, demora_s=120)
     assert cola.recibir(c.CLASIFICAR) is None
@@ -67,76 +45,17 @@ def test_cola_demora(cola, reloj):
     assert cola.recibir(c.CLASIFICAR).cuerpo == {"n": 1}
 
 
-def test_cola_errores_y_reenvio(cola):
-    cola.publicar(c.EXTRAER, {"n": 1})
-    m = cola.recibir(c.EXTRAER)
-    cola.a_errores(m, "bug")
-    assert cola.pendientes(c.EXTRAER) == 0
-    [en_errores] = cola.errores(c.EXTRAER)
-    assert (en_errores.mensaje.cuerpo, en_errores.motivo) == ({"n": 1}, "bug")
-    assert [e.mensaje.id for e in cola.sacar_de_errores(c.EXTRAER)] == [m.id]
-    assert cola.errores(c.EXTRAER) == []
-
-
-def test_cola_no_deja_completar_dos_veces(cola):
-    cola.publicar(c.EXTRAER, {})
-    m = cola.recibir(c.EXTRAER)
-    cola.completar(m)
-    with pytest.raises(c.ErrorCola):
-        cola.completar(m)
-
-
-def test_cola_copia_el_cuerpo_y_exige_json(cola):
-    cuerpo = {"lista": [1]}
-    cola.publicar(c.EXTRAER, cuerpo)
-    cuerpo["lista"].append(2)
-    assert cola.recibir(c.EXTRAER).cuerpo == {"lista": [1]}
-    with pytest.raises(TypeError):
-        cola.publicar(c.EXTRAER, {"no_json": object()})
-    with pytest.raises(c.ErrorCola):
-        cola.publicar("otra", {})
-
-
 # --- Estado ---
 
 
-def test_estado_crear_si_no_existe_gana_el_primero():
-    estado = EstadoEnMemoria()
-    primero, creado = estado.crear_si_no_existe("SR1", "proceso", "SR1", {"v": 1})
-    segundo, creado_otra_vez = estado.crear_si_no_existe("SR1", "proceso", "SR1", {"v": 2})
-    assert creado and not creado_otra_vez
-    assert segundo.datos == {"v": 1}
-    assert primero.version == segundo.version == 1
-
-
-def test_estado_reemplazo_condicional():
-    estado = EstadoEnMemoria()
-    leido, _ = estado.crear_si_no_existe("SR1", "documento", "D1", {"estado": "pendiente"})
-    nuevo = estado.reemplazar(leido, {"estado": "normalizado"})
-    assert nuevo.version == 2
-    with pytest.raises(Conflicto):
-        estado.reemplazar(leido, {"estado": "error_entrada"})
-    assert estado.leer("SR1", "documento", "D1").datos == {"estado": "normalizado"}
-
-
-def test_estado_lista_por_proceso_y_tipo(tmp_path):
+def test_estado_en_memoria_guarda_en_json(tmp_path):
     estado = EstadoEnMemoria()
     estado.crear_si_no_existe("SR1", "documento", "D2", {})
     estado.crear_si_no_existe("SR1", "proceso", "SR1", {})
     estado.crear_si_no_existe("SR1", "documento", "D1", {})
     estado.crear_si_no_existe("SR2", "documento", "D9", {})
-    assert [(r.tipo, r.id) for r in estado.listar("SR1")] == [("proceso", "SR1"), ("documento", "D1"), ("documento", "D2")]
-    assert [r.id for r in estado.listar("SR1", "documento")] == ["D1", "D2"]
     estado.guardar(tmp_path / "estado.json")
     assert (tmp_path / "estado.json").read_text(encoding="utf-8").count('"tipo"') == 4
-
-
-def test_estado_rechaza_tipos_desconocidos_y_lo_que_no_es_json():
-    estado = EstadoEnMemoria()
-    with pytest.raises(ErrorEstado):
-        estado.crear_si_no_existe("SR1", "otro", "X", {})
-    with pytest.raises(TypeError):
-        estado.crear_si_no_existe("SR1", "proceso", "SR1", {"x": object()})
 
 
 # --- Origen ---
