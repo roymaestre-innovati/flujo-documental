@@ -760,3 +760,33 @@ def test_cerrar_traduce_fallas_y_cierra_los_demas_recursos(operacion, recurso):
     assert str(error.value) == f"Service Bus cerrar {recurso} (ServiceBusCommunicationError)"
     assert cliente.operaciones[-4:] == ["close_renewer", "close_receiver", "close_sender", "close_client"]
     assert cliente.cerrado and cliente.emisores[0].cerrado
+
+
+def test_los_envios_de_varios_hilos_van_de_a_uno(adaptador, monkeypatch):
+    import threading
+    import time
+
+    cola, cliente = adaptador
+    from servicebus_falso import EmisorFalso
+
+    dentro, maximo, candado = 0, 0, threading.Lock()
+    original = EmisorFalso.send_messages
+
+    def enviar(self, mensaje):
+        nonlocal dentro, maximo
+        with candado:
+            dentro += 1
+            maximo = max(maximo, dentro)
+        time.sleep(0.005)
+        try:
+            return original(self, mensaje)
+        finally:
+            with candado:
+                dentro -= 1
+
+    monkeypatch.setattr(EmisorFalso, "send_messages", enviar)
+    with ThreadPoolExecutor(max_workers=4) as grupo:
+        list(grupo.map(lambda i: cola.publicar("normalizar", {"i": i}), range(20)))
+    assert maximo == 1
+    assert len(cliente.envios) == 20
+    assert len(cliente.emisores) == 1

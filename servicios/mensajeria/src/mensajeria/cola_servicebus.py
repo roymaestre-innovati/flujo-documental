@@ -1,10 +1,12 @@
 """Colas de Azure Service Bus en modo PeekLock.
 
-Los receptores del SDK requieren una instancia por hilo.
+Los receptores del SDK requieren una instancia por hilo. Los envíos pueden venir
+de varios hilos: van de a uno, con un candado.
 El comando local usa ColaEnMemoria.
 """
 
 import json
+import threading
 import logging
 import os
 from collections.abc import Callable, Iterator
@@ -215,6 +217,9 @@ class ColaServiceBus(Cola):
         self._crear_renovador = crear_renovador
         self._renovador: AutoLockRenewer | None = None
         self._emisores: dict[str, ServiceBusSender] = {}
+        self._candado_envio = threading.Lock()
+        """Los emisores del SDK no aceptan dos envíos a la vez: varios hilos del
+        worker publican con la misma cola."""
         self._receptores: dict[tuple[str, ServiceBusSubQueue | None], ServiceBusReceiver] = {}
         self._bloqueados: dict[str, _Entrega] = {}
         self._abandonados: dict[str, tuple[str, str]] = {}
@@ -266,7 +271,8 @@ class ColaServiceBus(Cola):
         with _traducir_fallas("send_messages", cola, tamano=tamano):
             mensaje = ServiceBusMessage(datos, application_properties=propiedades, message_id=id_mensaje,
                                         content_type="application/json", scheduled_enqueue_time_utc=programado)
-            self._emisor(cola, nombre).send_messages(mensaje)
+            with self._candado_envio:
+                self._emisor(cola, nombre).send_messages(mensaje)
         return id_mensaje
 
     @staticmethod
