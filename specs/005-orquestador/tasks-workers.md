@@ -52,7 +52,7 @@ Revisadas con el usuario y con una segunda opinión de Astra antes de empezar.
 - [x] **T03 — Piezas desde el entorno** (decisiones 9 y 11). Arma `Cola`, `Estado`, `Almacen` y `Origen` con sus `*_desde_entorno`, valida todo antes de recibir, exige las versiones de Azure y cierra todo al terminar.
 - [x] **T04 — Reserva por entrega** (decisión 6). Estado `NORMALIZANDO` con dueño y vencimiento, cambio condicional al principio de `Normalizar`, y `Apertura` que anota cada entrega publicada. Pruebas con dos workers sobre la misma entrega, incluida una reserva vencida y la caída de `Apertura` a la mitad.
 - [x] **T05 — Workers del orquestador** (decisiones 2 y 8): `orquestar-worker apertura|normalizar|clasificar`, con el clasificador falso desde el almacén.
-- [ ] **T06 — Worker de extracción** (decisiones 3 y 12): `extraer-worker`, con `Llamador` en modo worker, resultados en el almacén, publicación en `resultados` y `al_fallar` que publica el `error_proceso`.
+- [x] **T06 — Worker de extracción** (decisiones 3 y 12): `extraer-worker`, con `Llamador` en modo worker, resultados en el almacén, publicación en `resultados` y `al_fallar` que publica el `error_proceso`.
 - [ ] **T07 — Pendientes del almacén** (de `tasks-almacen-blob.md`): subtipos públicos de `ErrorAlmacen` (URI inválida y objeto ausente) con su trato en cada consumidor, y `AlmacenBlob.cerrar()` que espera las operaciones activas.
 - [ ] **T08 — Punta a punta con los workers:** los cuatro workers sobre los clientes falsos dan los mismos estados y solicitudes que `Corrida`, y los mismos sobres que `extraer_segmento`, con dobles y reloj controlado.
 - [ ] **T09 — Comandos de operación:** `reenviar-errores <cola>` y `escalar-fallas`.
@@ -126,3 +126,17 @@ Pruebas: orquestador 507 (58 saltadas).
 - Una configuración inválida o una variable que falta salen con 2 sin tocar la cola; un mensaje que va a errores no cambia el 0.
 
 Pruebas: orquestador 518 (58 saltadas).
+
+### T06
+
+`extraer-worker [--hilos 3] [--tomar-mensajes-s 1500]` (`extraccion/worker.py`). Depende de la mensajería y de la normalización, no del orquestador (hay una prueba que lo comprueba).
+
+- **`Llamador` en modo worker** (`ajustes_del_worker`): `reintentos_falla_pasajera=0` y `espera_limite_uso_total_s=0`, así una falla pasajera o un 429 salen enseguida como `LlamadaFallida`, que ahora lleva `espera_s` del 429. Las respuestas mal formadas se siguen repitiendo por dentro. La CLI `extraer` no cambia.
+- **`Servicio.relanzar_reintentables`**: con él, `extraer_segmento` lanza el `ErrorDeSolicitud` reintentable en vez de devolver su sobre. El worker lo traduce a `ErrorTransitorio` con la espera, y el bucle reintenta (3 veces con 2, 4 y 8 minutos, o espera lo pedido sin contar el intento).
+- **`al_fallar`** publica en `resultados` el sobre `error_proceso` del último error de ese hilo (`resultado_de_error`), o `FALLA_INTERNA` si fue un bug. Una solicitud inválida no publica nada: no se puede armar un sobre válido.
+- **`ResultadosEnAlmacen`** guarda los resultados en `extraccion/<id_proceso>/<entrega>/` del almacén, con el mismo formato y los anteriores al lado. Un mensaje repetido publica lo guardado sin llamar al LLM.
+- **`SolicitudInvalida`** es `MensajeRechazado`, con solo la cantidad de problemas en el motivo.
+- Los registros de la mensajería salen por el mismo manejador JSON de la extracción.
+- **Tamaño (decisión 12):** los sobres de ejemplo del contrato miden menos de la décima parte del límite de 248 000 bytes. Medir un sobre real grande queda para la corrida contra Azure (T11), porque los resultados de la muestra no están en el repositorio.
+
+Pruebas: extracción 238.

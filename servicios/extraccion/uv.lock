@@ -392,6 +392,7 @@ source = { editable = "." }
 dependencies = [
     { name = "jsonschema" },
     { name = "mcp" },
+    { name = "mensajeria" },
     { name = "normalizacion", extra = ["azure"] },
     { name = "openai" },
     { name = "openpyxl" },
@@ -414,6 +415,7 @@ dev = [
 requires-dist = [
     { name = "jsonschema", specifier = ">=4.23" },
     { name = "mcp", specifier = ">=2.3,<3" },
+    { name = "mensajeria", editable = "../mensajeria" },
     { name = "normalizacion", extras = ["azure"], editable = "../normalizacion" },
     { name = "openai", specifier = ">=3.49.0" },
     { name = "openpyxl", specifier = ">=3.1.5" },

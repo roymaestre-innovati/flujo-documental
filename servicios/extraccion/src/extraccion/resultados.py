@@ -88,3 +88,34 @@ class ResultadosEnCarpeta(Resultados):
         except BaseException:
             Path(temporal).unlink(missing_ok=True)
             raise
+
+
+class ResultadosEnAlmacen(Resultados):
+    """Los mismos JSON que `ResultadosEnCarpeta`, pero en el almacén (Blob en Azure),
+    bajo `extraccion/<id_proceso>/<entrega>/`. Lo usa el worker, cuyo disco se
+    pierde al terminar cada ejecución (decisión 3 de `tasks-workers.md`)."""
+
+    CARPETA = "extraccion"
+
+    def __init__(self, almacen) -> None:
+        self._almacen = almacen
+
+    def _uri(self, clave: Clave, sufijo: str = "") -> str:
+        return self._almacen.uri(f"{self.CARPETA}/{clave.id_proceso}/{clave.entrega}/{clave.nombre}{sufijo}.json")
+
+    def buscar(self, clave: Clave) -> dict | None:
+        uri = self._uri(clave)
+        if not self._almacen.existe(uri):
+            return None
+        return json.loads(self._almacen.leer(uri))
+
+    def guardar(self, clave: Clave, resultado: dict) -> None:
+        anterior = self.buscar(clave)
+        if anterior is not None:
+            sufijo = f".anterior-{anterior['ejecucion']['id']}"
+            self._almacen.escribir(self._uri(clave, sufijo), _bytes(anterior))
+        self._almacen.escribir(self._uri(clave), _bytes(resultado))
+
+
+def _bytes(resultado: dict) -> bytes:
+    return json.dumps(resultado, ensure_ascii=False, indent=1).encode("utf-8")
