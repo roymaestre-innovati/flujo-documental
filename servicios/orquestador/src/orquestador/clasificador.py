@@ -63,17 +63,28 @@ class ClasificadorFalso(Clasificador):
         if faltan:
             raise ErrorClasificadorFalso(f"Faltan columnas en el CSV: {', '.join(faltan)}")
         for n, fila in enumerate(lector, start=2):
+            if any(fila[c] is None for c in COLUMNAS):
+                raise ErrorClasificadorFalso(f"Línea {n} del CSV: le faltan columnas del encabezado")
             try:
                 clave = (fila["id_oferente"].strip() or None, _nfc(fila["ruta_origen"].strip()))
-                self._filas[clave].append({
-                    "pagina_inicio": int(fila["pagina_inicio"]) if fila["pagina_inicio"].strip() else None,
-                    "pagina_fin": int(fila["pagina_fin"]) if fila["pagina_fin"].strip() else None,
-                    "tipo_documental": fila["tipo_documental"].strip(),
-                    "subtipo": (fila.get("subtipo") or "").strip() or None,
-                    "confianza": float(fila["confianza"]),
-                })
-            except ValueError as e:
-                raise ErrorClasificadorFalso(f"Línea {n} del CSV: {e}") from None
+                inicio = int(fila["pagina_inicio"]) if fila["pagina_inicio"].strip() else None
+                fin = int(fila["pagina_fin"]) if fila["pagina_fin"].strip() else None
+                confianza = float(fila["confianza"])
+            except ValueError:
+                raise ErrorClasificadorFalso(f"Línea {n} del CSV: una página o la confianza no es un número") from None
+            if not 0 <= confianza <= 1:  # también descarta nan
+                raise ErrorClasificadorFalso(f"Línea {n} del CSV: la confianza va de 0 a 1")
+            if any(p is not None and p < 1 for p in (inicio, fin)) or (inicio and fin and fin < inicio):
+                raise ErrorClasificadorFalso(f"Línea {n} del CSV: las páginas no forman un rango")
+            if not fila["tipo_documental"].strip() or not clave[1]:
+                raise ErrorClasificadorFalso(f"Línea {n} del CSV: falta la ruta o el tipo documental")
+            self._filas[clave].append({
+                "pagina_inicio": inicio,
+                "pagina_fin": fin,
+                "tipo_documental": fila["tipo_documental"].strip(),
+                "subtipo": (fila.get("subtipo") or "").strip() or None,
+                "confianza": confianza,
+            })
 
     def clasificar(self, solicitud: dict) -> dict:
         clave = (solicitud["id_oferente"], _nfc(solicitud["ruta_origen"]))

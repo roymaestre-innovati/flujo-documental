@@ -114,14 +114,37 @@ def test_una_falla_al_armar_cierra_lo_ya_creado(entorno, fabricas, cierres):
     assert cierres == ["mongo"]
 
 
-def test_la_configuracion_invalida_de_la_cola_es_error_de_configuracion(entorno, fabricas):
-    def cola_invalida():
-        raise ErrorDeConfiguracion("Falta SERVICEBUS_NAMESPACE")
+def test_la_configuracion_invalida_de_la_cola_es_error_de_configuracion(entorno, fabricas, monkeypatch):
+    # La fábrica real de la cola, con un cliente del SDK que rechaza el namespace.
+    from functools import partial
 
-    fabricas.cola = cola_invalida
+    from orquestador.cola_servicebus import cola_desde_entorno
+
+    def cliente_que_rechaza(**_):
+        raise ValueError("namespace inválido")
+
+    fabricas.cola = partial(cola_desde_entorno, cliente_que_rechaza, credencial=object())
     with piezas_desde_entorno(con_origen=False, fabricas=fabricas) as piezas:
-        with pytest.raises(ErrorDeConfiguracion):
+        with pytest.raises(ErrorDeConfiguracion, match="Revisa SERVICEBUS_NAMESPACE"):
             piezas.cola()
+
+
+def test_si_el_estado_falla_al_armarse_se_cierra_el_cliente_de_mongo(entorno, monkeypatch):
+    from orquestador import entorno as modulo
+    from orquestador import estado_mongo
+
+    cerrados = []
+
+    class Cliente:
+        def close(self):
+            cerrados.append("mongo")
+
+    coleccion = type("C", (), {"database": type("D", (), {"client": Cliente()})()})()
+    monkeypatch.setattr(estado_mongo, "coleccion_desde_entorno", lambda: coleccion)
+    monkeypatch.setattr(estado_mongo, "EstadoMongo", lambda c: (_ for _ in ()).throw(ValueError("w=0")))
+    with pytest.raises(ValueError):
+        modulo.estado_desde_entorno()
+    assert cerrados == ["mongo"]
 
 
 def test_las_fabricas_reales_arman_mongo_y_blob_sin_red(entorno, monkeypatch):

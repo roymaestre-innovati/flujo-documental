@@ -5,7 +5,7 @@ cuándo y cuántas veces se intenta algo. Cada servicio puede extenderlos con lo
 suyos (el orquestador lo hace en `orquestador.parametros`).
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 
 @dataclass(frozen=True)
@@ -20,7 +20,7 @@ class Parametros:
     """Esperas pedidas por el servicio (límite de uso) que no cuentan como intento.
     Pasado este número se trata como una falla transitoria agotada, para que un
     mensaje no quede dando vueltas para siempre."""
-    renovacion_bloqueo_max_s: float = 1800
+    renovacion_bloqueo_max_s: float = field(default=1800, kw_only=True)
     """Tiempo máximo de renovación del bloqueo de una entrega de Service Bus."""
 
 

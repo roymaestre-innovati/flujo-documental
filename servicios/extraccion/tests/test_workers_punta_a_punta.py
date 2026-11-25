@@ -37,6 +37,21 @@ FILAS = [
 ]
 
 
+
+@pytest.fixture(autouse=True)
+def soffice_en_el_path(tmp_path_factory, monkeypatch):
+    """`orquestar-worker normalizar` busca LibreOffice al arrancar. Donde no está
+    instalado, uno falso basta: estas pruebas solo convierten PDF."""
+    import os
+    import shutil
+
+    if shutil.which("soffice") is None:
+        carpeta = tmp_path_factory.mktemp("bin")
+        falso = carpeta / "soffice"
+        falso.write_text("#!/bin/sh\nexit 1\n")
+        falso.chmod(0o755)
+        monkeypatch.setenv("PATH", f"{carpeta}{os.pathsep}{os.environ.get('PATH', '')}")
+
 @pytest.fixture
 def datalake(tmp_path):
     raiz = tmp_path / "datalake"

@@ -35,6 +35,21 @@ class Mundo:
         return mensajes
 
 
+
+@pytest.fixture(autouse=True)
+def soffice_en_el_path(tmp_path_factory, monkeypatch):
+    """`orquestar-worker normalizar` busca LibreOffice al arrancar. Donde no está
+    instalado, uno falso basta: estas pruebas solo convierten PDF."""
+    import os
+    import shutil
+
+    if shutil.which("soffice") is None:
+        carpeta = tmp_path_factory.mktemp("bin")
+        falso = carpeta / "soffice"
+        falso.write_text("#!/bin/sh\nexit 1\n")
+        falso.chmod(0o755)
+        monkeypatch.setenv("PATH", f"{carpeta}{os.pathsep}{os.environ.get('PATH', '')}")
+
 @pytest.fixture
 def entorno(monkeypatch):
     for nombre in VARIABLES_COMUNES + VARIABLES_ORIGEN:
@@ -111,11 +126,28 @@ def test_un_mensaje_a_errores_sale_con_0(mundo, capsys):
     assert len(mundo.cola.errores(c.NORMALIZAR)) == 1
 
 
-@pytest.mark.parametrize("argumentos", [["apertura", "--hilos", "0"], ["apertura", "--tomar-mensajes-s", "0"]])
+@pytest.mark.parametrize("argumentos", [["apertura", "--tomar-mensajes-s", "0"],
+                                        ["normalizar", "--soffice", "/no/existe/soffice"]])
 def test_argumentos_invalidos_salen_con_2(mundo, argumentos):
     assert mundo.correr(*argumentos) == 2
+    assert mundo.cola.pendientes(c.PROCESOS_LISTOS) == 1
 
 
-def test_varios_hilos_comparten_el_manejador(mundo):
-    assert mundo.correr("apertura", "--hilos", "3") == 0
-    assert mundo.cola.pendientes(c.NORMALIZAR) == 1
+def test_un_solo_hilo_por_ejecucion(mundo):
+    """Decisión 4: la concurrencia la dan las ejecuciones del job."""
+    with pytest.raises(SystemExit) as salida:
+        mundo.correr("apertura", "--hilos", "2")
+    assert salida.value.code == 2
+
+
+@pytest.mark.parametrize("fila", [["OF-001", "carta.pdf", "", "", "TD-16"],
+                                  ["OF-001", "carta.pdf", "", "", "TD-16", "nan", ""],
+                                  ["OF-001", "carta.pdf", "3", "1", "TD-16", "0.9", ""]])
+def test_un_csv_con_filas_invalidas_sale_con_2(mundo, monkeypatch, capsys, fila):
+    monkeypatch.setenv("CLASIFICADOR", "falso")
+    monkeypatch.setenv("CLASIFICADOR_CSV", "config/clasificacion.csv")
+    _csv(mundo, [fila])
+    mundo.cola.publicar(c.CLASIFICAR, {"id_proceso": P, "entrega": "OF-001", "id_documento": "x"})
+    assert mundo.correr("clasificar") == 2
+    assert "no es válido" in capsys.readouterr().err
+    assert mundo.cola.pendientes(c.CLASIFICAR) == 1

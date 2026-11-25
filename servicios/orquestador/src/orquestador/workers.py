@@ -1,7 +1,7 @@
 """Comando `orquestar-worker`: un manejador del orquestador como Container Apps Job
 (T05 de `specs/005-orquestador/tasks-workers.md`).
 
-    orquestar-worker apertura|normalizar|clasificar [--hilos 1] [--tomar-mensajes-s 1500]
+    orquestar-worker apertura|normalizar|clasificar [--tomar-mensajes-s 1500] [--soffice <ruta>]
 
 Arma las piezas de Azure desde el entorno (`entorno.py`), vacía la cola del
 manejador con `mensajeria.worker.vaciar` y termina. Los registros van en JSON
@@ -10,10 +10,14 @@ por stderr, solo con identificadores y conteos.
 - `apertura` lee `procesos-listos` y publica en `normalizar`. Usa OneLake cuando
   el aviso no trae la lista de archivos.
 - `normalizar` lee `normalizar` y publica en `clasificar`. Usa OneLake y, para
-  los documentos de Office, LibreOffice (`--soffice` o `soffice` en el `PATH`).
+  los documentos de Office, LibreOffice (`--soffice` o `soffice` en el `PATH`),
+  que se busca al arrancar.
 - `clasificar` lee `clasificar` y publica en `extraer`. En esta entrega solo hay
   clasificador falso, para desarrollo: `CLASIFICADOR=falso` y `CLASIFICADOR_CSV`
   con la ruta del CSV dentro del almacén (decisión 2).
+
+Un solo mensaje a la vez por ejecución (decisión 4): la concurrencia de
+`normalizar` la dan las ejecuciones del job, no hilos.
 
 Código de salida: 0 normal, 2 configuración inválida, 1 otra falla que cortó la
 ejecución (ver `mensajeria.worker`).
@@ -22,6 +26,7 @@ ejecución (ver `mensajeria.worker`).
 import argparse
 import logging
 import os
+import shutil
 import sys
 import threading
 
@@ -49,11 +54,18 @@ CON_ORIGEN = {APERTURA, NORMALIZAR}
 def _argumentos(argv):
     p = argparse.ArgumentParser(prog="orquestar-worker", description="Vacía la cola de un manejador y termina.")
     p.add_argument("worker", choices=WORKERS)
-    p.add_argument("--hilos", type=int, default=1, help="mensajes a la vez, cada uno con su cola (1)")
     p.add_argument("--tomar-mensajes-s", type=float, default=Limites().tomar_mensajes_s,
                    help="no toma mensajes nuevos pasado este tiempo (1500 s)")
     p.add_argument("--soffice", help="con normalizar: la ruta de LibreOffice, si no está en el PATH")
     return p.parse_args(argv)
+
+
+def _soffice(ruta: str | None) -> str:
+    """LibreOffice, revisado antes de recibir: sin él, el primer documento de Office fallaría."""
+    encontrado = shutil.which(ruta or "soffice")
+    if encontrado is None:
+        raise ValueError("No se encontró LibreOffice: --soffice o soffice en el PATH")
+    return encontrado
 
 
 def clasificador_desde_entorno(piezas: Piezas) -> ClasificadorFalso:
@@ -94,8 +106,8 @@ def main(argv: list[str] | None = None, *, fabricas: Fabricas | None = None,
     configurar(logging.INFO, sys.stderr)
     try:
         limites = Limites(tomar_mensajes_s=args.tomar_mensajes_s)
-        if args.hilos < 1:
-            raise ValueError("--hilos debe ser 1 o más")
+        if args.worker == NORMALIZAR:
+            args.soffice = _soffice(args.soffice)
     except ValueError as error:
         print(error, file=sys.stderr)
         return SALIDA_CONFIGURACION
@@ -109,7 +121,7 @@ def main(argv: list[str] | None = None, *, fabricas: Fabricas | None = None,
     with piezas:
         try:
             manejador = armar_manejador(args.worker, piezas, soffice=args.soffice)
-            colas = piezas.colas(args.hilos)
+            colas = piezas.colas(1)
         except ErrorDeConfiguracion as error:
             print(f"Configuración: {error}", file=sys.stderr)
             return SALIDA_CONFIGURACION

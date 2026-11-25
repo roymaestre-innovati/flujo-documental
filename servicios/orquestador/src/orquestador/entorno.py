@@ -40,7 +40,12 @@ def estado_desde_entorno():
     from .estado_mongo import EstadoMongo, coleccion_desde_entorno
 
     coleccion = coleccion_desde_entorno()
-    return EstadoMongo(coleccion), coleccion.database.client
+    cliente = coleccion.database.client
+    try:
+        return EstadoMongo(coleccion), cliente
+    except BaseException:
+        cliente.close()  # nadie más lo va a cerrar
+        raise
 
 
 def _crear_almacen():
