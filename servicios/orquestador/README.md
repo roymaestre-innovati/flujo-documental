@@ -2,7 +2,7 @@
 
 Lleva cada proceso de selección desde el aviso del módulo 1 hasta las solicitudes de extracción (iniciativa 005, entrega 1). La spec, el plan y las tareas están en `specs/005-orquestador/`; los contratos, en `contracts/modulo5-orquestador/v0.2/` y `contracts/modulo3-extraccion/v0.2/`.
 
-**Estado**. Entrega 1 cerrada (T01 a T11), en local. El resultado con la muestra real está en la nota de T11 de `tasks.md`. De la entrega 2 está cerrada la entrada desde OneLake (`tasks-entrada-onelake.md`, 2026-11-23): `orquestar` arma el aviso con las tablas del módulo 1, lee los originales de OneLake y ya corrió un evento real. También están las versiones de Azure de `Estado` (Cosmos con la API de MongoDB, ya probada contra la base de desarrollo) y de `Cola` (Service Bus, lista para probar cuando estén los roles), en `tasks-estado-cola-azure.md`. Blob y los workers en Container Apps siguen pendientes.
+**Estado**. Entrega 1 cerrada (T01 a T11), en local. El resultado con la muestra real está en la nota de T11 de `tasks.md`. De la entrega 2 está cerrada la entrada desde OneLake (`tasks-entrada-onelake.md`, 2026-11-23): `orquestar` arma el aviso con las tablas del módulo 1, lee los originales de OneLake y ya corrió un evento real. También están las versiones de Azure de `Estado` (Cosmos con la API de MongoDB, ya probada contra la base de desarrollo) y de `Cola` (Service Bus, lista para probar cuando estén los roles), en `tasks-estado-cola-azure.md`. `AlmacenBlob` ya está implementado y falta probarlo contra el contenedor de desarrollo (T04 de `tasks-almacen-blob.md`). Los workers en Container Apps siguen pendientes.
 
 ## Cómo funciona
 
@@ -62,6 +62,8 @@ uv run pytest --azure -m azure -v -k cola
 SERVICEBUS_PRUEBA_LARGA=1 uv run pytest --azure -m azure -v -s tests/test_cola_servicebus_azure.py
 ```
 
+Las pruebas de Blob se corren desde `servicios/normalizacion`. Los comandos y el rol están en el [README de la normalización](../normalizacion/README.md#pruebas-contra-azure).
+
 ## Correr un proceso en local
 
 ```bash
@@ -76,9 +78,11 @@ uv run orquestar --origen <carpeta del proceso> --proceso SR0000000001 \
 - `--registros <archivo>`: registros en JSON, solo con identificadores. Sin él, por pantalla salen solo las advertencias.
 - `--soffice`: la ruta de LibreOffice, si no está en el `PATH`.
 
-Por pantalla salen **solo conteos**: entregas, documentos y segmentos por estado, solicitudes por tipo documental, tareas abiertas por clase y motivo, registros atascados (en un estado intermedio sin tarea; debe ser 0), mensajes en errores y tiempo. En `<salida>` quedan el almacén (PDF normalizados y lecturas), `estado.json`, `solicitudes-extraccion.jsonl`, `errores.json` y `conteos.json`. **Todo eso trae datos personales**: el comando se niega a escribir dentro de un repositorio git. Termina con 0 si nada quedó en errores, 1 si algo quedó y 2 si los argumentos están mal.
+Por stdout salen **solo conteos**: entregas, documentos y segmentos por estado, solicitudes por tipo documental, tareas abiertas por clase y motivo, registros atascados (en un estado intermedio sin tarea; debe ser 0), mensajes en errores y tiempo. En `<salida>` quedan `estado.json`, `solicitudes-extraccion.jsonl`, `errores.json` y `conteos.json`. **Todo eso trae datos personales**: el comando se niega a escribir dentro de un repositorio git. Termina con 0 si nada quedó en errores, 1 si algo quedó y 2 si los argumentos están mal.
 
-Las demoras de los reintentos no se esperan: el comando adelanta el reloj. Si algo queda en errores, se ve en `errores.json` con su motivo.
+El almacén queda por defecto en `<salida>/almacen/`. Si está configurada `ALMACEN_BLOB_CUENTA`, `orquestar` escribe el almacén en Blob y avisa por stderr. Esto aplica con entrada local o desde OneLake. Ver el [README de la normalización](../normalizacion/README.md#almacén-en-blob-storage).
+
+El comando adelanta el reloj simulado para los reintentos. Con Blob real, reintenta un 429 sin hacer en tiempo real la espera que pide el servicio. Si algo queda en errores, se ve en `errores.json` con su motivo.
 
 ## Correr un evento desde OneLake
 
@@ -97,7 +101,7 @@ Las tres opciones de OneLake reemplazan a `--origen` y `--proceso`. El comando a
 
 El resumen agrega los archivos del aviso, los excluidos por motivo, los comprimidos sin contenido, los archivos bajados y aceptados, sus MB decimales y los segundos con descargas en curso. El tiempo incluye los intentos fallidos y cuenta una sola vez las descargas simultáneas. Los archivos y bytes aceptados se cuentan por descarga, incluidos los que se vuelvan a bajar en un reintento de la entrega.
 
-La salida queda fuera del repositorio git y contiene `almacen/` con los PDF normalizados y las lecturas, `estado.json`, `solicitudes-extraccion.jsonl`, `errores.json` y `conteos.json`. Los originales se bajan a carpetas temporales que se borran al terminar cada entrega. Si se rechaza el evento, el comando imprime el motivo y termina con código 2.
+La salida queda fuera del repositorio git y tiene los mismos archivos y opciones de almacén que una corrida desde una carpeta local. Los originales se bajan a carpetas temporales que se borran al terminar cada entrega. Si se rechaza el evento, el comando imprime el motivo y termina con código 2.
 
 ## Correr la muestra real
 
@@ -125,7 +129,7 @@ Abre `http://127.0.0.1:8766` con lo que dejó una corrida guardada con `--salida
 - **Tareas:** todas, abiertas primero; un clic abre el documento.
 - **Errores:** mensajes en las colas de errores y entregas con error.
 
-Las corridas traen datos personales: el servidor solo escucha en 127.0.0.1 y solo sirve archivos del almacén de la corrida. Se puede mover la carpeta de una corrida: los PDF se buscan en su `almacen/`. La página se recarga para ver una corrida nueva.
+Las corridas traen datos personales: el servidor solo escucha en 127.0.0.1 y solo sirve archivos del almacén local de la corrida (`file://`). Se puede mover la carpeta de una corrida local: los PDF se buscan en su `almacen/`. La página se recarga para ver una corrida nueva.
 
 ## Qué hay
 

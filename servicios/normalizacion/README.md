@@ -49,9 +49,42 @@ uv run normalizar <carpeta_entrega> --proceso SR0000000001 --oferente OF-002 --s
 
 La salida queda en `<carpeta_salida>/<proceso>/<oferente o PROCESO>/`: `manifiesto.json`, `pdf/`, `anexos/`, `lectura/` y `palabras/`.
 
+Los anexos de hojas de cálculo (XLS, XLSX y ODS) se guardan en su formato original, también en Blob. La conversión a PDF puede perder información. Son los únicos originales que se conservan y quedan sujetos a la retención (S1).
+
 Como función de Python: `normalizacion.entrega.normalizar_entrega(carpeta, id_proceso, id_oferente, AlmacenLocal(salida))`.
 
 **Con documentos reales:** la salida trae datos personales. Va fuera del repositorio y se borra cuando ya no sirve. Antes de usar documentos reales hay que pasar el checklist de habeas data (`specs/003-validacion-extraccion/checklist-habeas-data.md`).
+
+## Almacén en Blob Storage
+
+`AlmacenBlob` guarda la misma salida en Blob Storage. Usa el extra `normalizacion[azure]`, que instala `azure-storage-blob` y `azure-identity`. Desde esta carpeta se instala con `uv sync --extra azure`. La normalización local funciona sin el extra.
+
+`almacen_desde_entorno(raiz_local)`, en `normalizacion.almacen`, elige Blob cuando está definida `ALMACEN_BLOB_CUENTA` y usa `AlmacenLocal` cuando falta. La usan `orquestar` y `extraer`. El comando `normalizar` escribe en disco local.
+
+| Variable | Para qué |
+|---|---|
+| `ALMACEN_BLOB_CUENTA` | Solo el nombre de la cuenta (`<cuenta>`). Un valor vacío o inválido da error de configuración |
+| `ALMACEN_BLOB_CONTENEDOR` | Nombre del contenedor. Por defecto, `evaluacion-ofertas` |
+| `AZURE_CLIENT_ID` | ID de cliente de la identidad administrada asignada por el usuario en los jobs. Lo lee `DefaultAzureCredential` |
+
+`AlmacenNoDisponible` indica una falla transitoria, como un corte de red o un 429. Lleva `espera_s` si el servicio indica cuánto esperar. `AlmacenSinPermiso` indica una falla de configuración, como una credencial inválida, un permiso que falta o un contenedor inexistente.
+
+- `normalizar_entrega` relanza ambas excepciones para que las maneje quien la llama.
+- El orquestador trata `AlmacenNoDisponible` como `ErrorTransitorio` y aplica los reintentos y la espera pedida. Trata `AlmacenSinPermiso` como `ErrorDeConfiguracion` y manda el mensaje a errores sin reintento.
+- Si falla una lectura del almacén, la extracción devuelve `error_proceso`. Usa `ALMACEN_NO_DISPONIBLE` para la falla reintentable y `ALMACEN_SIN_PERMISO` para la falla sin reintento.
+
+Si la configuración falla al crear el almacén, `orquestar` y `extraer` muestran el motivo por stderr y salen con código 2.
+
+### Pruebas contra Azure
+
+La suite normal usa un contenedor falso para las pruebas de Blob. La batería contra el contenedor de desarrollo está preparada (T04) y requiere el rol `Storage Blob Data Contributor` sobre ese contenedor. Desde `servicios/normalizacion`, sustituye `<cuenta>` por el nombre de la cuenta de desarrollo.
+
+```bash
+az login
+ALMACEN_BLOB_CUENTA="<cuenta>" uv run pytest --azure -m azure -v
+```
+
+Reserva entre 10 y 20 segundos. Las pruebas escriben datos inventados bajo `pruebas/<uuid>/` y los borran al terminar. Si aparece `Sin acceso a Azure`, revisa la identidad del inicio de sesión y la asignación del rol.
 
 ## Medir la muestra real (criterios A3 a A5)
 
@@ -97,7 +130,8 @@ La imagen corre con el usuario 10001: la carpeta de salida tiene que admitir esc
 | `firma.py` | Firma digital (pikepdf para encontrarlas, pyHanko para validarlas) |
 | `lectura.py` | Tipo de página, texto, cobertura, rotación y palabras |
 | `anclas.py` | Líneas de firma, casillas y tablas SI/NO |
-| `almacen.py` | Interfaz de almacenamiento y su implementación en disco local |
+| `almacen.py` | Interfaz `Almacen`, implementación local y selector por entorno |
+| `almacen_blob.py` | `AlmacenBlob`, con el extra `azure` |
 | `parametros.py` | Umbrales con su versión. Cambiar uno sube `version_parametros` |
 | `errores.py` | Códigos de error con el aviso para el evaluador |
 | `registros.py` | Registros en JSON sin datos personales |

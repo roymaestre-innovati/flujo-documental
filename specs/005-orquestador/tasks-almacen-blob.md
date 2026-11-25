@@ -4,7 +4,7 @@ Es una pieza de la entrega 2 del orquestador: la interfaz `Almacen` deja de ser 
 
 **Meta:** `AlmacenBlob` pasa la misma batería de pruebas que `AlmacenLocal`, en local sin Azure y, cuando se pida, contra el contenedor real de desarrollo, y una corrida puede escribir ahí sin cambiar el resto del código.
 
-**Estado al 2026-11-25:** en curso, rama `almacen-blob`.
+**Estado al 2026-11-25:** T01 a T03 y T05 hechas, en la rama `almacen-blob`. T04 está preparada y espera que el administrador asigne el rol `Storage Blob Data Contributor` sobre el contenedor de desarrollo.
 
 ## Decisiones ya tomadas
 
@@ -70,7 +70,7 @@ Revisadas con el usuario y con una segunda opinión de Astra antes de empezar.
 
 - [ ] **T04 — `AlmacenBlob` contra el contenedor de desarrollo.** Correr la batería de T01 con la marca `azure` contra el contenedor real, con `az login`. **Necesita que el administrador haya asignado al usuario** `Storage Blob Data Contributor` sobre el contenedor (`infra/roles.bicep`, rama `infra-azure-inicial`). Mientras tanto, la tarea queda en espera. La prueba anónima (sin credenciales) debe seguir dando 404. La corre el usuario.
 
-- [ ] **T05 — Cierre.** Notas de lo encontrado. Actualizar la tabla de interfaces de `plan.md`, el README de la normalización (el extra `azure` y las variables de entorno) y `inventario-codigo.md`.
+- [x] **T05 — Cierre.** Notas de lo encontrado. Actualizar la tabla de interfaces de `plan.md`, los README de la normalización y el orquestador, y `inventario-codigo.md`.
 
 ## Fuera de esta versión
 
@@ -110,3 +110,11 @@ ALMACEN_BLOB_CUENTA="<cuenta>" uv run pytest --azure -m azure -v
 La corrida debería tardar entre 10 y 20 segundos. Son unas 105 peticiones, incluyendo la limpieza, que a unos 70 ms cada una suman 7 segundos. A eso se añade la obtención de la credencial y la transferencia de 5 MiB en cada dirección.
 
 Si la corrida se corta con `Sin acceso a Azure`, verifica que el inicio de sesión corresponde a la identidad con el rol sobre el contenedor. Si falta la asignación, pídesela al administrador y repite el comando cuando esté activa. El nombre de la cuenta va solo en la variable de entorno, nunca en el repositorio.
+
+### T05
+
+- El SDK de Blob deja pasar el 429. El bucle del orquestador lo reintenta y usa la espera pedida por el servicio cuando viene indicada.
+- `exists()` del SDK da `False` si falta el contenedor. `get_blob_properties()` permite reservar `False` para `BlobNotFound` y tratar el contenedor inexistente como un error de configuración.
+- `normalizar_entrega` atrapaba las fallas del almacén como si fueran bugs del documento. Ahora las relanza para que el orquestador pueda reintentar las transitorias o mandar a errores las de configuración.
+
+Queda por correr T04 cuando esté el rol. La retención (S1), la decisión sobre el lease por entrega y el acceso desde Azure a corridas locales ya hechas quedan fuera de esta pieza, igual que migrar esas corridas.
