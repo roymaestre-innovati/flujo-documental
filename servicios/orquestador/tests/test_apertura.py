@@ -167,9 +167,9 @@ def test_caida_a_la_mitad_se_completa_al_reenviar(mundo):
     assert procesar_uno(mundo.cola, mundo.apertura).desenlace == "ok"
     assert mundo.estado.listar(P, estados.TAREA) == [tarea]
     publicadas = [m["entrega"] for m in mundo.normalizar()]
-    # La primera entrega sale dos veces: la normalización lo absorbe (T06).
-    assert sorted(set(publicadas)) == ["OF-001", "OF-002", "PROCESO"]
-    assert publicadas.count("OF-001") == 2
+    # La primera entrega ya estaba marcada como publicada: no sale otra vez
+    # (T04 de tasks-workers.md). Si saliera, la reserva de Normalizar lo absorbe.
+    assert sorted(publicadas) == ["OF-001", "OF-002", "PROCESO"]
     assert mundo.estado.leer(P, estados.PROCESO, P).datos["entregas_publicadas"] is True
     # Y ahora un aviso repetido ya no hace nada.
     mundo.avisar(aviso)

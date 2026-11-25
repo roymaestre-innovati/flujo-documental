@@ -187,7 +187,8 @@ def test_consultar(estado, reloj):
     e.crear(estado, reloj, P, e.PROCESO, P, e.ABIERTO, "aviso")
     for entrega in ("PROCESO", "OF-001", "OF-002"):
         e.crear(estado, reloj, P, e.OFERENTE, entrega, e.RECIBIDO, "aviso", entrega=entrega)
-    e.cambiar(estado, reloj, P, e.OFERENTE, "OF-001", e.RECIBIDO, e.PROCESANDO, "normalizado")
+    e.cambiar(estado, reloj, P, e.OFERENTE, "OF-001", e.RECIBIDO, e.NORMALIZANDO, "normalizando")
+    e.cambiar(estado, reloj, P, e.OFERENTE, "OF-001", e.NORMALIZANDO, e.PROCESANDO, "normalizado")
     _documento(estado, reloj, "OF-001-a")
     _documento(estado, reloj, "OF-001-b", inicial=e.DUPLICADO)
     _documento(estado, reloj, "OF-001-c", inicial=e.ERROR_ENTRADA)

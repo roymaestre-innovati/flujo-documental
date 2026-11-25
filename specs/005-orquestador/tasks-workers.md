@@ -50,7 +50,7 @@ Revisadas con el usuario y con una segunda opinión de Astra antes de empezar.
 - [x] **T01 — Paquete `mensajeria`** (decisión 1). Mover `Cola`, `ColaEnMemoria`, `ColaServiceBus`, `procesar_uno`, sus excepciones, parámetros y contexto de registro, con sus pruebas. El orquestador reexporta; su suite pasa sin cambios.
 - [x] **T02 — Bucle de un worker** (decisiones 5 y 10). Vacía una cola con un manejador hasta que no queda nada visible o se cumple el límite, atiende `SIGTERM`, devuelve conteos por desenlace y el código de salida. Con hilos, cada uno con su cola. Se prueba con `ColaEnMemoria`.
 - [x] **T03 — Piezas desde el entorno** (decisiones 9 y 11). Arma `Cola`, `Estado`, `Almacen` y `Origen` con sus `*_desde_entorno`, valida todo antes de recibir, exige las versiones de Azure y cierra todo al terminar.
-- [ ] **T04 — Reserva por entrega** (decisión 6). Estado `NORMALIZANDO` con dueño y vencimiento, cambio condicional al principio de `Normalizar`, y `Apertura` que anota cada entrega publicada. Pruebas con dos workers sobre la misma entrega, incluida una reserva vencida y la caída de `Apertura` a la mitad.
+- [x] **T04 — Reserva por entrega** (decisión 6). Estado `NORMALIZANDO` con dueño y vencimiento, cambio condicional al principio de `Normalizar`, y `Apertura` que anota cada entrega publicada. Pruebas con dos workers sobre la misma entrega, incluida una reserva vencida y la caída de `Apertura` a la mitad.
 - [ ] **T05 — Workers del orquestador** (decisiones 2 y 8): `orquestar-worker apertura|normalizar|clasificar`, con el clasificador falso desde el almacén.
 - [ ] **T06 — Worker de extracción** (decisiones 3 y 12): `extraer-worker`, con `Llamador` en modo worker, resultados en el almacén, publicación en `resultados` y `al_fallar` que publica el `error_proceso`.
 - [ ] **T07 — Pendientes del almacén** (de `tasks-almacen-blob.md`): subtipos públicos de `ErrorAlmacen` (URI inválida y objeto ausente) con su trato en cada consumidor, y `AlmacenBlob.cerrar()` que espera las operaciones activas.
@@ -103,3 +103,16 @@ Pruebas: mensajería 18.
 - `Fabricas` permite pasar versiones falsas en las pruebas. Sin red, las fábricas reales arman Mongo (pymongo no se conecta hasta la primera operación) y Blob.
 
 Pruebas: orquestador 498 (58 saltadas).
+
+### T04
+
+- **Estado nuevo `normalizando`** en la máquina del oferente: `recibido → normalizando → procesando`, y `normalizando → error_proceso` o de vuelta a `recibido`. `error_proceso → normalizando` para reintentar. Ya no se pasa directo de `recibido` a `procesando`.
+- **`estados.reservar`** hace el cambio condicional y guarda `reserva: {dueno, vence, desde}`. Si hay una reserva vigente de otro, lanza `Reservado` con su vencimiento; si venció, la toma (paso `normalizando → normalizando`, motivo `reserva vencida`); si ya es del mismo dueño, no cambia nada.
+- **`Normalizar`** reserva después de revisar las versiones y antes de bajar nada, con un dueño nuevo por intento (`uuid4`). La duración es `Parametros.reserva_normalizar_s` (2400 s, más que los 30 minutos de un job). Si la entrega está reservada, lanza `ErrorTransitorio` con la espera que le queda a la reserva más 1 s, que el bucle trata como espera y no como intento.
+- **Un intento que falla en la misma ejecución** suelta la reserva con `estados.liberar`, que devuelve la entrega al estado del que se reservó. Así el reintento no espera a que venza. Solo una ejecución que muere deja la reserva puesta hasta que vence.
+- **Antes de registrar documentos y publicar** se comprueba que la reserva sigue siendo propia. Si no, se registra un aviso y no se publica nada. Con la duración elegida no debería pasar.
+- **`al_fallar`** no marca `error_proceso` si otra ejecución tiene la reserva vigente. El dueño de cada intento se guarda por hilo.
+- **`Apertura`** marca `publicada: True` en cada oferente al publicar su `normalizar`. Si se cae a la mitad, la repetición no vuelve a publicar los ya marcados. `test_caida_a_la_mitad_se_completa_al_reenviar` cambia: la primera entrega ya no sale dos veces.
+- Pruebas nuevas en `test_reserva.py`: dos ejecuciones a la vez (la segunda espera sin escribir en el almacén), la espera que queda, la reserva vencida que se toma y se termina, el intento fallido que suelta la reserva, `al_fallar` que respeta la reserva ajena, el bug que deja `error_proceso` y se puede reintentar, y la reserva perdida a la mitad que no publica nada.
+
+Pruebas: orquestador 507 (58 saltadas).

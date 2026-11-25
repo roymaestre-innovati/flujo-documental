@@ -19,6 +19,10 @@ class Parametros(ParametrosMensajeria):
     """Entregas que se normalizan a la vez (acordado el 2026-11-06)."""
     paralelo_bajar: int = 8
     """Archivos de una misma entrega que se bajan a la vez (T04)."""
+    reserva_normalizar_s: float = 2400
+    """Cuánto dura la reserva de una entrega mientras se normaliza: más que el tiempo
+    máximo de un job (30 minutos), para que la ejecución que la tenía ya no exista
+    cuando otra la tome (decisión 6 de `tasks-workers.md`)."""
     espera_limite_estado_s: float = 1
     """Espera cuando Cosmos limita las RU y no indica cuándo reintentar."""
 

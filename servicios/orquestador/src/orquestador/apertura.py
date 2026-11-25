@@ -169,8 +169,8 @@ class Apertura:
             esperados = {ruta: campos for ruta, campos in contenido.archivos.items() if campos}
             if esperados:
                 datos_entrega["esperados"] = esperados
-            estados.crear(self._estado, self._reloj, id_proceso, estados.OFERENTE, entrega, estados.RECIBIDO,
-                          "aviso del módulo 1", datos_entrega, entrega=entrega)
+            oferente = estados.crear(self._estado, self._reloj, id_proceso, estados.OFERENTE, entrega,
+                                     estados.RECIBIDO, "aviso del módulo 1", datos_entrega, entrega=entrega).registro
             for ruta in sorted(contenido.comprimidos):
                 clave = json.dumps([id_proceso, entrega, ruta], ensure_ascii=False).encode()
                 referencia = "comprimido-" + hashlib.sha256(clave).hexdigest()[:16]
@@ -179,7 +179,11 @@ class Apertura:
                             {"ruta_origen": ruta,
                              "detalle": "Un archivo comprimido de la entrega no se pudo descomprimir en el origen, "
                                         "así que su contenido no se revisó. Pídaselo al módulo 1 o revíselo a mano."})
-            self._cola.publicar(NORMALIZAR, {"id_proceso": id_proceso, "entrega": entrega})
+            # Cada entrega se marca al publicarla: si el trabajador se cae a la mitad,
+            # la repetición no vuelve a publicar las que ya salieron.
+            if not oferente.datos.get("publicada"):
+                self._cola.publicar(NORMALIZAR, {"id_proceso": id_proceso, "entrega": entrega})
+                estados.anotar(self._estado, id_proceso, estados.OFERENTE, entrega, {"publicada": True})
 
         estados.anotar(self._estado, id_proceso, estados.PROCESO, id_proceso, {"entregas_publicadas": True})
         registro.info("Proceso abierto: %s entregas", len(entregas))
