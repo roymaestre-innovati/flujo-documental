@@ -49,7 +49,7 @@ Revisadas con el usuario y con una segunda opinión de Astra antes de empezar.
 
 - [x] **T01 — Paquete `mensajeria`** (decisión 1). Mover `Cola`, `ColaEnMemoria`, `ColaServiceBus`, `procesar_uno`, sus excepciones, parámetros y contexto de registro, con sus pruebas. El orquestador reexporta; su suite pasa sin cambios.
 - [x] **T02 — Bucle de un worker** (decisiones 5 y 10). Vacía una cola con un manejador hasta que no queda nada visible o se cumple el límite, atiende `SIGTERM`, devuelve conteos por desenlace y el código de salida. Con hilos, cada uno con su cola. Se prueba con `ColaEnMemoria`.
-- [ ] **T03 — Piezas desde el entorno** (decisiones 9 y 11). Arma `Cola`, `Estado`, `Almacen` y `Origen` con sus `*_desde_entorno`, valida todo antes de recibir, exige las versiones de Azure y cierra todo al terminar.
+- [x] **T03 — Piezas desde el entorno** (decisiones 9 y 11). Arma `Cola`, `Estado`, `Almacen` y `Origen` con sus `*_desde_entorno`, valida todo antes de recibir, exige las versiones de Azure y cierra todo al terminar.
 - [ ] **T04 — Reserva por entrega** (decisión 6). Estado `NORMALIZANDO` con dueño y vencimiento, cambio condicional al principio de `Normalizar`, y `Apertura` que anota cada entrega publicada. Pruebas con dos workers sobre la misma entrega, incluida una reserva vencida y la caída de `Apertura` a la mitad.
 - [ ] **T05 — Workers del orquestador** (decisiones 2 y 8): `orquestar-worker apertura|normalizar|clasificar`, con el clasificador falso desde el almacén.
 - [ ] **T06 — Worker de extracción** (decisiones 3 y 12): `extraer-worker`, con `Llamador` en modo worker, resultados en el almacén, publicación en `resultados` y `al_fallar` que publica el `error_proceso`.
@@ -92,3 +92,14 @@ Pruebas: mensajería 2, orquestador 491 (58 saltadas), extracción 224.
 - `informar(resumen)` registra una línea con la cola, los conteos por desenlace, el motivo de fin y la duración; de una falla, solo el tipo y el lugar.
 
 Pruebas: mensajería 18.
+
+### T03
+
+`orquestador/entorno.py`: `piezas_desde_entorno(con_origen=)` revisa primero todas las variables obligatorias (`SERVICEBUS_NAMESPACE`, `ESTADO_MONGO_URL`, `ALMACEN_BLOB_CUENTA` y, con origen, `ONELAKE_WORKSPACE` y `ONELAKE_LAKEHOUSE`) y, si falta alguna, lanza un solo `ErrorDeConfiguracion` que las nombra sin sus valores. No cae a lo local.
+
+- Arma `EstadoMongo`, `AlmacenBlob` y, si se pide, `OrigenOneLake`. Un `AlmacenSinPermiso` al armar se vuelve `ErrorDeConfiguracion`, como en la cola y el estado, para que el worker salga con 2.
+- Las colas se crean aparte, una por hilo, con `Piezas.colas(n)`.
+- `Piezas.cerrar()` cierra en orden inverso: colas, almacén y cliente de Mongo, también si algo falla a la mitad.
+- `Fabricas` permite pasar versiones falsas en las pruebas. Sin red, las fábricas reales arman Mongo (pymongo no se conecta hasta la primera operación) y Blob.
+
+Pruebas: orquestador 498 (58 saltadas).
