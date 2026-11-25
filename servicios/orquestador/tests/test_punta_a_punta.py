@@ -294,6 +294,26 @@ def test_el_comando_escribe_en_blob_y_cierra_el_almacen(tmp_path, capsys, monkey
     assert not (salida / "almacen").exists()
 
 
+def test_el_comando_guarda_estado_y_solicitudes_si_falla_el_cierre_blob(
+    tmp_path, capsys, monkeypatch, contenedor_blob_falso,
+):
+    credencial = Mock(spec=["close"])
+    credencial.close.side_effect = OSError("ruta-reservada-inventada")
+    monkeypatch.setattr(almacen_blob, "DefaultAzureCredential", Mock(return_value=credencial))
+    monkeypatch.setattr(almacen_blob, "ContainerClient", Mock(return_value=contenedor_blob_falso))
+    monkeypatch.setenv("ALMACEN_BLOB_CUENTA", "cuentafalsa")
+    salida = tmp_path / "salida"
+
+    assert _comando(tmp_path, salida) == 0
+
+    credencial.close.assert_called_once_with()
+    assert json.loads((salida / "estado.json").read_text())
+    assert len((salida / "solicitudes-extraccion.jsonl").read_text().splitlines()) == 5
+    registros = capsys.readouterr().err
+    assert "Blob cerrar credencial (OSError)" in registros
+    assert "ruta-reservada-inventada" not in registros
+
+
 @pytest.mark.parametrize("cuenta", ["", "CuentaFalsa!"])
 def test_el_comando_rechaza_una_cuenta_blob_invalida(tmp_path, capsys, monkeypatch, cuenta):
     monkeypatch.setenv("ALMACEN_BLOB_CUENTA", cuenta)

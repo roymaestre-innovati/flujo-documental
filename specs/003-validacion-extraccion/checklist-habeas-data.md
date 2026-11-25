@@ -95,6 +95,7 @@ Lo que falta: los permisos concretos (quién tiene acceso al almacenamiento, con
 **Qué hace el sistema.**
 
 - Los documentos normalizados, su lectura y el manifiesto se conservan lo mismo que la evidencia del proceso, porque sostienen cada veredicto (spec, pregunta S1). El plazo no está definido.
+- El almacén conserva la salida de la normalización sin una copia aparte de la entrada. Un PDF que abre bien queda byte a byte como normalizado y conserva sus firmas (R11). Los PDF reparados, las imágenes y los DOC, DOCX y ODT quedan como PDF resultantes. Las hojas de cálculo quedan como PDF y también como anexo en su formato original. El plazo que definan S1 y HD-7 incluye estos archivos.
 - Nada se borra ni se reemplaza durante el proceso: una subsanación agrega un documento nuevo (decisión 19).
 - El script que mide la muestra real deja su salida en una carpeta temporal que se borra al terminar (tasks, T13).
 - Para la extracción (entrega 2), el diseño propone guardar la traza completa 30 días y después solo metadatos, sin imágenes (decisión D23).

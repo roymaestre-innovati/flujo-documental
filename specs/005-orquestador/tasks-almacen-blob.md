@@ -1,6 +1,6 @@
 # Tareas 005 — Almacén en Blob Storage
 
-Es una pieza de la entrega 2 del orquestador: la interfaz `Almacen` deja de ser solo una carpeta local y tiene su versión en Blob Storage, donde quedan los PDF normalizados, las lecturas, las palabras, los anexos y los manifiestos. Los originales no se guardan (decisión 32), salvo los anexos de hojas de cálculo (decisión 14 de abajo). `Estado` y `Cola` van aparte, en `tasks-estado-cola-azure.md`.
+Es una pieza de la entrega 2 del orquestador: la interfaz `Almacen` deja de ser solo una carpeta local y tiene su versión en Blob Storage, donde quedan los PDF normalizados, las lecturas, las palabras, los anexos y los manifiestos. La decisión 32 deja la entrada en su zona de origen, sin una copia aparte. Un PDF que abre bien se guarda tal cual como normalizado (R11 de la spec 003). Los PDF reparados, las imágenes y los DOC, DOCX y ODT quedan como PDF resultantes. Las hojas de cálculo quedan como PDF y también como anexos en su formato original (decisión 14). `Estado` y `Cola` van aparte, en `tasks-estado-cola-azure.md`.
 
 **Meta:** `AlmacenBlob` pasa la misma batería de pruebas que `AlmacenLocal`, en local sin Azure y, cuando se pida, contra el contenedor real de desarrollo, y una corrida puede escribir ahí sin cambiar el resto del código.
 
@@ -19,20 +19,20 @@ Detalle en `specs/005-orquestador/pendientes-azure.md` de la rama `infra-azure-i
 
 Revisadas con el usuario y con una segunda opinión de Astra antes de empezar.
 
-1. **Errores de Blob.** Dos excepciones nuevas en `normalizacion/almacen.py`, que no heredan de `ErrorAlmacen` (que sigue siendo URI inválida, fuera del almacén o inexistente): `AlmacenNoDisponible` (red, lectura cortada sin estado HTTP, 408, 429, 5xx; lleva `espera_s` cuando el servicio la pide con `Retry-After` o `x-ms-retry-after-ms`, solo si es finita y no negativa) y `AlmacenSinPermiso` (401, 403, credencial, contenedor inexistente, configuración que falta o es inválida). `normalizar_entrega` las relanza antes de su `except Exception`, para que no se cuenten como bug del documento. El orquestador las traduce en un solo lugar, el bucle de `errores.py`, a `ErrorTransitorio` y `ErrorDeConfiguracion`; eso cubre normalizar, clasificar y extraer, que leen del almacén. En la extracción, `entrada._leer` las lleva a `error_proceso` con un código propio, reintentable para `AlmacenNoDisponible` y no reintentable para `AlmacenSinPermiso`. Los mensajes llevan solo operación, estado HTTP y código del servicio, nunca texto del servidor ni nombres de archivo.
+1. **Errores de Blob.** Dos excepciones nuevas en `normalizacion/almacen.py`, que no heredan de `ErrorAlmacen` (que sigue siendo URI inválida, fuera del almacén o inexistente): `AlmacenNoDisponible` (red, cortes sin estado HTTP, 408, 429 y 5xx salvo 501 y 505, con `espera_s` de 0 a 3600 segundos si el servicio la pide con `Retry-After` o `x-ms-retry-after-ms`) y `AlmacenSinPermiso` (401, 403, credencial, contenedor inexistente, configuración que falta o es inválida). `normalizar_entrega` las relanza antes de su `except Exception`, para que no se cuenten como bug del documento. El orquestador las traduce en un solo lugar, el bucle de `errores.py`, a `ErrorTransitorio` y `ErrorDeConfiguracion`; eso cubre normalizar, clasificar y extraer, que leen del almacén. En la extracción, `entrada._leer` las lleva a `error_proceso` con un código propio, reintentable para `AlmacenNoDisponible` y no reintentable para `AlmacenSinPermiso`. Los mensajes llevan solo operación, estado HTTP y, si está en la lista blanca, código del servicio.
 2. **Reintentos.** Se dejan los del SDK (los de Blob reintentan 408 y 5xx, no 429) con `connection_timeout=20` y `read_timeout=60`. El 429 lo reintenta el bucle con la espera pedida.
 3. **`existe`** usa `get_blob_properties()`: solo `BlobNotFound` es `False`. `exists()` del SDK también da `False` si el contenedor no existe, y eso es configuración.
-4. **Prefijo de pruebas.** `AlmacenBlob` recibe `prefijo=""`, que se aplica en `uri()` y se valida por segmento en todas las operaciones (`pruebas/abc` nunca abarca `pruebas/abcd`).
+4. **Prefijo de pruebas.** `AlmacenBlob` recibe `prefijo=""`, que se aplica en `uri()` y se valida por segmento en todas las operaciones (`pruebas/abc` nunca abarca `pruebas/abcd`). Solo `listar` acepta la raíz del prefijo.
 5. **`listar`** en una sola llamada a `list_blobs(name_starts_with=…)`, filtrando los nombres iguales al prefijo o que empiezan por `prefijo + "/"`; si existe el blob exacto, solo ese. El iterador se consume dentro de la traducción de errores. La raíz (del contenedor o del prefijo) se puede listar, como en local.
-6. **URI.** Solo `https://<cuenta>.blob.core.windows.net/<contenedor>/…`, host sin distinguir mayúsculas, sin usuario, puerto, query (tampoco SAS) ni fragmento. La ruta se decodifica una sola vez y se revisan contenedor, prefijo y `..`.
+6. **URI.** Solo `https://<cuenta>.blob.core.windows.net/<contenedor>/…`, host sin distinguir mayúsculas, sin usuario, puerto, query (tampoco SAS) ni fragmento. Cada `%` debe ir seguido de dos dígitos hexadecimales. La ruta se decodifica una sola vez y se revisan contenedor, prefijo y `..`.
 7. **`content_type`** con `mimetypes.guess_type`, `application/octet-stream` si no sabe.
 8. **Entorno.** `DefaultAzureCredential(exclude_interactive_browser_credential=True)`, cerrada con el cliente, también si falla la construcción. `ALMACEN_BLOB_CUENTA` es solo el nombre, `[a-z0-9]{3,24}`; `ALMACEN_BLOB_CONTENEDOR` también se valida. El selector de T03 usa local si la variable no está y falla si está vacía o mal. `AZURE_CLIENT_ID` para la identidad del job va en el README.
 9. **Un cliente de Blob por hilo**, como `OrigenOneLake`: la normalización corre entregas en paralelo y el transporte del SDK no garantiza uso concurrente.
 10. **`ubicar`** solo reubica URI `file://` cuando el almacén activo es local. Con Blob, una URI `file://` es `ErrorAlmacen`.
 11. **Pruebas normales** borran `ALMACEN_BLOB_CUENTA` del entorno, para no escribir en Azure aunque haya `az login`. Las de Azure llevan la marca `azure` en la normalización también (hoy su `conftest.py` no la tiene), y el corte por falta de permisos reconoce `AlmacenSinPermiso`.
-12. **Registros.** El logger `azure` queda en `ERROR` (Azure Identity registra detalles de credenciales en `WARNING`), con una prueba de que un valor sensible inventado no aparece en registros ni errores.
+12. **Registros.** Los comandos dejan el logger `azure` en `ERROR` (Azure Identity registra detalles de credenciales en `WARNING`). Al construirse, `AlmacenBlob` fija el logger de `HttpLoggingPolicy` en `WARNING` como mínimo, porque el SDK registra la URL completa en `INFO`.
 13. **CLI.** `orquestar correr` avisa por stderr si escribe en Blob. `extraer` también usa el selector. El visor sigue local, y `orquestar correr` con Blob real no respeta las esperas de un 429 (reloj simulado): quedan como limitaciones.
-14. **Anexos.** Los anexos nativos (XLS, XLSX, ODS) son los originales y sí se guardan, porque la conversión de hojas de cálculo a PDF no siempre es fiel. Es la excepción a la decisión 32 y entra en la retención (S1).
+14. **Originales en la salida.** El usuario aceptó el 2026-11-25 que, si el archivo sirve tal cual, se guarde tal cual. El normalizado de un PDF que abre bien coincide byte a byte con la entrada y conserva sus firmas (R11 de la spec 003). Los PDF reparados, las imágenes y los DOC, DOCX y ODT quedan convertidos. Las hojas de cálculo se convierten a PDF y se guardan también como anexos en su formato original (XLS, XLSX, ODS), porque la conversión puede perder información. Todo forma parte de la salida sujeta a retención (S1). La decisión 32 deja la entrada en el origen, sin una copia en una zona aparte.
 15. `servicios/extraccion/uv.lock` se conserva y se actualiza en T03.
 
 ## Dónde va
@@ -88,7 +88,7 @@ Para T02, se agrega `pytest.param("almacen_blob", id="blob")`. El fixture `almac
 
 ### T02
 
-El SDK 12.31.1 puede entregar `error_code` como texto o enum. `get_blob_properties()` permite distinguir `BlobNotFound` de un contenedor inaccesible. La traducción abarca todo el iterador paginado de `list_blobs()` y `readall()`, pues el SDK puede envolver un corte de descarga en un `HttpResponseError` sin estado. Los errores conservan datos estructurados y la espera numérica que pida el servicio.
+El SDK 12.31.1 puede entregar `error_code` como texto o enum. `get_blob_properties()` permite distinguir `BlobNotFound` de un contenedor inaccesible. La traducción abarca todo el iterador paginado de `list_blobs()` y `readall()`, pues el SDK puede envolver un corte de descarga en un `HttpResponseError` sin estado. Los errores conservan datos estructurados y la espera del servicio dentro del límite de una hora.
 
 Se reutiliza un cliente de contenedor por hilo con la misma credencial. El cliente inyectado se usa bajo un candado. La fábrica valida el entorno antes de crear recursos y transfiere su cierre al almacén mediante `ExitStack`. La batería de contrato comparte los casos de Local y Blob con un contenedor en memoria.
 
@@ -118,3 +118,23 @@ Si la corrida se corta con `Sin acceso a Azure`, verifica que el inicio de sesi�
 - `normalizar_entrega` atrapaba las fallas del almacén como si fueran bugs del documento. Ahora las relanza para que el orquestador pueda reintentar las transitorias o mandar a errores las de configuración.
 
 Queda por correr T04 cuando esté el rol. La retención (S1), la decisión sobre el lease por entrega y el acceso desde Azure a corridas locales ya hechas quedan fuera de esta pieza, igual que migrar esas corridas.
+
+### Revisión de Astra
+
+1. El logger de `HttpLoggingPolicy` queda en `WARNING` como mínimo al construir el almacén, con una prueba del SDK sobre un transporte en memoria.
+2. Los mensajes solo incluyen códigos conocidos de Storage de la lista blanca. La clasificación usa el código recibido.
+3. T04 usa `pruebas/<uuid>/interno` como prefijo del almacén y prueba los prefijos ajenos `otra` e `internod` dentro del mismo UUID que limpia.
+4. Los errores `OSError` y `ValueError` al crear la credencial se traducen a `AlmacenSinPermiso` con un mensaje fijo.
+5. Los cortes sin estado HTTP y los estados 5xx, salvo 501 y 505, se traducen como fallas transitorias en las cuatro operaciones.
+6. `Retry-After` acepta segundos y fechas HTTP con el analizador del SDK. Las fechas pasadas dan cero. Si cualquiera de las dos cabeceras pide más de una hora, el bucle usa el reintento normal.
+7. Solo `listar` admite la raíz del prefijo. Las operaciones de archivo exigen un nombre debajo de ella.
+8. El cierre intenta liberar cada recurso y registra una advertencia con la operación y la clase de error por cada fallo. El comando guarda el estado y las solicitudes aunque falle un cierre.
+9. T04 comprueba listado, escritura, lectura y borrado antes de correr. Las fallas del SDK se muestran con mensajes limpios y la limpieza informa cuántos blobs quedaron tras intentar todos los borrados.
+10. Las URI con escapes mal formados se rechazan antes de decodificar. Los nombres que contienen `%` conservan su ida y vuelta.
+11. El README de extracción indica que el ejemplo local se corre sin `ALMACEN_BLOB_CUENTA`.
+12. La documentación de normalización, del orquestador y de cumplimiento precisa qué archivos quedan guardados, según la decisión del 2026-11-25.
+
+**Pendientes para los workers**
+
+- Con Blob activo, una URI `file://` da `ARCHIVO_NO_ENCONTRADO` reintentable aunque repetir no ayude. Si falta la lectura en `Clasificar` o `Extraer.pedir`, el bucle manda el mensaje a errores como bug, igual que con `AlmacenLocal`. Distinguir «URI inválida» de «objeto ausente» con subtipos públicos de `ErrorAlmacen`.
+- `AlmacenBlob.cerrar()` puede cerrar un cliente que otro hilo todavía esté usando. Las CLI esperan a sus hilos antes de cerrar. Los workers deberán impedir operaciones nuevas y esperar las activas.

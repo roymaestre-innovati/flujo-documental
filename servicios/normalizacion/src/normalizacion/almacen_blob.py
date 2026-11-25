@@ -1,5 +1,6 @@
 """Almacén de resultados en Azure Blob Storage, con el extra `azure`."""
 
+import logging
 import mimetypes
 import os
 import re
@@ -16,10 +17,10 @@ from azure.core.credentials import TokenCredential
 from azure.core.exceptions import (
     ClientAuthenticationError,
     HttpResponseError,
-    IncompleteReadError,
     ServiceRequestError,
     ServiceResponseError,
 )
+from azure.core.pipeline.policies._utils import parse_retry_after
 from azure.core.utils import CaseInsensitiveDict
 from azure.identity import DefaultAzureCredential
 from azure.storage.blob import ContainerClient, ContentSettings
@@ -27,20 +28,24 @@ from azure.storage.blob import ContainerClient, ContentSettings
 from .almacen import Almacen, AlmacenNoDisponible, AlmacenSinPermiso, ErrorAlmacen
 
 _CONTENEDOR_PREDETERMINADO = "evaluacion-ofertas"
-_ESTADOS_TRANSITORIOS = {408, 429, 500, 502, 503, 504}
+_CODIGOS_PUBLICOS = frozenset({
+    "AccountIsDisabled", "AuthenticationFailed", "AuthorizationFailure", "AuthorizationPermissionMismatch",
+    "BlobNotFound", "ContainerNotFound", "InsufficientAccountPermissions", "InternalError",
+    "InvalidAuthenticationInfo", "InvalidHeaderValue", "InvalidResourceName", "InvalidUri",
+    "OperationTimedOut", "ResourceNotFound", "ServerBusy",
+})
+_registro = logging.getLogger(__name__)
 
 
 class _BlobNoEncontrado(ErrorAlmacen):
     """El contenedor respondió que falta el blob pedido."""
 
 
-def _codigo_servicio(error: HttpResponseError, cabeceras: Mapping[str, str]) -> str | None:
+def _leer_codigo_servicio(error: HttpResponseError, cabeceras: Mapping[str, str]) -> str | None:
     codigo = getattr(error, "error_code", None) or cabeceras.get("x-ms-error-code")
     if isinstance(codigo, Enum):
         codigo = codigo.value
-    if isinstance(codigo, str) and re.fullmatch(r"[A-Za-z][A-Za-z0-9_]*", codigo):
-        return codigo
-    return None
+    return codigo if isinstance(codigo, str) else None
 
 
 def _espera_pedida(cabeceras: Mapping[str, str]) -> float | None:
@@ -51,9 +56,14 @@ def _espera_pedida(cabeceras: Mapping[str, str]) -> float | None:
         try:
             segundos = float(valor) / divisor
         except (ValueError, TypeError, OverflowError):
-            continue
+            if nombre != "Retry-After":
+                continue
+            try:
+                segundos = parse_retry_after(valor)
+            except (ValueError, TypeError, OverflowError):
+                continue
         if isfinite(segundos) and segundos >= 0:
-            return segundos
+            return segundos if segundos <= 3600 else None
     return None
 
 
@@ -67,29 +77,31 @@ def _traducir_fallas(operacion: str) -> Iterator[None]:
     except HttpResponseError as error:
         estado = error.status_code
         cabeceras = CaseInsensitiveDict(getattr(error.response, "headers", None) or {})
-        codigo = _codigo_servicio(error, cabeceras)
+        codigo = _leer_codigo_servicio(error, cabeceras)
         mensaje = f"Blob {operacion}"
         if estado is not None:
             mensaje += f" HTTP {estado}"
-        if codigo is not None:
+        if codigo in _CODIGOS_PUBLICOS:
             mensaje += f" [{codigo}]"
 
+        corte = estado is None and not isinstance(error, ClientAuthenticationError)
+        falla_del_servidor = estado is not None and 500 <= estado < 600 and estado not in (501, 505)
+        if corte or falla_del_servidor or estado in (408, 429):
+            raise AlmacenNoDisponible(mensaje, espera_s=_espera_pedida(cabeceras)) from None
         if isinstance(error, ClientAuthenticationError) or estado in (401, 403) or codigo == "ContainerNotFound":
             raise AlmacenSinPermiso(mensaje) from None
         if estado == 404 and codigo != "BlobNotFound":
             raise AlmacenSinPermiso(mensaje) from None
-        if estado in (404, None) and codigo == "BlobNotFound" and operacion in ("leer", "existe"):
+        if estado == 404 and codigo == "BlobNotFound" and operacion in ("leer", "existe"):
             raise _BlobNoEncontrado(mensaje) from None
-        # El SDK de Blob puede envolver el corte de descarga en un HttpResponseError sin estado.
-        descarga_interrumpida = estado is None and (operacion == "leer" or isinstance(error, IncompleteReadError))
-        if estado in _ESTADOS_TRANSITORIOS or descarga_interrumpida:
-            raise AlmacenNoDisponible(mensaje, espera_s=_espera_pedida(cabeceras)) from None
         raise RuntimeError(mensaje) from None
 
 
 def _cerrar(recurso, operacion: str) -> None:
-    with _traducir_fallas(operacion):
+    try:
         recurso.close()
+    except Exception as error:  # noqa: BLE001 - un fallo de cierre no debe interrumpir los demás cierres.
+        _registro.warning("Blob %s (%s)", operacion, type(error).__name__)
 
 
 def _validar_configuracion(cuenta: str, contenedor: str) -> None:
@@ -125,6 +137,9 @@ class AlmacenBlob(Almacen):
         _validar_configuracion(cuenta, contenedor)
         if (cliente is None) == (credencial is None):
             raise TypeError("Se requiere un cliente de contenedor o una credencial.")
+        # HttpLoggingPolicy incluye la URL del blob en sus registros de nivel INFO.
+        registro_http = logging.getLogger("azure.core.pipeline.policies.http_logging_policy")
+        registro_http.setLevel(max(logging.WARNING, registro_http.getEffectiveLevel()))
         self._host = f"{cuenta}.blob.core.windows.net"
         self._url_cuenta = f"https://{self._host}"
         self._contenedor = contenedor
@@ -158,7 +173,7 @@ class AlmacenBlob(Almacen):
         return self._cliente_del_hilo()
 
     def cerrar(self) -> None:
-        """Cierra los recursos propios al terminar las operaciones."""
+        """Cierra los recursos propios y avisa si falla alguno de los cierres."""
         with self._proteger_cliente, self._candado_clientes:
             self._cerrado = True
             self._recursos.close()
@@ -181,6 +196,8 @@ class AlmacenBlob(Almacen):
             raise ErrorAlmacen("La URI del almacén Blob es inválida.")
         try:
             partes = urlsplit(uri)
+            if re.search(r"%(?![0-9a-fA-F]{2})", partes.path):
+                raise ValueError
             ruta = unquote(partes.path, errors="strict")
         except ValueError:
             raise ErrorAlmacen("La URI del almacén Blob es inválida.") from None
@@ -194,7 +211,7 @@ class AlmacenBlob(Almacen):
             raise ErrorAlmacen("La URI está fuera del almacén Blob.")
         if self._prefijo and nombre != self._prefijo and not nombre.startswith(self._prefijo + "/"):
             raise ErrorAlmacen("La URI está fuera del almacén Blob.")
-        if not nombre and not listar:
+        if not listar and nombre.rstrip("/") in ("", self._prefijo):
             raise ErrorAlmacen("La URI del almacén Blob debe indicar un archivo.")
         return nombre
 
@@ -243,7 +260,7 @@ def almacen_blob_desde_entorno() -> AlmacenBlob:
         with _traducir_fallas("crear credencial"):
             try:
                 credencial = DefaultAzureCredential(exclude_interactive_browser_credential=True)
-            except ValueError:
+            except (OSError, ValueError):
                 raise AlmacenSinPermiso("Blob crear credencial") from None
         recursos.callback(_cerrar, credencial, "cerrar credencial")
         almacen = AlmacenBlob(cuenta, contenedor, credencial=credencial)

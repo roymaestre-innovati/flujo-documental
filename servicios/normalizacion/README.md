@@ -49,7 +49,7 @@ uv run normalizar <carpeta_entrega> --proceso SR0000000001 --oferente OF-002 --s
 
 La salida queda en `<carpeta_salida>/<proceso>/<oferente o PROCESO>/`: `manifiesto.json`, `pdf/`, `anexos/`, `lectura/` y `palabras/`.
 
-Los anexos de hojas de cálculo (XLS, XLSX y ODS) se guardan en su formato original, también en Blob. La conversión a PDF puede perder información. Son los únicos originales que se conservan y quedan sujetos a la retención (S1).
+Un PDF que abre bien se guarda como normalizado tal cual, byte a byte, y conserva sus firmas (R11 de la spec 003). Los PDF reparados, las imágenes y los DOC, DOCX y ODT se guardan como PDF resultantes. Las hojas de cálculo (XLS, XLSX y ODS) se convierten a PDF y también se guardan como anexos en su formato original, porque la conversión puede perder información. El almacén, local o en Blob, conserva estos resultados sin una copia aparte de la entrada. Los resultados quedan sujetos a la retención (S1).
 
 Como función de Python: `normalizacion.entrega.normalizar_entrega(carpeta, id_proceso, id_oferente, AlmacenLocal(salida))`.
 

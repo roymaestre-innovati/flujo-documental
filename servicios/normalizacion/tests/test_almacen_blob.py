@@ -1,4 +1,4 @@
-"""Operaciones, errores y recursos de Blob Storage con el SDK simulado."""
+"""Operaciones, errores y recursos de Blob Storage sin red."""
 
 import io
 import logging
@@ -6,6 +6,8 @@ import subprocess
 import sys
 import traceback
 from concurrent.futures import ThreadPoolExecutor
+from datetime import UTC, datetime, timedelta
+from email.utils import format_datetime
 from threading import Barrier
 from unittest.mock import Mock, call
 
@@ -18,9 +20,9 @@ from azure.core.exceptions import (
     ServiceRequestError,
     ServiceResponseError,
 )
+from azure.core.pipeline.transport import HttpResponse, HttpTransport
 from azure.identity import CredentialUnavailableError
-from azure.storage.blob import StorageErrorCode
-
+from azure.storage.blob import ContainerClient, StorageErrorCode
 from blob_falso import ContenedorFalso, error_http
 from normalizacion import almacen_blob, registros
 from normalizacion.almacen import AlmacenNoDisponible, AlmacenSinPermiso, ErrorAlmacen
@@ -91,6 +93,28 @@ def test_lista_la_raiz_del_prefijo_por_segmento(cliente):
     assert cliente.prefijos_listados == ["pruebas/abc"]
 
 
+@pytest.mark.parametrize("sufijo", ["", "/"])
+def test_solo_listar_acepta_la_raiz_del_prefijo(cliente, sufijo):
+    with AlmacenBlob(CUENTA, CONTENEDOR, "pruebas/abc", cliente=cliente) as almacen:
+        archivo = almacen.uri("documento.pdf")
+        almacen.escribir(archivo, b"pdf")
+        raiz = f"{RAIZ}/pruebas/abc{sufijo}"
+
+        for operacion, argumentos in ((almacen.leer, ()), (almacen.escribir, (b"x",)), (almacen.existe, ())):
+            with pytest.raises(ErrorAlmacen, match="debe indicar un archivo"):
+                operacion(raiz, *argumentos)
+
+        assert almacen.listar(raiz) == [archivo]
+        assert cliente.cargas == [("pruebas/abc/documento.pdf", True, "application/pdf")]
+
+
+@pytest.mark.parametrize("escape", ["%", "%2", "%ZZ", "%2G", "%G2"])
+def test_rechaza_escapes_mal_formados_antes_de_escribir(almacen, cliente, escape):
+    with pytest.raises(ErrorAlmacen, match="URI del almacén Blob es inválida"):
+        almacen.escribir(f"{RAIZ}/archivo{escape}", b"x")
+    assert cliente.cargas == []
+
+
 def test_lista_solo_el_blob_exacto_aunque_tenga_descendientes(almacen, cliente):
     cliente.blobs[f"{RUTA}/descendiente.json"] = b""
     uri = almacen.uri(RUTA)
@@ -134,7 +158,7 @@ def operacion(request, almacen, cliente):
     return nombre, ejecutar
 
 
-@pytest.mark.parametrize("clase", [ServiceRequestError, ServiceResponseError])
+@pytest.mark.parametrize("clase", [ServiceRequestError, ServiceResponseError, HttpResponseError])
 def test_traduce_las_fallas_de_red(operacion, clase):
     nombre, ejecutar = operacion
     with pytest.raises(AlmacenNoDisponible) as falla:
@@ -144,13 +168,28 @@ def test_traduce_las_fallas_de_red(operacion, clase):
     _comprobar_mensaje(falla.value, f"Blob {nombre}")
 
 
-@pytest.mark.parametrize("estado", [408, 429, 500, 502, 503, 504])
+@pytest.mark.parametrize("estado", [408, 429, 500, 502, 503, 504, 507, 599])
 def test_traduce_los_estados_transitorios(operacion, estado):
     nombre, ejecutar = operacion
     with pytest.raises(AlmacenNoDisponible) as falla:
         ejecutar(error_http(estado, texto=TEXTO_SERVIDOR))
     assert falla.value.espera_s is None
     _comprobar_mensaje(falla.value, f"Blob {nombre} HTTP {estado}")
+
+
+@pytest.mark.parametrize("estado", [501, 505])
+def test_los_estados_501_y_505_no_son_transitorios(operacion, estado):
+    nombre, ejecutar = operacion
+    with pytest.raises(RuntimeError) as falla:
+        ejecutar(error_http(estado, texto=TEXTO_SERVIDOR))
+    _comprobar_mensaje(falla.value, f"Blob {nombre} HTTP {estado}")
+
+
+def test_un_estado_transitorio_prevalece_sobre_el_codigo_del_servicio(almacen, cliente):
+    cliente.fallas["list_blobs"] = error_http(507, "ContainerNotFound")
+    with pytest.raises(AlmacenNoDisponible) as falla:
+        almacen.listar(almacen.uri(RUTA))
+    _comprobar_mensaje(falla.value, "Blob listar HTTP 507 [ContainerNotFound]")
 
 
 @pytest.mark.parametrize(("cabeceras", "espera"), [
@@ -160,14 +199,27 @@ def test_traduce_los_estados_transitorios(operacion, estado):
     ({"Retry-After": "mal", "x-ms-retry-after-ms": "1800"}, 1.8),
     ({"Retry-After": "-1", "x-ms-retry-after-ms": "-1"}, None),
     ({"Retry-After": "nan", "x-ms-retry-after-ms": "inf"}, None),
-    ({"Retry-After": "Wed, 25 Nov 2026 12:00:00 GMT"}, None),
+    ({"Retry-After": "Wed, 25 Nov 2020 12:00:00 GMT"}, 0.0),
+    ({"Retry-After": "3600"}, 3600.0),
+    ({"Retry-After": "1000000000000", "x-ms-retry-after-ms": "1800"}, None),
+    ({"x-ms-retry-after-ms": "3600000"}, 3600.0),
+    ({"x-ms-retry-after-ms": "3600001"}, None),
 ])
 def test_traduce_el_429_y_la_espera_pedida(operacion, cabeceras, espera):
     nombre, ejecutar = operacion
     with pytest.raises(AlmacenNoDisponible) as falla:
-        ejecutar(error_http(429, "TooManyRequests", cabeceras, TEXTO_SERVIDOR))
+        ejecutar(error_http(429, "ServerBusy", cabeceras, TEXTO_SERVIDOR))
     assert falla.value.espera_s == espera
-    _comprobar_mensaje(falla.value, f"Blob {nombre} HTTP 429 [TooManyRequests]")
+    _comprobar_mensaje(falla.value, f"Blob {nombre} HTTP 429 [ServerBusy]")
+
+
+@pytest.mark.parametrize(("segundos", "espera"), [(120, pytest.approx(120, abs=2)), (7200, None)])
+def test_interpreta_una_fecha_futura_en_retry_after(almacen, cliente, segundos, espera):
+    fecha = format_datetime(datetime.now(UTC) + timedelta(seconds=segundos), usegmt=True)
+    cliente.fallas["download_blob"] = error_http(429, cabeceras={"Retry-After": fecha})
+    with pytest.raises(AlmacenNoDisponible) as falla:
+        almacen.leer(almacen.uri(RUTA))
+    assert falla.value.espera_s == espera
 
 
 @pytest.mark.parametrize(("estado", "codigo", "clase", "detalle"), [
@@ -206,6 +258,13 @@ def test_otra_respuesta_http_conserva_solo_el_estado_y_el_codigo(operacion, codi
 def test_existe_reconoce_el_codigo_en_la_cabecera(almacen, cliente):
     cliente.fallas["get_blob_properties"] = error_http(404, cabeceras={"X-MS-Error-Code": "BlobNotFound"})
     assert almacen.existe(almacen.uri(RUTA)) is False
+
+
+def test_no_publica_un_codigo_sensible_alfanumerico_en_la_cabecera(almacen, cliente):
+    cliente.fallas["upload_blob"] = error_http(403, cabeceras={"x-ms-error-code": CUENTA}, texto=TEXTO_SERVIDOR)
+    with pytest.raises(AlmacenSinPermiso) as falla:
+        almacen.escribir(almacen.uri(RUTA), b"x")
+    _comprobar_mensaje(falla.value, "Blob escribir HTTP 403")
 
 
 @pytest.mark.parametrize("clase", [HttpResponseError, IncompleteReadError, ServiceResponseError])
@@ -347,14 +406,86 @@ def test_el_entorno_protege_los_datos_de_una_configuracion_de_credencial_invalid
     _comprobar_mensaje(falla.value, "Blob crear credencial")
 
 
-def test_el_entorno_cierra_la_credencial_aunque_falle_el_cierre_del_cliente(recursos_azure):
+def test_el_entorno_protege_la_ruta_de_un_certificado_ausente(monkeypatch, tmp_path):
+    certificado = tmp_path / "certificado-inventado.pem"
+    monkeypatch.setenv("AZURE_CLIENT_CERTIFICATE_PATH", str(certificado))
+    monkeypatch.setenv("AZURE_TENANT_ID", "00000000-0000-0000-0000-000000000001")
+    monkeypatch.setenv("AZURE_CLIENT_ID", "00000000-0000-0000-0000-000000000002")
+    monkeypatch.delenv("AZURE_CLIENT_SECRET", raising=False)
+    monkeypatch.setenv("ALMACEN_BLOB_CUENTA", CUENTA)
+
+    with pytest.raises(AlmacenSinPermiso) as falla:
+        almacen_blob_desde_entorno()
+
+    _comprobar_mensaje(falla.value, "Blob crear credencial")
+    assert certificado.name not in "".join(traceback.format_exception(falla.value))
+
+
+def test_el_cierre_intenta_todos_los_recursos_y_avisa_sin_publicar_datos(recursos_azure, caplog):
     credencial, _, _, clientes = recursos_azure
     almacen = almacen_blob_desde_entorno()
     clientes[0].fallas["close"] = ServiceResponseError(TEXTO_SERVIDOR)
-    with pytest.raises(AlmacenNoDisponible) as falla:
-        almacen.cerrar()
+    credencial.close.side_effect = OSError(TEXTO_SERVIDOR)
+
+    almacen.cerrar()
+    almacen.cerrar()
+
     credencial.close.assert_called_once_with()
-    _comprobar_mensaje(falla.value, "Blob cerrar cliente")
+    assert clientes[0].cierres == 1
+    assert caplog.messages == ["Blob cerrar cliente (ServiceResponseError)", "Blob cerrar credencial (OSError)"]
+
+
+class _RespuestaVacia(HttpResponse):
+    def body(self) -> bytes:
+        return b""
+
+
+class _TransporteEnMemoria(HttpTransport):
+    def __init__(self):
+        self.urls = []
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        self.close()
+
+    def open(self):
+        pass
+
+    def close(self):
+        pass
+
+    def send(self, request, **kwargs):
+        self.urls.append(request.url)
+        respuesta = _RespuestaVacia(request, None)
+        respuesta.status_code = 201
+        respuesta.headers = {"ETag": '"etag-inventado"'}
+        return respuesta
+
+
+@pytest.mark.parametrize(("nivel_inicial", "nivel_final"), [
+    (logging.NOTSET, logging.WARNING),
+    (logging.DEBUG, logging.WARNING),
+    (logging.ERROR, logging.ERROR),
+])
+def test_el_almacen_protege_la_url_en_los_registros_del_sdk(caplog, nivel_inicial, nivel_final):
+    caplog.set_level(logging.INFO)
+    caplog.set_level(logging.NOTSET, logger="azure")
+    registro_http = logging.getLogger("azure.core.pipeline.policies.http_logging_policy")
+    caplog.set_level(nivel_inicial, logger=registro_http.name)
+    transporte = _TransporteEnMemoria()
+
+    with (
+        ContainerClient(URL_CUENTA, CONTENEDOR, transport=transporte) as cliente,
+        AlmacenBlob(CUENTA, CONTENEDOR, cliente=cliente) as almacen,
+    ):
+        almacen.escribir(almacen.uri(RUTA), b"pdf")
+
+    assert registro_http.level == nivel_final
+    assert transporte.urls == [f"{RAIZ}/{RUTA}"]
+    assert CUENTA not in caplog.text
+    assert "archivo-privado.pdf" not in caplog.text
 
 
 def test_configurar_silencia_los_avisos_de_azure_y_el_error_protege_los_datos(almacen, cliente, caplog):

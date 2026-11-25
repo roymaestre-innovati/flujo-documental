@@ -26,6 +26,8 @@ uv run extraer <carpeta>/solicitudes-extraccion.jsonl --corrida <carpeta> \
     --llm falso --respuestas tests/respuestas
 ```
 
+Si `ALMACEN_BLOB_CUENTA` está exportada, `extraer` lee de Blob Storage y lo avisa por stderr. Para correr el ejemplo local, ejecuta el comando sin esa variable.
+
 - Los resultados quedan en `<carpeta>/extraccion/<id_proceso>/<entrega>/<id_segmento>.<TD>.v<versión>.json`. La corrida tiene que estar fuera de cualquier repositorio git, porque los resultados traen datos personales.
 - Una segunda corrida devuelve lo guardado sin llamar al LLM. `--forzar` extrae otra vez y deja el resultado anterior al lado, con el sufijo `.anterior-<id de ejecución>`. Una falla técnica (`error_proceso`) no se guarda.
 - `--solo <id_segmento>` (se puede repetir) extrae solo esos segmentos. `--concurrencia` cambia el tope de llamadas al LLM a la vez (3).

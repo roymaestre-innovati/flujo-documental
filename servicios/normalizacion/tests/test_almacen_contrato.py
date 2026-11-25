@@ -24,12 +24,13 @@ def almacen_local(tmp_path, uris_ajenas_local):
     return AlmacenLocal(tmp_path / "salida"), uris_ajenas_local
 
 
-def _uris_ajenas_blob(cuenta, contenedor, prefijo):
+def _uris_ajenas_blob(cuenta, contenedor, prefijo, otra_carpeta="otra-carpeta"):
     host = f"{cuenta}.blob.core.windows.net"
     base = f"https://{host}/{contenedor}"
     ruta = f"/{contenedor}/{prefijo}/a.json"
     otra_cuenta = "otracuenta" if cuenta != "otracuenta" else "cuentafalsa"
     otro_contenedor = "otro-contenedor" if contenedor != "otro-contenedor" else "contenedor-falso"
+    # La validación rechaza otra cuenta u otro contenedor antes de llamar al SDK.
     return (
         f"http://{host}{ruta}",
         f"https://{otra_cuenta}.blob.core.windows.net{ruta}",
@@ -41,7 +42,7 @@ def _uris_ajenas_blob(cuenta, contenedor, prefijo):
         f"https://{host}:443{ruta}",
         f"https://usuario:clave@{host}{ruta}",
         f"{base}/{prefijo}/%2E%2E/a.json",
-        f"{base}/otra-carpeta/a.json",
+        f"{base}/{otra_carpeta}/a.json",
         f"{base}/{prefijo}d/a.json",
     )
 
@@ -52,9 +53,12 @@ def uris_ajenas_blob():
 
 
 @pytest.fixture
-def uris_ajenas_blob_azure(cliente_contenedor_blob_azure, prefijo_blob_azure):
+def uris_ajenas_blob_azure(cliente_contenedor_blob_azure, prefijo_blob_azure, prefijo_interno_blob_azure):
     cliente = cliente_contenedor_blob_azure
-    return _uris_ajenas_blob(cliente.account_name, cliente.container_name, prefijo_blob_azure)
+    # Si falla la validación del prefijo, las escrituras siguen dentro del UUID que se limpia.
+    return _uris_ajenas_blob(
+        cliente.account_name, cliente.container_name, prefijo_interno_blob_azure, f"{prefijo_blob_azure}/otra",
+    )
 
 
 @pytest.fixture
