@@ -35,7 +35,7 @@ Nada de Azure en esta entrega. Para la entrega 2 quedan, ya decididos en el dise
 
 ## Interfaces
 
-Cada pieza externa queda detrás de una interfaz pequeña, como `Almacen` en la normalización. En esta entrega solo existen las versiones locales.
+Cada pieza externa queda detrás de una interfaz pequeña, como `Almacen` en la normalización. La entrega 1 usa las versiones locales o en memoria. La tabla incluye las versiones de Azure de la entrega 2 y el estado de sus pruebas.
 
 | Interfaz | Qué hace | Versión local | Versión de la entrega 2 |
 |---|---|---|---|
@@ -43,7 +43,7 @@ Cada pieza externa queda detrás de una interfaz pequeña, como `Almacen` en la 
 | `Estado` | `leer`, `crear_si_no_existe`, `cambiar(id, de_estado, a_estado, motivo)` condicional, `consultar(id_proceso)` | `EstadoEnMemoria`, que puede guardarse en un JSON al terminar | `EstadoMongo`: Cosmos con la API de MongoDB, con `id_proceso` como partición (hecho y probado contra la base de desarrollo, `tasks-estado-cola-azure.md`) |
 | `Origen` | `listar(ruta)` y `bajar(ruta, destino, esperado)` | `OrigenLocal`: una carpeta | `OrigenOneLake` (hecho, `tasks-entrada-onelake.md`) |
 | `Clasificador` | `clasificar(documento) → segmentos` | `ClasificadorFalso`: lee un CSV | El clasificador del otro equipo (C1 a C3) |
-| `Almacen` | Lo que producimos | `AlmacenLocal` de la normalización | Blob Storage |
+| `Almacen` | Lo que producimos | `AlmacenLocal` de la normalización | `AlmacenBlob` de la normalización (extra `azure`), probado con un contenedor falso. Falta correrlo contra el de desarrollo (T04 de `tasks-almacen-blob.md`). Ver el [README de la normalización](../../servicios/normalizacion/README.md#almacén-en-blob-storage) |
 
 El reloj también es inyectable (`ahora()`), para probar las esperas y las 24 horas del escalamiento sin esperar.
 

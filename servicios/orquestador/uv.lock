@@ -555,8 +555,16 @@ dependencies = [
     { name = "pypdfium2" },
 ]
 
+[package.optional-dependencies]
+azure = [
+    { name = "azure-identity" },
+    { name = "azure-storage-blob" },
+]
+
 [package.metadata]
 requires-dist = [
+    { name = "azure-identity", marker = "extra == 'azure'", specifier = ">=1.19" },
+    { name = "azure-storage-blob", marker = "extra == 'azure'", specifier = ">=12.31" },
     { name = "img2pdf", specifier = ">=0.6.3" },
     { name = "olefile", specifier = ">=0.47" },
     { name = "pdfplumber", specifier = ">=0.11.10" },
@@ -565,9 +573,12 @@ requires-dist = [
     { name = "pyhanko", specifier = ">=0.38.1" },
     { name = "pypdfium2", specifier = ">=5.14.0" },
 ]
+provides-extras = ["azure"]
 
 [package.metadata.requires-dev]
 dev = [
+    { name = "azure-identity", specifier = ">=1.19" },
+    { name = "azure-storage-blob", specifier = ">=12.31" },
     { name = "cryptography", specifier = ">=50.0.2" },
     { name = "jsonschema", specifier = ">=4.23" },
     { name = "msoffcrypto-tool", specifier = ">=6.1.0" },
@@ -608,7 +619,7 @@ dependencies = [
     { name = "azure-storage-file-datalake" },
     { name = "deltalake" },
     { name = "jsonschema" },
-    { name = "normalizacion" },
+    { name = "normalizacion", extra = ["azure"] },
     { name = "pyarrow" },
     { name = "pymongo" },
     { name = "rfc3339-validator" },
@@ -630,7 +641,7 @@ requires-dist = [
     { name = "azure-storage-file-datalake", specifier = ">=12.18" },
     { name = "deltalake", specifier = ">=1.6" },
     { name = "jsonschema", specifier = ">=4.23" },
-    { name = "normalizacion", editable = "../normalizacion" },
+    { name = "normalizacion", extras = ["azure"], editable = "../normalizacion" },
     { name = "pyarrow", specifier = ">=18" },
     { name = "pymongo", specifier = ">=4.10" },
     { name = "rfc3339-validator", specifier = ">=0.1.4" },

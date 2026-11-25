@@ -10,7 +10,9 @@ import hashlib
 import json
 from dataclasses import dataclass
 
-from normalizacion.almacen import Almacen, ErrorAlmacen, ruta_en_el_almacen
+from normalizacion.almacen import (
+    Almacen, AlmacenLocal, AlmacenNoDisponible, AlmacenSinPermiso, ErrorAlmacen, ruta_en_el_almacen,
+)
 
 from . import contratos
 
@@ -67,10 +69,12 @@ class Entrada:
 def ubicar(almacen: Almacen, uri: str) -> str:
     """La URI dentro del almacén que se usa.
 
-    Una URI `file://` de una corrida local se reubica por lo que va después de
-    `almacen/`, para que la corrida se pueda mover de carpeta. Las demás (Blob
-    Storage en producción, O2) quedan como vienen.
+    Con un almacén local, reubica las URI `file://` por lo que va después de
+    `almacen/`, para que la corrida se pueda mover de carpeta. En los demás
+    casos la URI llega al almacén tal como viene en la solicitud.
     """
+    if not isinstance(almacen, AlmacenLocal):
+        return uri
     relativa = ruta_en_el_almacen(uri)
     return almacen.uri(str(relativa)) if relativa is not None else uri
 
@@ -80,6 +84,10 @@ def _leer(almacen: Almacen, uri: str, que: str) -> bytes:
         return almacen.leer(ubicar(almacen, uri))
     except ErrorAlmacen:
         raise _proceso("ARCHIVO_NO_ENCONTRADO", f"No se encontró {que} en el almacén.", reintentable=True) from None
+    except AlmacenNoDisponible as error:
+        raise _proceso("ALMACEN_NO_DISPONIBLE", str(error), reintentable=True) from None
+    except AlmacenSinPermiso as error:
+        raise _proceso("ALMACEN_SIN_PERMISO", str(error), reintentable=False) from None
 
 
 def _huella(datos: bytes) -> str:

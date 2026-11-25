@@ -30,7 +30,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from . import CONTRATO, VERSION, registros
-from .almacen import Almacen
+from .almacen import Almacen, AlmacenNoDisponible, AlmacenSinPermiso
 from .conversion import convertir
 from .errores import CONVERSION_FALLIDA, SIN_PAGINAS, ErrorDocumento, error_documento
 from .firma import FirmaDigital, leer_firmas
@@ -282,6 +282,8 @@ def normalizar_entrega(
                     continue
                 try:
                     entrada = procesador.procesar(archivo)
+                except (AlmacenNoDisponible, AlmacenSinPermiso):
+                    raise
                 except Exception:
                     registro.exception("Falla inesperada al procesar el documento")
                     fallidos.append(archivo.id_documento)

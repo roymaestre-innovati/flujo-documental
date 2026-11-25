@@ -10,12 +10,14 @@ lanza una de estas excepciones y el bucle decide qué hacer:
 |                        |       | tarea para el evaluador                                    |
 | ErrorTransitorio       | 2     | Reintenta 3 veces, a los 2, 4 y 8 minutos. Si el servicio   |
 |                        |       | dijo cuánto esperar, espera eso sin contar el intento      |
+| AlmacenNoDisponible    | 2     | Igual que ErrorTransitorio, con la espera pedida por Blob   |
 | RespuestaInvalida      | 3     | Reintenta 2 veces enseguida                                |
 | MensajeRechazado       | 4     | El mensaje mismo está mal (por ejemplo, un aviso que no    |
 |                        |       | cumple su contrato): sin reintento, a operación            |
 | ErrorDeConfiguracion   | 4     | Falta un permiso, una credencial o una opción del entorno  |
 |                        |       | (por ejemplo, OneLake responde 403): sin reintento, a      |
 |                        |       | operación, con un motivo que dice qué revisar              |
+| AlmacenSinPermiso      | 4     | Igual que ErrorDeConfiguracion, con el motivo de Blob       |
 | cualquier otra         | 4     | Un bug: sin reintento                                      |
 
 Si la cola da `BloqueoPerdido` al resolver una entrega, `procesar_uno` avisa y
@@ -34,6 +36,8 @@ entre las dos cosas, el mensaje se repite; por eso cada manejador es idempotente
 import logging
 from dataclasses import dataclass
 from typing import Protocol
+
+from normalizacion.almacen import AlmacenNoDisponible, AlmacenSinPermiso
 
 from .cola import BloqueoPerdido, Cola, Mensaje
 from .parametros import PARAMETROS, Parametros
@@ -134,7 +138,7 @@ def _procesar_mensaje(cola: Cola, manejador: Manejador, mensaje: Mensaje, parame
         cola.completar(mensaje)
         registro.info("Error del documento, para el evaluador: %s", type(error).__name__)
         return Resultado(mensaje.id, "error_documento")
-    except ErrorTransitorio as error:
+    except (ErrorTransitorio, AlmacenNoDisponible) as error:
         motivo = lugar_de_la_excepcion(error)
         if error.espera_s is not None and esperas < parametros.max_esperas:
             _reintentar(cola, mensaje, error.espera_s, esperas=esperas + 1)
@@ -155,7 +159,7 @@ def _procesar_mensaje(cola: Cola, manejador: Manejador, mensaje: Mensaje, parame
         return _fallar(cola, manejador, mensaje, f"Respuesta inválida tras {intento} intentos: {motivo}")
     except MensajeRechazado as error:
         return _fallar(cola, manejador, mensaje, f"Rechazado: {error}")
-    except ErrorDeConfiguracion as error:
+    except (ErrorDeConfiguracion, AlmacenSinPermiso) as error:
         return _fallar(cola, manejador, mensaje, f"Configuración: {error}")
     except Exception as error:  # noqa: BLE001 - clase 4: cualquier otra cosa es un bug
         return _fallar(cola, manejador, mensaje, f"Bug: {lugar_de_la_excepcion(error)}")

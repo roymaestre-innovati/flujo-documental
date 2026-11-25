@@ -13,6 +13,13 @@ dependencies = [
     "pypdfium2>=5.14.0",
 ]
 
+[project.optional-dependencies]
+# AlmacenBlob (almacen_blob.py). La normalización funciona sin este extra.
+azure = [
+    "azure-storage-blob>=12.31",
+    "azure-identity>=1.19",
+]
+
 [project.scripts]
 normalizar = "normalizacion.cli:main"
 
@@ -26,6 +33,9 @@ dev = [
     "cryptography>=50.0.2",
     "msoffcrypto-tool>=6.1.0",
     "python-pptx>=1.0.2",
+    # Las pruebas de AlmacenBlob usan un cliente falso, pero importan el SDK.
+    "azure-storage-blob>=12.31",
+    "azure-identity>=1.19",
 ]
 
 [build-system]
@@ -40,4 +50,5 @@ testpaths = ["tests"]
 addopts = "-ra --strict-markers"
 markers = [
     "libreoffice: necesita el comando soffice; se salta si no está instalado",
+    "azure(variable): usa recursos de Azure; requiere --azure y declarar la variable de entorno",
 ]

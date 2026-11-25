@@ -46,7 +46,7 @@ Hoy el evaluador recibe las carpetas de cada oferente y sabe de memoria, o en un
 
 - R1. El aviso trae el identificador del proceso, la carpeta donde quedaron sus documentos y, opcional, la lista de archivos con su oferente. Un aviso que no cumple esa forma no se procesa y va a operación.
 - R2. Un aviso repetido del mismo proceso no abre el proceso otra vez ni repite trabajo.
-- R3. Los documentos se leen donde los dejó el módulo 1. No se guarda una copia de los originales: solo lo que produce el flujo (decisión 32).
+- R3. Los documentos se leen donde los dejó el módulo 1. Se guarda lo que produce el flujo, sin una copia aparte de la entrada (decisión 32). Si un PDF abre bien, su normalizado es el mismo archivo, byte a byte, según R11 de la spec 003. Así se mantienen válidas sus firmas.
 - R4. Los documentos del proceso (condiciones, adendas, anexos) se separan de los de cada oferente. Mientras A-1 no se responda, se distinguen por la estructura de carpetas (ver `plan.md`).
 - R5. Al abrir el proceso se fijan las versiones que usará: modelo de extracción, ontología del clasificador, reglas, normalizador y sus parámetros, y umbrales de clasificación. Publicar una versión nueva no cambia los procesos abiertos.
 
