@@ -12,7 +12,7 @@ import pytest
 import fabrica
 from normalizacion import entrega as modulo_entrega
 from normalizacion import registros
-from normalizacion.almacen import AlmacenLocal
+from normalizacion.almacen import AlmacenLocal, AlmacenNoDisponible, AlmacenSinPermiso
 from normalizacion.cli import main
 from normalizacion.entrega import ErrorEntrega, normalizar_entrega
 from normalizacion.parametros import PARAMETROS
@@ -325,6 +325,48 @@ def test_si_falta_un_archivo_del_almacen_se_procesa_de_nuevo(entrega_chica):
 
 
 # Errores: R17 y clase 4 ----------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("clase", [AlmacenNoDisponible, AlmacenSinPermiso])
+def test_las_fallas_del_almacen_al_escribir_salen_de_la_entrega(tmp_path, monkeypatch, clase):
+    carpeta = tmp_path / "entrega"
+    _armar(carpeta, ["pdf_texto"])
+    almacen = AlmacenLocal(tmp_path / "salida")
+    falla = clase("Falla simulada al escribir")
+
+    def escribir(uri, datos):
+        assert "/pdf/" in uri
+        raise falla
+
+    monkeypatch.setattr(almacen, "escribir", escribir)
+    with pytest.raises(clase) as error:
+        normalizar_entrega(carpeta, PROCESO, OFERENTE, almacen)
+    assert error.value is falla
+
+
+@pytest.mark.parametrize("clase", [AlmacenNoDisponible, AlmacenSinPermiso])
+@pytest.mark.parametrize("recurso", ["manifiesto", "lectura"])
+def test_las_fallas_del_almacen_al_reusar_salen_de_la_entrega(tmp_path, monkeypatch, clase, recurso):
+    carpeta = tmp_path / "entrega"
+    _armar(carpeta, ["pdf_texto"])
+    almacen = AlmacenLocal(tmp_path / "salida")
+    resultado = normalizar_entrega(carpeta, PROCESO, OFERENTE, almacen)
+    recursos = {
+        "manifiesto": almacen.uri(f"{PROCESO}/{OFERENTE}/manifiesto.json"),
+        "lectura": resultado.manifiesto["archivos"][0]["lectura"],
+    }
+    leer_real = almacen.leer
+    falla = clase("Falla simulada al leer")
+
+    def leer(uri):
+        if uri == recursos[recurso]:
+            raise falla
+        return leer_real(uri)
+
+    monkeypatch.setattr(almacen, "leer", leer)
+    with pytest.raises(clase) as error:
+        normalizar_entrega(carpeta, PROCESO, OFERENTE, almacen)
+    assert error.value is falla
 
 
 def test_r17_un_error_del_documento_no_frena_a_los_demas(entrega_chica):

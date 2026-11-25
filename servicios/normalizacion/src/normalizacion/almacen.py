@@ -1,8 +1,7 @@
 """Dónde se guardan los resultados de la normalización.
 
-El almacenamiento queda detrás de la interfaz `Almacen` para cambiarlo cuando se
-responda A-1 (por ejemplo, por Blob Storage). En esta entrega solo existe
-`AlmacenLocal`, sobre una carpeta, con URI `file://`.
+La interfaz `Almacen` permite usar una carpeta con URI `file://` (`AlmacenLocal`)
+o Azure Blob Storage (`normalizacion.almacen_blob`).
 """
 
 import os
@@ -52,6 +51,18 @@ def en_el_almacen(carpeta: Path, uri: str | None) -> Path | None:
 
 class ErrorAlmacen(Exception):
     """URI inválida, fuera del almacén o inexistente."""
+
+
+class AlmacenNoDisponible(Exception):
+    """Una falla transitoria del almacén, con la espera que pidió el servicio."""
+
+    def __init__(self, descripcion: str = "", espera_s: float | None = None) -> None:
+        super().__init__(descripcion)
+        self.espera_s = espera_s
+
+
+class AlmacenSinPermiso(Exception):
+    """Acceso denegado o configuración del almacén inválida."""
 
 
 class Almacen(ABC):

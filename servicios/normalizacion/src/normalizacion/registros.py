@@ -65,4 +65,5 @@ def configurar(nivel: int = logging.INFO, salida=None) -> logging.Handler:
     paquete.addHandler(manejador)
     paquete.setLevel(nivel)
     paquete.propagate = False
+    logging.getLogger("azure").setLevel(logging.ERROR)
     return manejador

@@ -2,7 +2,9 @@
 
 import pytest
 
+from blob_falso import ContenedorFalso
 from normalizacion.almacen import Almacen, AlmacenLocal, ErrorAlmacen
+from normalizacion.almacen_blob import AlmacenBlob
 
 
 @pytest.fixture
@@ -22,8 +24,35 @@ def almacen_local(tmp_path, uris_ajenas_local):
     return AlmacenLocal(tmp_path / "salida"), uris_ajenas_local
 
 
+@pytest.fixture
+def uris_ajenas_blob():
+    host = "cuentafalsa.blob.core.windows.net"
+    base = f"https://{host}/evaluacion-ofertas"
+    ruta = "/evaluacion-ofertas/pruebas/abc/a.json"
+    return (
+        f"http://{host}{ruta}",
+        f"https://otracuenta.blob.core.windows.net{ruta}",
+        f"https://{host}/otro-contenedor/pruebas/abc/a.json",
+        f"https://{host}{ruta}?sig=firma-inventada",
+        f"https://{host}{ruta}#fragmento",
+        f"https://{host}{ruta}?",
+        f"https://{host}{ruta}#",
+        f"https://{host}:443{ruta}",
+        f"https://usuario:clave@{host}{ruta}",
+        f"{base}/pruebas/abc/%2E%2E/a.json",
+        f"{base}/otra-carpeta/a.json",
+        f"{base}/pruebas/abcd/a.json",
+    )
+
+
+@pytest.fixture
+def almacen_blob(uris_ajenas_blob):
+    with AlmacenBlob("cuentafalsa", "evaluacion-ofertas", "pruebas/abc", cliente=ContenedorFalso()) as almacen:
+        yield almacen, uris_ajenas_blob
+
+
 # Cada implementación agrega aquí su fixture con el almacén y sus URI ajenas.
-@pytest.fixture(params=[pytest.param("almacen_local", id="local")])
+@pytest.fixture(params=[pytest.param("almacen_local", id="local"), pytest.param("almacen_blob", id="blob")])
 def implementacion_almacen(request):
     return request.getfixturevalue(request.param)
 

@@ -58,7 +58,7 @@ Revisadas con el usuario y con una segunda opinión de Astra antes de empezar.
   - escribir bytes vacíos funciona;
   - una URI de otro almacén (otro esquema, otra cuenta, otro contenedor) da `ErrorAlmacen`.
 
-- [ ] **T02 — `AlmacenBlob`.** Implementa `Almacen` con `azure-storage-blob`. Recibe un cliente del contenedor ya armado, para poder pasarle uno falso, y trae una función que lo arma desde el entorno (`ALMACEN_BLOB_CUENTA`, la URL `https://<cuenta>.blob.core.windows.net`, y `ALMACEN_BLOB_CONTENEDOR`, por defecto `evaluacion-ofertas`) con `DefaultAzureCredential`. Pasa la batería de T01 con el cliente falso.
+- [x] **T02 — `AlmacenBlob`.** Implementa `Almacen` con `azure-storage-blob`. Recibe un cliente del contenedor ya armado, para poder pasarle uno falso, y trae una función que lo arma desde el entorno (`ALMACEN_BLOB_CUENTA`, la URL `https://<cuenta>.blob.core.windows.net`, y `ALMACEN_BLOB_CONTENEDOR`, por defecto `evaluacion-ofertas`) con `DefaultAzureCredential`. Pasa la batería de T01 con el cliente falso.
   - `uri(ruta)`: `https://<cuenta>.blob.core.windows.net/<contenedor>/<ruta>`, con la ruta codificada (espacios, tildes) y las mismas validaciones que la versión local: relativa, sin `..` y no vacía.
   - `escribir`: `upload_blob(overwrite=True)`. Blob ya escribe completo o no escribe, así que no hace falta el temporal de la versión local. Con `content_type` según la extensión (`application/pdf`, `application/json`).
   - `leer`: `download_blob().readall()`. Un blob que no existe da `ErrorAlmacen`.
@@ -85,3 +85,9 @@ Revisadas con el usuario y con una segunda opinión de Astra antes de empezar.
 `test_almacen_contrato.py` comprueba la interfaz, la lectura y escritura (incluidos bytes vacíos), los prefijos al listar y el rechazo de rutas y URI ajenas. `test_almacen.py` conserva las pruebas de URI `file://`, temporales y ubicación de archivos en corridas movidas.
 
 Para T02, se agrega `pytest.param("almacen_blob", id="blob")`. El fixture `almacen_blob` devuelve el almacén con cliente falso y las URI de `uris_ajenas_blob` (otro esquema, otra cuenta, otro contenedor y query).
+
+### T02
+
+El SDK 12.31.1 puede entregar `error_code` como texto o enum. `get_blob_properties()` permite distinguir `BlobNotFound` de un contenedor inaccesible. La traducción abarca todo el iterador paginado de `list_blobs()` y `readall()`, pues el SDK puede envolver un corte de descarga en un `HttpResponseError` sin estado. Los errores conservan datos estructurados y la espera numérica que pida el servicio.
+
+Se reutiliza un cliente de contenedor por hilo con la misma credencial. El cliente inyectado se usa bajo un candado. La fábrica valida el entorno antes de crear recursos y transfiere su cierre al almacén mediante `ExitStack`. La batería de contrato comparte los casos de Local y Blob con un contenedor en memoria.
