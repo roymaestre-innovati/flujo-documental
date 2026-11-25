@@ -171,7 +171,11 @@ class AlmacenBlob(Almacen):
                 self._sin_activas.notify_all()
 
     def _cliente_del_hilo(self) -> ContainerClient:
+        # La revisión del cierre va bajo el mismo candado que la creación: si no, un
+        # `cerrar()` entre las dos dejaría un cliente nuevo que nadie cierra.
         with self._candado_clientes:
+            if self._cerrado:
+                raise RuntimeError("El almacén Blob está cerrado.")
             if self._cliente_inyectado is not None:
                 return self._cliente_inyectado
             cliente = getattr(self._clientes, "cliente", None)
@@ -185,10 +189,10 @@ class AlmacenBlob(Almacen):
             return cliente
 
     def cliente_contenedor(self) -> ContainerClient:
-        """Presta el cliente SDK del hilo actual mientras el almacén esté abierto."""
-        with self._candado_clientes:
-            if self._cerrado:
-                raise RuntimeError("El almacén Blob está cerrado.")
+        """Presta el cliente SDK del hilo actual mientras el almacén esté abierto.
+
+        El préstamo no cuenta como operación activa: quien lo usa no debe cerrar el
+        almacén mientras tanto."""
         return self._cliente_del_hilo()
 
     def cerrar(self) -> None:

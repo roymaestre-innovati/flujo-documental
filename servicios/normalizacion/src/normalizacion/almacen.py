@@ -114,10 +114,13 @@ class AlmacenLocal(Almacen):
         return self.raiz.joinpath(*relativa.parts).as_uri()
 
     def _ruta(self, uri: str) -> Path:
-        partes = urlparse(uri)
-        if partes.scheme != "file" or partes.netloc not in ("", "localhost"):
-            raise UriInvalida("El almacén local solo acepta URI file:// locales.")
-        ruta = Path(unquote(partes.path)).resolve()
+        try:
+            partes = urlparse(uri)
+            if partes.scheme != "file" or partes.netloc not in ("", "localhost"):
+                raise UriInvalida("El almacén local solo acepta URI file:// locales.")
+            ruta = Path(unquote(partes.path)).resolve()
+        except ValueError:  # una autoridad mal formada o un carácter nulo
+            raise UriInvalida("La URI no es válida.") from None
         if ruta != self.raiz and self.raiz not in ruta.parents:
             raise UriInvalida("La URI está fuera del almacén.")
         return ruta

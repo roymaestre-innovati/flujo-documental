@@ -121,8 +121,10 @@ class _Control:
             self._tomados -= 1
 
     def terminar(self, motivo: str) -> None:
+        """El primer motivo queda, salvo `FALLA`, que siempre gana: el código de
+        salida es 1 y el resumen debe decir por qué."""
         with self._candado:
-            if self.motivo is None:
+            if self.motivo is None or motivo == FALLA:
                 self.motivo = motivo
 
     def duracion(self) -> float:

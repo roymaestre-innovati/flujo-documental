@@ -177,24 +177,23 @@ def test_una_falla_de_la_cola_corta_la_ejecucion_con_su_codigo(error, codigo):
     assert (resumen.motivo_fin, resumen.falla, resumen.codigo_salida) == (worker.FALLA, error, codigo)
 
 
-def test_una_falla_en_un_hilo_detiene_a_los_demas(cola):
+def test_una_falla_en_un_hilo_detiene_a_los_demas(cola, monkeypatch):
     _publicar(cola, 50)
     fallo = threading.Event()
+    terminar = worker._Control.terminar
 
-    class ColaQueAvisa(ColaQueFalla):
-        def recibir(self, nombre):
-            try:
-                super().recibir(nombre)
-            finally:
-                fallo.set()
+    def terminar_y_avisar(self, motivo):
+        terminar(self, motivo)
+        if motivo == worker.FALLA:
+            fallo.set()
+
+    monkeypatch.setattr(worker._Control, "terminar", terminar_y_avisar)
 
     def esperar_la_falla(cuerpo):
         if cuerpo["n"] == 0:
-            assert fallo.wait(5)
-            # Deja que el hilo roto marque el fin antes de pedir otro turno.
-            threading.Event().wait(0.2)
+            assert fallo.wait(5), "el hilo roto marca el fin antes de que este pida otro turno"
 
-    rota = ColaQueAvisa(RelojManual(), ConnectionError("red"))
+    rota = ColaQueFalla(RelojManual(), ConnectionError("red"))
     resumen = vaciar([cola, rota], Manejador(esperar_la_falla))
     assert (resumen.motivo_fin, resumen.codigo_salida) == (worker.FALLA, 1)
     assert resumen.mensajes == 1
@@ -203,7 +202,7 @@ def test_una_falla_en_un_hilo_detiene_a_los_demas(cola):
 
 def test_informar_registra_solo_conteos(cola, caplog):
     _publicar(cola, 2)
-    resumen = vaciar([cola], Manejador())
+    resumen = vaciar([cola], Manejador(), reloj=lambda: 7.0)
     with caplog.at_level(logging.INFO, logger="mensajeria"):
         assert informar(resumen) == 0
     [linea] = [r for r in caplog.records if r.name == "mensajeria.worker"]
@@ -222,3 +221,26 @@ def test_informar_una_falla_sin_su_mensaje(caplog):
 def test_limites_invalidos(limites):
     with pytest.raises(ValueError):
         Limites(**limites)
+
+
+def test_si_un_hilo_vacia_y_otro_falla_el_motivo_es_la_falla():
+    # La rota ya está recibiendo cuando la otra vuelve vacía, y falla después.
+    recibiendo, vacia_listo = threading.Event(), threading.Event()
+
+    class ColaQueFallaDespues(ColaQueFalla):
+        def recibir(self, nombre):
+            recibiendo.set()
+            assert vacia_listo.wait(5)
+            return super().recibir(nombre)
+
+    class ColaVacia(ColaEnMemoria):
+        def recibir(self, nombre):
+            assert recibiendo.wait(5)
+            try:
+                return super().recibir(nombre)
+            finally:
+                vacia_listo.set()
+
+    resumen = vaciar([ColaVacia(RelojManual()), ColaQueFallaDespues(RelojManual(), ConnectionError("red"))],
+                     Manejador())
+    assert (resumen.motivo_fin, resumen.codigo_salida) == (worker.FALLA, 1)

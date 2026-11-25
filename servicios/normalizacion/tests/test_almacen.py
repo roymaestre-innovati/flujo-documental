@@ -48,3 +48,11 @@ def test_en_el_almacen_no_deja_salir(tmp_path):
     assert en_el_almacen(tmp_path, "file:///lejos/almacen/SR1/a.pdf") == archivo.resolve()
     assert en_el_almacen(tmp_path, "file:///lejos/almacen/SR1/no.pdf") is None
     assert en_el_almacen(tmp_path, "file:///lejos/almacen/../secreto.txt") is None
+
+
+@pytest.mark.parametrize("uri", ["file://[mal/a.pdf", "file:///tmp/a%00.pdf"])
+def test_una_uri_mal_formada_es_uri_invalida(almacen, uri):
+    from normalizacion.almacen import UriInvalida
+
+    with pytest.raises(UriInvalida):
+        almacen.leer(uri)

@@ -345,6 +345,17 @@ def test_presta_el_cliente_del_contenedor_hasta_cerrar(recursos_azure):
         almacen.cliente_contenedor()
 
 
+def test_despues_de_cerrar_no_se_crea_ningun_cliente(recursos_azure):
+    _, _, crear_cliente, _ = recursos_azure
+    almacen = almacen_blob_desde_entorno()
+    almacen.cerrar()
+    creados = crear_cliente.call_count
+    with ThreadPoolExecutor(max_workers=1) as hilo:
+        with pytest.raises(RuntimeError, match="está cerrado"):
+            hilo.submit(almacen._cliente_del_hilo).result()
+    assert crear_cliente.call_count == creados
+
+
 @pytest.mark.parametrize("valor", [None, "", "ab", "a" * 25, "CuentaFalsa", "cuenta-falsa", URL_CUENTA, " abc"])
 def test_el_entorno_exige_un_nombre_de_cuenta_valido(monkeypatch, recursos_azure, valor):
     _, crear_credencial, _, _ = recursos_azure
