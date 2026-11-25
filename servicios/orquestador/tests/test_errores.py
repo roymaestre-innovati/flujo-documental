@@ -306,3 +306,14 @@ def test_configurar_silencia_los_avisos_de_credenciales(caplog, monkeypatch):
         mongo.warning("Aviso de Mongo")
 
     assert caplog.messages == ["Error de identidad", "Aviso de Mongo"]
+
+
+def test_un_archivo_que_falta_en_el_almacen_va_a_errores_sin_llamarse_bug(reloj):
+    from normalizacion.almacen import NoEncontrado
+
+    cola = c.ColaEnMemoria(reloj)
+    cola.publicar(c.CLASIFICAR, CUERPO)
+    manejador = Juguete(NoEncontrado("No existe el archivo pedido en el almacén."))
+    resultado = procesar_uno(cola, manejador, Parametros(demora_base_s=0))
+    assert resultado.desenlace == "a_errores"
+    assert resultado.motivo == "Almacén: No existe el archivo pedido en el almacén."

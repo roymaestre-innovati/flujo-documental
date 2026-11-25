@@ -53,7 +53,7 @@ Revisadas con el usuario y con una segunda opinión de Astra antes de empezar.
 - [x] **T04 — Reserva por entrega** (decisión 6). Estado `NORMALIZANDO` con dueño y vencimiento, cambio condicional al principio de `Normalizar`, y `Apertura` que anota cada entrega publicada. Pruebas con dos workers sobre la misma entrega, incluida una reserva vencida y la caída de `Apertura` a la mitad.
 - [x] **T05 — Workers del orquestador** (decisiones 2 y 8): `orquestar-worker apertura|normalizar|clasificar`, con el clasificador falso desde el almacén.
 - [x] **T06 — Worker de extracción** (decisiones 3 y 12): `extraer-worker`, con `Llamador` en modo worker, resultados en el almacén, publicación en `resultados` y `al_fallar` que publica el `error_proceso`.
-- [ ] **T07 — Pendientes del almacén** (de `tasks-almacen-blob.md`): subtipos públicos de `ErrorAlmacen` (URI inválida y objeto ausente) con su trato en cada consumidor, y `AlmacenBlob.cerrar()` que espera las operaciones activas.
+- [x] **T07 — Pendientes del almacén** (de `tasks-almacen-blob.md`): subtipos públicos de `ErrorAlmacen` (URI inválida y objeto ausente) con su trato en cada consumidor, y `AlmacenBlob.cerrar()` que espera las operaciones activas.
 - [ ] **T08 — Punta a punta con los workers:** los cuatro workers sobre los clientes falsos dan los mismos estados y solicitudes que `Corrida`, y los mismos sobres que `extraer_segmento`, con dobles y reloj controlado.
 - [ ] **T09 — Comandos de operación:** `reenviar-errores <cola>` y `escalar-fallas`.
 - [ ] **T10 — Imágenes y configuración** (decisiones 8 y 13): imagen liviana, etapa de worker en la de LibreOffice, y la tabla de configuración por job en el README.
@@ -140,3 +140,12 @@ Pruebas: orquestador 518 (58 saltadas).
 - **Tamaño (decisión 12):** los sobres de ejemplo del contrato miden menos de la décima parte del límite de 248 000 bytes. Medir un sobre real grande queda para la corrida contra Azure (T11), porque los resultados de la muestra no están en el repositorio.
 
 Pruebas: extracción 238.
+
+### T07
+
+- **Subtipos de `ErrorAlmacen`** en `normalizacion/almacen.py`: `UriInvalida` (la URI o la ruta no son de este almacén, o no sirven) y `NoEncontrado` (la URI es del almacén pero no hay archivo). `AlmacenLocal` y `AlmacenBlob` lanzan siempre uno de los dos; quien atrapa `ErrorAlmacen` sigue funcionando.
+- **Extracción:** `UriInvalida` es `error_proceso` con `URI_INVALIDA`, no reintentable (por ejemplo, una URI `file://` con Blob activo); `NoEncontrado` sigue siendo `ARCHIVO_NO_ENCONTRADO`, reintentable. Fila nueva en la tabla de errores de `plan-extraccion.md`.
+- **Bucle:** un `ErrorAlmacen` en un manejador (por ejemplo, falta la lectura al clasificar) va a errores con motivo `Almacén: ...` en vez de `Bug: ...`. No se reintenta: el archivo no aparece solo.
+- **`AlmacenBlob.cerrar()`** no acepta operaciones nuevas (lanzan `RuntimeError`), espera las que están en curso en otros hilos hasta `espera_cierre_s` (120 s) y después cierra. Si no terminan a tiempo, registra un aviso con cuántas seguían.
+
+Pruebas: normalización 643 (23 saltadas), orquestador 519 (58 saltadas), extracción 238.

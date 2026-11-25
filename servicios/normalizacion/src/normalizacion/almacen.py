@@ -51,7 +51,15 @@ def en_el_almacen(carpeta: Path, uri: str | None) -> Path | None:
 
 
 class ErrorAlmacen(Exception):
-    """URI inválida, fuera del almacén o inexistente."""
+    """URI inválida, fuera del almacén o inexistente. Se lanza una de sus dos subclases."""
+
+
+class UriInvalida(ErrorAlmacen):
+    """La URI o la ruta no son de este almacén, o no sirven. Repetir no cambia nada."""
+
+
+class NoEncontrado(ErrorAlmacen):
+    """La URI es de este almacén, pero ahí no hay ningún archivo."""
 
 
 class AlmacenNoDisponible(Exception):
@@ -102,22 +110,22 @@ class AlmacenLocal(Almacen):
     def uri(self, ruta: str) -> str:
         relativa = PurePosixPath(ruta)
         if relativa.is_absolute() or ".." in relativa.parts or not relativa.parts:
-            raise ErrorAlmacen("La ruta debe ser relativa y no puede salir del almacén.")
+            raise UriInvalida("La ruta debe ser relativa y no puede salir del almacén.")
         return self.raiz.joinpath(*relativa.parts).as_uri()
 
     def _ruta(self, uri: str) -> Path:
         partes = urlparse(uri)
         if partes.scheme != "file" or partes.netloc not in ("", "localhost"):
-            raise ErrorAlmacen("El almacén local solo acepta URI file:// locales.")
+            raise UriInvalida("El almacén local solo acepta URI file:// locales.")
         ruta = Path(unquote(partes.path)).resolve()
         if ruta != self.raiz and self.raiz not in ruta.parents:
-            raise ErrorAlmacen("La URI está fuera del almacén.")
+            raise UriInvalida("La URI está fuera del almacén.")
         return ruta
 
     def leer(self, uri: str) -> bytes:
         ruta = self._ruta(uri)
         if not ruta.is_file():
-            raise ErrorAlmacen("No existe el archivo pedido en el almacén.")
+            raise NoEncontrado("No existe el archivo pedido en el almacén.")
         return ruta.read_bytes()
 
     def escribir(self, uri: str, datos: bytes) -> None:

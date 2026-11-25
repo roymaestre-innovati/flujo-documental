@@ -18,6 +18,8 @@ lanza una de estas excepciones y el bucle decide qué hacer:
 |                        |       | (por ejemplo, OneLake responde 403): sin reintento, a      |
 |                        |       | operación, con un motivo que dice qué revisar              |
 | AlmacenSinPermiso      | 4     | Igual que ErrorDeConfiguracion, con el motivo de Blob       |
+| ErrorAlmacen           | 4     | Falta un archivo del almacén o la URI no es suya: sin      |
+|                        |       | reintento, a operación, con motivo `Almacén: ...`          |
 | cualquier otra         | 4     | Un bug: sin reintento                                      |
 
 Si la cola da `BloqueoPerdido` al resolver una entrega, `procesar_uno` avisa y
@@ -37,7 +39,7 @@ import logging
 from dataclasses import dataclass
 from typing import Protocol
 
-from normalizacion.almacen import AlmacenNoDisponible, AlmacenSinPermiso
+from normalizacion.almacen import AlmacenNoDisponible, AlmacenSinPermiso, ErrorAlmacen
 
 from .cola import BloqueoPerdido, Cola, Mensaje
 from .parametros import PARAMETROS, Parametros
@@ -161,6 +163,10 @@ def _procesar_mensaje(cola: Cola, manejador: Manejador, mensaje: Mensaje, parame
         return _fallar(cola, manejador, mensaje, f"Rechazado: {error}")
     except (ErrorDeConfiguracion, AlmacenSinPermiso) as error:
         return _fallar(cola, manejador, mensaje, f"Configuración: {error}")
+    except ErrorAlmacen as error:
+        # Falta un archivo del almacén o la URI no es suya: no es un bug ni se arregla
+        # repitiendo. El texto de `ErrorAlmacen` no lleva URI ni nombres.
+        return _fallar(cola, manejador, mensaje, f"Almacén: {error}")
     except Exception as error:  # noqa: BLE001 - clase 4: cualquier otra cosa es un bug
         return _fallar(cola, manejador, mensaje, f"Bug: {lugar_de_la_excepcion(error)}")
     cola.completar(mensaje)
