@@ -154,9 +154,13 @@ def extraer_segmento(solicitud: dict, servicio: Servicio) -> dict:
 
 
 def resultado_de_error(solicitud: dict, servicio: Servicio, error: ErrorDeSolicitud) -> dict:
-    """El sobre de un segmento que no se pudo extraer, con una `ejecucion` nueva y sin gasto.
+    """El sobre de un segmento que no se pudo extraer, con una `ejecucion` nueva.
 
-    Lo usa el worker cuando se agotan los reintentos de un `error_proceso`.
+    Lo usa el worker cuando se agotan los reintentos de un `error_proceso`. Si el
+    error viene del LLM, lleva lo que gastó el último intento.
     """
     inicio, comienzo = servicio.reloj.ahora(), servicio.reloj.monotono()
-    return sobre_de_error(solicitud, error, _ejecucion(servicio, servicio.nuevo_id(), inicio, comienzo, _Gasto()))
+    gasto = _Gasto()
+    if isinstance(error, LlamadaFallida):
+        gasto = _Gasto(error.tokens_entrada, error.tokens_salida, error.reintentos, error.modelo)
+    return sobre_de_error(solicitud, error, _ejecucion(servicio, servicio.nuevo_id(), inicio, comienzo, gasto))

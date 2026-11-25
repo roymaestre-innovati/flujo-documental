@@ -88,7 +88,9 @@ def _leer(almacen: Almacen, uri: str, que: str) -> bytes:
     except ErrorAlmacen:
         raise _proceso("ARCHIVO_NO_ENCONTRADO", f"No se encontró {que} en el almacén.", reintentable=True) from None
     except AlmacenNoDisponible as error:
-        raise _proceso("ALMACEN_NO_DISPONIBLE", str(error), reintentable=True) from None
+        fallida = _proceso("ALMACEN_NO_DISPONIBLE", str(error), reintentable=True)
+        fallida.espera_s = error.espera_s  # la que pidió el almacén, para que el worker la respete
+        raise fallida from None
     except AlmacenSinPermiso as error:
         raise _proceso("ALMACEN_SIN_PERMISO", str(error), reintentable=False) from None
 

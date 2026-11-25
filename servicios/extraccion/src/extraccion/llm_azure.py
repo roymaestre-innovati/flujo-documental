@@ -77,6 +77,9 @@ class LLMAzureOpenAI(ClienteLLM):
             base_url=url_base(endpoint), api_key=clave, timeout=tiempo_limite_s, max_retries=0, http_client=http,
         )
 
+    def cerrar(self) -> None:
+        self._cliente.close()
+
     @classmethod
     def desde_entorno(cls, entorno: Mapping[str, str], **opciones) -> "LLMAzureOpenAI":
         faltantes = [v for v in VARIABLES if not entorno.get(v)]

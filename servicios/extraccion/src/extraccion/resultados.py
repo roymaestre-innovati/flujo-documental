@@ -107,7 +107,12 @@ class ResultadosEnAlmacen(Resultados):
         uri = self._uri(clave)
         if not self._almacen.existe(uri):
             return None
-        return json.loads(self._almacen.leer(uri))
+        guardado = json.loads(self._almacen.leer(uri))
+        if _clave_del_sobre(guardado) != clave:
+            # Dos claves con `/` en sus identificadores pueden dar la misma ruta:
+            # el sobre de otra solicitud no se devuelve.
+            return None
+        return guardado
 
     def guardar(self, clave: Clave, resultado: dict) -> None:
         anterior = self.buscar(clave)
@@ -115,6 +120,13 @@ class ResultadosEnAlmacen(Resultados):
             sufijo = f".anterior-{anterior['ejecucion']['id']}"
             self._almacen.escribir(self._uri(clave, sufijo), _bytes(anterior))
         self._almacen.escribir(self._uri(clave), _bytes(resultado))
+
+
+def _clave_del_sobre(sobre: dict) -> Clave | None:
+    try:
+        return Clave.de(sobre)
+    except (KeyError, TypeError):
+        return None
 
 
 def _bytes(resultado: dict) -> bytes:

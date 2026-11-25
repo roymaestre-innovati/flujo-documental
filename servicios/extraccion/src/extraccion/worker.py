@@ -50,6 +50,8 @@ from .resultados import ResultadosEnAlmacen
 from .servicio import Servicio, extraer_segmento, resultado_de_error
 
 VARIABLES = ("SERVICEBUS_NAMESPACE", "ALMACEN_BLOB_CUENTA", "EXTRACCION_MODELO")
+VARIABLES_MCP = ("MCP_URL", "MCP_API_KEY")
+"""Con `EXTRACCION_MODELO=mcp`. El job usa la clave del MCP (`servicios/workers/README.md`)."""
 CONCURRENCIA = 3
 
 FALLA_INTERNA = ErrorDeSolicitud(ERROR_PROCESO, "FALLA_INTERNA",
@@ -71,10 +73,10 @@ class ManejadorExtraer:
         self._publicar = publicar
         self._servicio = servicio
         self._ultimo = threading.local()
-        """El último error reintentable de cada hilo, para el sobre de `al_fallar`."""
+        """El último error reintentable y el último resultado de cada hilo, para `al_fallar`."""
 
     def procesar(self, solicitud: dict) -> None:
-        self._ultimo.error = None
+        self._ultimo.error = self._ultimo.resultado = None
         try:
             resultado = extraer_segmento(solicitud, self._servicio)
         except SolicitudInvalida as invalida:
@@ -82,6 +84,7 @@ class ManejadorExtraer:
         except ErrorDeSolicitud as error:
             self._ultimo.error = error
             raise ErrorTransitorio(error.codigo, espera_s=getattr(error, "espera_s", None)) from None
+        self._ultimo.resultado = resultado
         self._publicar.publicar(RESULTADOS, resultado)
 
     def al_fallar(self, solicitud: dict, motivo: str) -> None:
@@ -89,6 +92,12 @@ class ManejadorExtraer:
             validar(solicitud)
         except SolicitudInvalida:
             return
+        with contexto_de(solicitud):
+            if (resultado := getattr(self._ultimo, "resultado", None)) is not None:
+                # El segmento se extrajo y lo que falló fue publicarlo: se publica ese resultado.
+                self._publicar.publicar(RESULTADOS, resultado)
+                registro.warning("Segmento extraído que no se pudo publicar en los reintentos: se publica de nuevo")
+                return
         error = getattr(self._ultimo, "error", None) or FALLA_INTERNA
         with contexto_de(solicitud):
             self._publicar.publicar(RESULTADOS, resultado_de_error(solicitud, self._servicio, error))
@@ -108,19 +117,29 @@ class Fabricas:
 def _fabricas_reales() -> Fabricas:
     from normalizacion.almacen_blob import almacen_blob_desde_entorno
 
-    from .cli import ErrorDeUso, _fuente, _llm_azure
+    from .cli import ErrorDeUso, _fuente
+    from .ficha_mcp import FuenteModeloMCP
+    from .llm_azure import ConfiguracionIncompleta, DeploymentNoPermitido, LLMAzureOpenAI
 
+    # Solo el entorno del job: el worker no lee el `.env` de la carpeta actual, como la CLI.
     def fuente():
-        try:
-            return _fuente(os.environ["EXTRACCION_MODELO"].strip())
-        except ErrorDeUso as error:
-            raise ErrorDeConfiguracion(f"EXTRACCION_MODELO: {error}") from None
+        modelo = os.environ["EXTRACCION_MODELO"].strip()
+        if modelo != "mcp":
+            try:
+                return _fuente(modelo)
+            except ErrorDeUso:
+                raise ErrorDeConfiguracion("EXTRACCION_MODELO debe ser mcp o archivo:<ficha.json> legible") from None
+        if faltan := [v for v in VARIABLES_MCP if not os.environ.get(v, "").strip()]:
+            raise ErrorDeConfiguracion("Faltan variables de entorno: " + ", ".join(faltan))
+        return FuenteModeloMCP.desde_entorno(os.environ)
 
     def cliente():
         try:
-            return _llm_azure()
-        except ErrorDeUso as error:
+            return LLMAzureOpenAI.desde_entorno(os.environ)
+        except ConfiguracionIncompleta as error:
             raise ErrorDeConfiguracion(str(error)) from None
+        except DeploymentNoPermitido:
+            raise ErrorDeConfiguracion("AZURE_OPENAI_DEPLOYMENT parece gpt-5.4-mini: la extracción usa gpt-5.4") from None
 
     return Fabricas(cola_desde_entorno, almacen_blob_desde_entorno, fuente, cliente)
 
@@ -154,8 +173,12 @@ def main(argv: list[str] | None = None, *, fabricas: Fabricas | None = None,
         try:
             almacen = recursos.enter_context(fabricas.almacen())
             reloj = RelojSistema()
-            servicio = Servicio(almacen=almacen, fuente=fabricas.fuente(),
-                                llamador=Llamador(fabricas.cliente(), reloj, ajustes_del_worker()),
+            fuente = fabricas.fuente()
+            cliente = fabricas.cliente()
+            if hasattr(cliente, "cerrar"):
+                recursos.callback(cliente.cerrar)
+            servicio = Servicio(almacen=almacen, fuente=fuente,
+                                llamador=Llamador(cliente, reloj, ajustes_del_worker()),
                                 resultados=ResultadosEnAlmacen(almacen), reloj=reloj, relanzar_reintentables=True)
             colas = [_cola(fabricas, recursos) for _ in range(args.hilos)]
             manejador = ManejadorExtraer(_cola(fabricas, recursos), servicio)

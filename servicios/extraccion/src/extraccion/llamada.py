@@ -96,11 +96,14 @@ class Llamador:
                     respuesta = self._cliente.responder(enviados)
             except LimiteDeUso as limite:
                 espera = limite.espera if limite.espera is not None else a["espera_limite_uso_s"]
-                if espera_por_limite + espera > a["espera_limite_uso_total_s"]:
+                # Una espera de 0 cuenta como 1 s: si no, un `Retry-After: 0` repetido
+                # no agota nunca el presupuesto. Con presupuesto 0 (el worker), el 429
+                # vuelve enseguida al bucle de la cola con la espera que se pidió.
+                if espera_por_limite + max(espera, 1) > a["espera_limite_uso_total_s"]:
                     raise fallida("LLM_NO_DISPONIBLE",
                                   f"El LLM siguió pidiendo esperar después de {espera_por_limite:.0f} s",
-                                  limite.espera) from None
-                espera_por_limite += espera
+                                  espera) from None
+                espera_por_limite += max(espera, 1)
                 self._reloj.dormir(espera)
                 continue
             except FallaPasajera as falla:

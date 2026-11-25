@@ -6,6 +6,7 @@ import json
 import pytest
 from mensajeria.cola import EXTRAER, RESULTADOS, ColaEnMemoria
 from mensajeria.cola_servicebus import LIMITE_MENSAJE_BYTES
+from mensajeria.errores import ErrorTransitorio
 from mensajeria.reloj import RelojManual
 
 from conftest import EJEMPLOS, respuesta_falsa
@@ -164,6 +165,76 @@ def test_los_registros_de_la_cola_salen_en_json(fabricas, cola, solicitud, capsy
     assert _correr(fabricas) == 0
     lineas = [json.loads(l) for l in capsys.readouterr().err.splitlines()]
     assert any(l["modulo"] == "mensajeria.worker" for l in lineas)
+
+
+def test_un_429_sin_espera_pedida_se_reprograma_con_la_de_por_defecto(fabricas, cola, solicitud, llm, reloj):
+    llm.programar(LimiteDeUso(espera=None))
+    cola.publicar(EXTRAER, solicitud)
+    assert _correr(fabricas) == 0
+    espera = worker.parametros()["llamada"]["espera_limite_uso_s"]
+    assert cola.proxima_visible() == reloj.ahora() + datetime.timedelta(seconds=espera)
+
+
+def test_si_publicar_falla_en_todos_los_intentos_se_publica_el_resultado_y_no_una_falla(
+        fabricas, cola, solicitud, llm, reloj, monkeypatch):
+    original = cola.publicar
+    fallas = []
+
+    def publicar(nombre, cuerpo, *args, **kwargs):
+        if nombre == RESULTADOS and len(fallas) < 4:
+            fallas.append(1)
+            raise ErrorTransitorio("Service Bus no respondió")
+        return original(nombre, cuerpo, *args, **kwargs)
+
+    monkeypatch.setattr(cola, "publicar", publicar)
+    cola.publicar(EXTRAER, solicitud)
+    for _ in range(4):
+        assert _correr(fabricas) == 0
+        reloj.adelantar(10_000)
+
+    [sobre] = _resultados(cola)
+    assert sobre["estado"] == "ok"
+    assert len(llm.llamadas) == 1, "los reintentos usan lo guardado"
+
+
+def test_el_sobre_de_error_lleva_lo_que_gasto_el_llm(solicitud):
+    from extraccion.llamada import LlamadaFallida
+    from extraccion.reloj import RelojManual as RelojExtraccion
+    from extraccion.servicio import resultado_de_error
+
+    class Servicio:
+        reloj = RelojExtraccion()
+        llamador = type("L", (), {"modelo": "gpt-5.4"})()
+
+        @staticmethod
+        def nuevo_id():
+            return "00000000-0000-4000-8000-000000000000"
+
+    error = LlamadaFallida("RESPUESTA_INVALIDA", "sin forma", 2, 900, 120, "gpt-5.4")
+    sobre = resultado_de_error(solicitud, Servicio, error)
+    assert contratos.errores(contratos.SALIDA, sobre) == []
+    ejecucion = sobre["ejecucion"]
+    assert (ejecucion["tokens_entrada"], ejecucion["tokens_salida"], ejecucion["reintentos"]) == (900, 120, 2)
+
+
+def test_las_fabricas_reales_no_leen_el_env_y_exigen_la_clave_del_mcp(tmp_path, monkeypatch):
+    (tmp_path / ".env").write_text("MCP_URL=https://mcp.invalido\nMCP_API_KEY=inventada\n", encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("EXTRACCION_MODELO", "mcp")
+    monkeypatch.delenv("MCP_URL", raising=False)
+    monkeypatch.delenv("MCP_API_KEY", raising=False)
+    with pytest.raises(worker.ErrorDeConfiguracion) as error:
+        worker._fabricas_reales().fuente()
+    assert str(error.value) == "Faltan variables de entorno: MCP_URL, MCP_API_KEY"
+
+
+def test_un_deployment_rechazado_no_se_nombra(monkeypatch):
+    monkeypatch.setenv("AZURE_OPENAI_ENDPOINT", "https://cuentafalsa.openai.azure.com")
+    monkeypatch.setenv("AZURE_OPENAI_API_KEY", "inventada")
+    monkeypatch.setenv("AZURE_OPENAI_DEPLOYMENT", "despliegue-secreto-mini")
+    with pytest.raises(worker.ErrorDeConfiguracion) as error:
+        worker._fabricas_reales().cliente()
+    assert "despliegue-secreto" not in str(error.value)
 
 
 @pytest.mark.parametrize("ejemplo", sorted(EJEMPLOS.glob("salida_*.json")), ids=lambda r: r.stem)

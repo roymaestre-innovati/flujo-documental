@@ -174,3 +174,30 @@ def test_el_semaforo_se_libera_si_la_llamada_falla():
     hilo.start()
     hilo.join(timeout=2)
     assert not hilo.is_alive()
+
+
+def test_con_presupuesto_cero_un_429_vuelve_enseguida_con_su_espera():
+    llm = LLMFalso(por_tipo={"TD-16": VALIDA})
+    llm.programar(LimiteDeUso(0), LimiteDeUso(0))
+    sujeto, reloj = llamador(llm, espera_limite_uso_total_s=0)
+    with pytest.raises(LlamadaFallida) as error:
+        sujeto.llamar(MENSAJES)
+    assert (len(llm.llamadas), reloj.esperas, error.value.espera_s) == (1, [], 0)
+
+
+def test_con_presupuesto_cero_un_429_sin_espera_pedida_lleva_la_de_por_defecto():
+    llm = LLMFalso(por_tipo={"TD-16": VALIDA})
+    llm.programar(LimiteDeUso(None))
+    sujeto, _ = llamador(llm, espera_limite_uso_total_s=0)
+    with pytest.raises(LlamadaFallida) as error:
+        sujeto.llamar(MENSAJES)
+    assert error.value.espera_s == 30
+
+
+def test_un_retry_after_de_cero_repetido_agota_el_presupuesto():
+    llm = LLMFalso(por_tipo={"TD-16": VALIDA})
+    llm.programar(*[LimiteDeUso(0)] * 20)
+    sujeto, _ = llamador(llm, espera_limite_uso_total_s=5)
+    with pytest.raises(LlamadaFallida):
+        sujeto.llamar(MENSAJES)
+    assert len(llm.llamadas) == 6
