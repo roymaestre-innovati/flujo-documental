@@ -92,10 +92,12 @@ El contrato `modulo3-extraccion/0.2` ya está publicado y no cambia. Los ejemplo
 | La solicitud no cumple `entrada.schema.json` | `SolicitudInvalida` (bug de quien la manda, clase 4). En el comando, la línea se informa y se sigue con la siguiente |
 | `paginas.hasta` mayor que las páginas de la lectura, o `desde > hasta` | `error_entrada`, `PAGINAS_FUERA_DE_RANGO`, no reintentable |
 | La lectura o el PDF no están en el almacén | `error_proceso`, `ARCHIVO_NO_ENCONTRADO`, reintentable |
+| El almacén sufre una falla transitoria | `error_proceso`, `ALMACEN_NO_DISPONIBLE`, reintentable |
+| El almacén deniega el acceso o está mal configurado | `error_proceso`, `ALMACEN_SIN_PERMISO`, no reintentable |
 | La huella del PDF no coincide con `archivo.sha256` o con `hash_pdf` de la lectura | `error_proceso`, `ARCHIVO_DISTINTO`, no reintentable (R28) |
 | La versión o el TD no existen en la fuente | `error_proceso`, `FICHA_NO_ENCONTRADA`, no reintentable |
 
-Las URI `file://` se resuelven por lo que va después de `almacen/`, como `en_el_almacen` del visor, para que una corrida se pueda mover de carpeta. Esa función se pasa a la normalización (`normalizacion.almacen`) para que la usen el visor y la extracción, sin copiarla.
+Con un almacén local, las URI `file://` se resuelven por lo que va después de `almacen/`, como en el visor, para que una corrida se pueda mover de carpeta. El visor y la extracción comparten esa lógica de `normalizacion.almacen`. Con Blob, cada URI llega al almacén tal como viene en la solicitud.
 
 ### Qué va de cada página (R31 a R34, R36)
 

@@ -1,9 +1,10 @@
 """Comando `orquestar`: corre un proceso desde una carpeta local o OneLake.
 
-En `<salida>` quedan el almacén (PDF normalizados y lecturas), `estado.json`,
-`solicitudes-extraccion.jsonl`, `errores.json` y `conteos.json`. Todo eso trae
-datos personales: el comando no escribe dentro de un repositorio git
-(principio 6). Por pantalla salen solo conteos.
+En `<salida>` quedan `estado.json`, `solicitudes-extraccion.jsonl`, `errores.json`
+y `conteos.json`. Los PDF normalizados y las lecturas se guardan en Blob Storage
+si se configura `ALMACEN_BLOB_CUENTA`, o en `<salida>/almacen` por defecto. Los
+datos personales se guardan fuera de cualquier repositorio git (principio 6).
+Por stdout salen solo conteos.
 """
 
 import argparse
@@ -12,9 +13,10 @@ import json
 import logging
 import sys
 import time
+from contextlib import ExitStack
 from pathlib import Path
 
-from normalizacion.almacen import AlmacenLocal
+from normalizacion.almacen import CARPETA_ALMACEN, AlmacenLocal, AlmacenSinPermiso, almacen_desde_entorno
 
 from . import VERSION
 from .clasificador import ClasificadorFalso
@@ -83,14 +85,19 @@ def main(argv: list[str] | None = None, *, tablas: Tablas | None = None, origen:
         return 2
     salida.mkdir(parents=True, exist_ok=True)
 
-    archivo_registros = open(args.registros, "a", encoding="utf-8") if args.registros else None
-    try:
+    with ExitStack() as recursos:
         # Los registros llevan solo identificadores. Sin archivo, por pantalla
         # salen solo las advertencias y los errores.
-        if archivo_registros:
+        if args.registros:
+            archivo_registros = recursos.enter_context(open(args.registros, "a", encoding="utf-8"))
             configurar(logging.INFO, archivo_registros)
         else:
             configurar(logging.WARNING, sys.stderr)
+        try:
+            almacen = recursos.enter_context(almacen_desde_entorno(salida / CARPETA_ALMACEN))
+        except AlmacenSinPermiso as error:
+            print(error, file=sys.stderr)
+            return 2
         inicio = time.perf_counter()
         if es_onelake:
             try:
@@ -105,13 +112,15 @@ def main(argv: list[str] | None = None, *, tablas: Tablas | None = None, origen:
 
         corrida = Corrida(
             origen=origen if es_onelake else OrigenLocal(carpeta.parent),
-            almacen=AlmacenLocal(salida / "almacen"),
+            almacen=almacen,
             clasificador=ClasificadorFalso(args.clasificacion),
             parametros=dataclasses.replace(PARAMETROS, paralelo_normalizar=args.paralelo,
                                            paralelo_bajar=args.paralelo_bajar),
             soffice=args.soffice,
         )
         cuerpo = entrada.aviso if es_onelake else aviso(args.proceso, carpeta.name, corrida.reloj)
+        if not isinstance(almacen, AlmacenLocal):
+            print("Los resultados se escriben en Blob Storage.", file=sys.stderr)
         corrida.publicar_aviso(cuerpo)
         corrida.correr()
         resumen = {**conteos(corrida, cuerpo["id_proceso"]), "tiempo_s": round(time.perf_counter() - inicio, 1)}
@@ -122,9 +131,6 @@ def main(argv: list[str] | None = None, *, tablas: Tablas | None = None, origen:
                 comprimidos_sin_contenido=len(cuerpo.get("comprimidos_sin_contenido", [])),
                 **origen.conteos_descarga(),
             )
-    finally:
-        if archivo_registros:
-            archivo_registros.close()
 
     guardar_salida(corrida, salida, resumen)
 

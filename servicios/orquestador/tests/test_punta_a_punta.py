@@ -9,6 +9,7 @@ import time
 from unittest.mock import Mock
 
 import pytest
+from normalizacion import almacen_blob
 from normalizacion.almacen import AlmacenLocal
 
 from fabrica import AVISO, P, RUTA, escribir, pdf, pdf_con_contrasena
@@ -270,6 +271,40 @@ def test_el_comando_local_sin_clasificacion(tmp_path, capsys):
     assert resumen["segmentos"] == {"sin_extraccion": 2}
     assert resumen["solicitudes_por_td"] == {}
     assert "archivos_bajados" not in resumen
+
+
+def test_el_comando_escribe_en_blob_y_cierra_el_almacen(tmp_path, capsys, monkeypatch, contenedor_blob_falso):
+    escribir(tmp_path, "OF-001/oferta.pdf", pdf(1, "oferta inventada"))
+    almacen = almacen_blob.AlmacenBlob("cuentafalsa", "evaluacion-ofertas", cliente=contenedor_blob_falso)
+    cerrar = Mock(wraps=almacen.cerrar)
+    monkeypatch.setattr(almacen, "cerrar", cerrar)
+    fabrica = Mock(return_value=almacen)
+    monkeypatch.setattr(almacen_blob, "almacen_blob_desde_entorno", fabrica)
+    monkeypatch.setenv("ALMACEN_BLOB_CUENTA", "cuentafalsa")
+    salida = tmp_path / "salida"
+
+    assert cli.main(["--origen", str(tmp_path / "datalake" / RUTA), "--proceso", P, "--salida", str(salida)]) == 0
+
+    fabrica.assert_called_once_with()
+    cerrar.assert_called_once_with()
+    impreso = capsys.readouterr()
+    assert impreso.err.splitlines() == ["Los resultados se escriben en Blob Storage."]
+    assert "cuentafalsa" not in impreso.out + impreso.err
+    assert f"{P}/OF-001/manifiesto.json" in contenedor_blob_falso.blobs
+    assert not (salida / "almacen").exists()
+
+
+@pytest.mark.parametrize("cuenta", ["", "CuentaFalsa!"])
+def test_el_comando_rechaza_una_cuenta_blob_invalida(tmp_path, capsys, monkeypatch, cuenta):
+    monkeypatch.setenv("ALMACEN_BLOB_CUENTA", cuenta)
+    origen = tmp_path / "origen"
+    origen.mkdir()
+
+    assert cli.main(["--origen", str(origen), "--proceso", P, "--salida", str(tmp_path / "salida")]) == 2
+
+    impreso = capsys.readouterr()
+    assert impreso.out == ""
+    assert impreso.err.splitlines() == ["ALMACEN_BLOB_CUENTA falta o es inválida."]
 
 
 ONELAKE = ["--onelake-workspace", "ws", "--onelake-lakehouse", "lkh", "--evento", EVENTO]

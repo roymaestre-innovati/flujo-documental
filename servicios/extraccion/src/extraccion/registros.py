@@ -62,6 +62,7 @@ def resumen(resultado: dict) -> dict:
 def configurar(nivel: int = logging.INFO, salida=None) -> None:
     """Registros de la extracción y de la normalización en JSON hacia `salida`."""
     base.configurar(nivel, salida)
+    logging.getLogger("azure").setLevel(max(nivel, logging.ERROR))
     manejador = logging.StreamHandler(salida or sys.stderr)
     manejador.setFormatter(FormatoExtraccion())
     for anterior in list(registro.handlers):

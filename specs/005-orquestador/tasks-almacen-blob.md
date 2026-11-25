@@ -66,7 +66,7 @@ Revisadas con el usuario y con una segunda opinión de Astra antes de empezar.
   - `listar(prefijo)`: `list_blobs(name_starts_with=…)`. Si el prefijo es un blob, ese blob; si no, se cierra con `/` antes de buscar. Devuelve las URI ordenadas.
   - Errores del SDK: los de red y de servicio ocupado o limitado (429, 503) son `ErrorTransitorio` del orquestador, o la excepción que el bucle ya trata como transitoria; los de permiso (401, 403) se distinguen con un mensaje claro, porque son de configuración y no se reintentan. Revisar cómo los clasifica hoy `errores.py` y seguir lo mismo. Si para eso hay que importar algo del orquestador en la normalización, preguntar antes.
 
-- [ ] **T03 — Elegir el almacén por configuración.** Una función que devuelve `AlmacenBlob` si está `ALMACEN_BLOB_CUENTA` y `AlmacenLocal` si no, para que los comandos y, después, los workers no tengan que saberlo. Revisar que la extracción (`entrada.ubicar`) y el orquestador funcionen con URI `https://` de punta a punta: una prueba con `orquestar` en memoria y el cliente de Blob falso, donde el manifiesto, la lectura y el PDF quedan en el almacén falso y la extracción los lee de ahí. El visor sigue siendo local y no cambia.
+- [x] **T03 — Elegir el almacén por configuración.** Una función que devuelve `AlmacenBlob` si está `ALMACEN_BLOB_CUENTA` y `AlmacenLocal` si no, para que los comandos y, después, los workers no tengan que saberlo. Revisar que la extracción (`entrada.ubicar`) y el orquestador funcionen con URI `https://` de punta a punta: una prueba con `orquestar` en memoria y el cliente de Blob falso, donde el manifiesto, la lectura y el PDF quedan en el almacén falso y la extracción los lee de ahí. El visor sigue siendo local y no cambia.
 
 - [ ] **T04 — `AlmacenBlob` contra el contenedor de desarrollo.** Correr la batería de T01 con la marca `azure` contra el contenedor real, con `az login`. **Necesita que el administrador haya asignado al usuario** `Storage Blob Data Contributor` sobre el contenedor (`infra/roles.bicep`, rama `infra-azure-inicial`). Mientras tanto, la tarea queda en espera. La prueba anónima (sin credenciales) debe seguir dando 404. La corre el usuario.
 
@@ -91,3 +91,9 @@ Para T02, se agrega `pytest.param("almacen_blob", id="blob")`. El fixture `almac
 El SDK 12.31.1 puede entregar `error_code` como texto o enum. `get_blob_properties()` permite distinguir `BlobNotFound` de un contenedor inaccesible. La traducción abarca todo el iterador paginado de `list_blobs()` y `readall()`, pues el SDK puede envolver un corte de descarga en un `HttpResponseError` sin estado. Los errores conservan datos estructurados y la espera numérica que pida el servicio.
 
 Se reutiliza un cliente de contenedor por hilo con la misma credencial. El cliente inyectado se usa bajo un candado. La fábrica valida el entorno antes de crear recursos y transfiere su cierre al almacén mediante `ExitStack`. La batería de contrato comparte los casos de Local y Blob con un contenedor en memoria.
+
+### T03
+
+Los comandos eligen y cierran el almacén mediante la interfaz común. El bucle del orquestador y la entrada de extracción clasifican las fallas del almacén. Una prueba con el contenedor falso exporta las solicitudes del orquestador y comprueba que la extracción lee el PDF y la lectura desde Blob.
+
+El visor solo lee `file://`. `orquestar correr` con Blob real adelanta su reloj simulado y por eso no respeta en tiempo real las esperas de un 429.

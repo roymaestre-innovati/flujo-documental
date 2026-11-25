@@ -4,10 +4,10 @@
             [--llm falso --respuestas <carpeta> | --llm azure] [--solo <id_segmento>]…
             [--concurrencia 3] [--forzar] [--si-mando-documentos] [--registros <archivo>]
 
-Las URI de las solicitudes se resuelven contra `<corrida>/almacen/` y los
-resultados van a `<corrida>/extraccion/`, donde los encuentra el visor. Una
-segunda corrida devuelve los resultados guardados sin llamar al LLM, salvo con
-`--forzar`.
+Los documentos se leen de Blob Storage si se configura `ALMACEN_BLOB_CUENTA`,
+o de `<corrida>/almacen/` por defecto. Los resultados van a
+`<corrida>/extraccion/`, donde los encuentra el visor. Una segunda corrida
+devuelve los resultados guardados sin llamar al LLM, salvo con `--forzar`.
 
 - `--modelo mcp` pide la ficha al servidor MCP del modelo semántico, con
   `MCP_URL` y `MCP_API_KEY` del entorno o del `.env`. El MCP solo recibe la versión
@@ -31,10 +31,11 @@ import sys
 import time
 from collections import Counter
 from concurrent.futures import ThreadPoolExecutor
+from contextlib import ExitStack
 from pathlib import Path
 
 from dotenv import dotenv_values
-from normalizacion.almacen import CARPETA_ALMACEN, AlmacenLocal
+from normalizacion.almacen import CARPETA_ALMACEN, AlmacenLocal, AlmacenSinPermiso, almacen_desde_entorno
 from normalizacion.registros import lugar_de_la_excepcion
 
 from . import VERSION
@@ -62,7 +63,7 @@ def dentro_de_un_repositorio(ruta: Path) -> bool:
 def _argumentos(argv):
     p = argparse.ArgumentParser(prog="extraer", description="Extrae los segmentos de una corrida del orquestador.")
     p.add_argument("solicitudes", type=Path, help="solicitudes-extraccion.jsonl de la corrida")
-    p.add_argument("--corrida", type=Path, required=True, help="carpeta de la corrida, con almacen/")
+    p.add_argument("--corrida", type=Path, required=True, help="carpeta de la corrida, con almacen/ en modo local")
     p.add_argument("--modelo", required=True, help="mcp (MCP_URL y MCP_API_KEY) o archivo:<ficha.json>")
     p.add_argument("--llm", choices=("falso", "azure"), default="falso")
     p.add_argument("--respuestas", type=Path, help="con --llm falso: carpeta con TD-NN.json")
@@ -194,51 +195,52 @@ def main(argv: list[str] | None = None, cliente: ClienteLLM | None = None, entra
     """`cliente`, `entrada`, `reloj` y `fuente` son solo para las pruebas."""
     args = _argumentos(argv)
     corrida = args.corrida.resolve()
-    try:
-        if not (corrida / CARPETA_ALMACEN).is_dir():
-            raise ErrorDeUso("La corrida no tiene almacen/.")
-        if dentro_de_un_repositorio(corrida):
-            raise ErrorDeUso("Los resultados traen datos personales: la corrida debe estar fuera de cualquier repositorio git.")
-        if not args.solicitudes.is_file():
-            raise ErrorDeUso("No existe el archivo de solicitudes.")
-        if args.concurrencia < 1:
-            raise ErrorDeUso("--concurrencia debe ser 1 o más.")
-        fuente = fuente or _fuente(args.modelo)
-        if cliente is None:
-            cliente = _llm_azure() if args.llm == "azure" else _respuestas_falsas(args.respuestas)
-        if args.llm == "azure" and not args.si_mando_documentos and not _confirmar(entrada):
-            print("No se mandó nada.", file=sys.stderr)
+    with ExitStack() as recursos:
+        try:
+            raiz_almacen = corrida / CARPETA_ALMACEN
+            almacen = recursos.enter_context(almacen_desde_entorno(raiz_almacen))
+            if isinstance(almacen, AlmacenLocal) and not raiz_almacen.is_dir():
+                raise ErrorDeUso("La corrida no tiene almacen/.")
+            if dentro_de_un_repositorio(corrida):
+                raise ErrorDeUso("Los resultados traen datos personales: la corrida debe estar fuera de cualquier repositorio git.")
+            if not args.solicitudes.is_file():
+                raise ErrorDeUso("No existe el archivo de solicitudes.")
+            if args.concurrencia < 1:
+                raise ErrorDeUso("--concurrencia debe ser 1 o más.")
+            fuente = fuente or _fuente(args.modelo)
+            if cliente is None:
+                cliente = _llm_azure() if args.llm == "azure" else _respuestas_falsas(args.respuestas)
+            if args.llm == "azure" and not args.si_mando_documentos and not _confirmar(entrada):
+                print("No se mandó nada.", file=sys.stderr)
+                return 2
+        except (ErrorDeUso, AlmacenSinPermiso) as error:
+            print(error, file=sys.stderr)
             return 2
-    except ErrorDeUso as error:
-        print(error, file=sys.stderr)
-        return 2
 
-    solicitudes, ilegibles = leer_solicitudes(args.solicitudes, args.solo)
-    archivo_registros = open(args.registros, "a", encoding="utf-8") if args.registros else None
-    try:
+        solicitudes, ilegibles = leer_solicitudes(args.solicitudes, args.solo)
         # Los registros llevan solo identificadores y conteos. Sin archivo, por pantalla
         # salen solo las advertencias y los errores.
-        if archivo_registros:
+        if args.registros:
+            archivo_registros = recursos.enter_context(open(args.registros, "a", encoding="utf-8"))
             configurar(logging.INFO, archivo_registros)
         else:
             configurar(logging.WARNING, sys.stderr)
         reloj = reloj or RelojSistema()
         ajustes = {**parametros()["llamada"], "concurrencia": args.concurrencia}
         servicio = Servicio(
-            almacen=AlmacenLocal(corrida / CARPETA_ALMACEN),
+            almacen=almacen,
             fuente=FuenteQueGuarda(fuente, corrida / CARPETA_RESULTADOS / CARPETA_FICHAS),
             llamador=Llamador(cliente, reloj, ajustes),
             resultados=ResultadosEnCarpeta(corrida / CARPETA_RESULTADOS),
             reloj=reloj,
         )
+        if not isinstance(almacen, AlmacenLocal):
+            print("Los documentos se leen de Blob Storage.", file=sys.stderr)
         inicio = time.perf_counter()
         # Más hilos que llamadas a la vez: el preprocesamiento de unos avanza mientras otros esperan al LLM.
         resumen = correr(solicitudes, servicio, hilos=args.concurrencia * 2, forzar=args.forzar)
         resumen["lineas_ilegibles"] = ilegibles
         resumen["tiempo_s"] = round(time.perf_counter() - inicio, 1)
-    finally:
-        if archivo_registros:
-            archivo_registros.close()
 
     print(json.dumps(resumen, ensure_ascii=False, indent=2))
     con_problemas = (resumen["solicitudes_invalidas"] or resumen["fallas_internas"] or ilegibles

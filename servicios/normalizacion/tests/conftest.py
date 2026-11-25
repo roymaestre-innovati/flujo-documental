@@ -3,6 +3,12 @@ import shutil
 import pytest
 
 
+@pytest.fixture(autouse=True)
+def _sin_almacen_blob(monkeypatch):
+    monkeypatch.delenv("ALMACEN_BLOB_CUENTA", raising=False)
+    monkeypatch.delenv("ALMACEN_BLOB_CONTENEDOR", raising=False)
+
+
 def pytest_collection_modifyitems(config, items):
     """Salta las pruebas marcadas `libreoffice` si `soffice` no está instalado."""
     if shutil.which("soffice"):

@@ -8,6 +8,7 @@ import os
 import tempfile
 from abc import ABC, abstractmethod
 from pathlib import Path, PurePosixPath
+from typing import Self
 from urllib.parse import unquote, urlparse
 
 
@@ -84,6 +85,15 @@ class Almacen(ABC):
     def listar(self, prefijo: str) -> list[str]:
         """URI de todos los archivos bajo `prefijo`, ordenadas."""
 
+    def cerrar(self) -> None:
+        """Libera los recursos propios del almacén, si tiene."""
+
+    def __enter__(self) -> Self:
+        return self
+
+    def __exit__(self, *exc) -> None:
+        self.cerrar()
+
 
 class AlmacenLocal(Almacen):
     def __init__(self, raiz: str | os.PathLike[str]) -> None:
@@ -136,3 +146,13 @@ class AlmacenLocal(Almacen):
             for ruta in base.rglob("*")
             if ruta.is_file() and not ruta.name.startswith(".escribiendo-")
         )
+
+
+def almacen_desde_entorno(raiz_local: str | os.PathLike[str]) -> Almacen:
+    """El almacén configurado en el entorno o el local si falta la cuenta Blob."""
+    if "ALMACEN_BLOB_CUENTA" not in os.environ:
+        return AlmacenLocal(raiz_local)
+
+    from .almacen_blob import almacen_blob_desde_entorno
+
+    return almacen_blob_desde_entorno()

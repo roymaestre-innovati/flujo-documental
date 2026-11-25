@@ -1,6 +1,7 @@
 import os
 import shutil
 from functools import wraps
+from pathlib import Path
 from uuid import uuid4
 
 import pytest
@@ -10,6 +11,23 @@ from servicebus_azure import ESPERA_SERVICEBUS_AZURE_S, ids_en_colas, limpiar_co
 from orquestador.cola_servicebus import cola_desde_entorno
 from orquestador.errores import ErrorDeConfiguracion
 from orquestador.estado_mongo import EstadoMongo, coleccion_desde_entorno
+
+
+@pytest.fixture(autouse=True)
+def _sin_almacen_blob(monkeypatch, request):
+    if request.node.get_closest_marker("azure") is None:
+        monkeypatch.delenv("ALMACEN_BLOB_CUENTA", raising=False)
+        monkeypatch.delenv("ALMACEN_BLOB_CONTENEDOR", raising=False)
+
+
+@pytest.fixture
+def contenedor_blob_falso(monkeypatch):
+    pruebas_normalizacion = Path(__file__).resolve().parents[2] / "normalizacion" / "tests"
+    with monkeypatch.context() as parche:
+        parche.syspath_prepend(str(pruebas_normalizacion))
+        from blob_falso import ContenedorFalso
+
+    return ContenedorFalso()
 
 
 def _detener_si_falta_acceso(probar) -> None:

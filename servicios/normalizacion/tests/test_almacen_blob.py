@@ -367,13 +367,20 @@ def test_configurar_silencia_los_avisos_de_azure_y_el_error_protege_los_datos(al
     assert VALOR_SENSIBLE not in caplog.text + salida.getvalue()
 
 
-def test_normalizacion_y_almacen_se_importan_sin_el_sdk():
+def test_normalizacion_usa_almacen_local_sin_el_sdk(tmp_path):
     programa = """
 import sys
 sys.modules['azure'] = None
 import normalizacion
-import normalizacion.almacen
+from normalizacion.almacen import AlmacenLocal, almacen_desde_entorno
+
+with almacen_desde_entorno(sys.argv[1]) as almacen:
+    assert isinstance(almacen, AlmacenLocal)
+    assert almacen.uri('lectura.json').endswith('/almacen/lectura.json')
+    almacen.cerrar()
+
 assert 'normalizacion.almacen_blob' not in sys.modules
 """
-    ejecucion = subprocess.run([sys.executable, "-c", programa], capture_output=True, text=True)
+    ejecucion = subprocess.run([sys.executable, "-c", programa, str(tmp_path / "almacen")],
+                               capture_output=True, text=True)
     assert ejecucion.returncode == 0, ejecucion.stderr

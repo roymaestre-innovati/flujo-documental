@@ -5,6 +5,7 @@ import json
 import logging
 
 import pytest
+from normalizacion.almacen import AlmacenNoDisponible, AlmacenSinPermiso
 
 from orquestador import cola as c
 from orquestador import registros
@@ -179,6 +180,37 @@ def test_esperas_sin_fin_terminan_como_transitoria(cola, reloj):
     assert [r.desenlace for r in resultados] == ["espera", "espera", "reintento", "a_errores"]
 
 
+@pytest.mark.parametrize("espera_s, desenlace, demora, propiedades", [
+    (None, "reintento", 120, {"intento": 2}),
+    (7, "espera", 7, {"esperas": 1}),
+])
+def test_almacen_no_disponible_se_reintenta(cola, reloj, espera_s, desenlace, demora, propiedades):
+    inicio = reloj.ahora()
+    cola.publicar(c.CLASIFICAR, CUERPO)
+    manejador = Juguete(AlmacenNoDisponible("Blob leer", espera_s=espera_s))
+
+    resultado = procesar_uno(cola, manejador)
+    assert resultado.desenlace == desenlace
+    assert resultado.motivo.startswith("AlmacenNoDisponible en ")
+    assert (cola.proxima_visible() - inicio).total_seconds() == demora
+    reloj.adelantar(demora)
+    mensaje = cola.recibir(c.CLASIFICAR)
+    assert mensaje.cuerpo == CUERPO
+    assert mensaje.propiedades == propiedades
+
+
+def test_almacen_sin_permiso_va_a_errores_sin_reintentar(cola, reloj):
+    cola.publicar(c.CLASIFICAR, CUERPO)
+    manejador = Juguete(AlmacenSinPermiso("Blob leer HTTP 403 [AuthorizationPermissionMismatch]"))
+
+    [resultado] = _correr(cola, reloj, manejador)
+    assert resultado.desenlace == "a_errores"
+    assert resultado.motivo == "Configuración: Blob leer HTTP 403 [AuthorizationPermissionMismatch]"
+    assert manejador.fallidos == [(CUERPO, resultado.motivo)]
+    [en_errores] = cola.errores(c.CLASIFICAR)
+    assert en_errores.motivo == resultado.motivo
+
+
 def test_respuesta_invalida_se_reintenta_enseguida(cola, reloj):
     inicio = reloj.ahora()
     cola.publicar(c.CLASIFICAR, CUERPO)
@@ -257,7 +289,7 @@ def test_alerta_con_identificadores_y_sin_datos_personales(cola, reloj):
     assert "Juan" not in salida.getvalue()
 
 
-def test_configurar_en_debug_silencia_debug_de_los_sdk(caplog, monkeypatch):
+def test_configurar_silencia_los_avisos_de_credenciales(caplog, monkeypatch):
     for nombre in ("normalizacion", "orquestador", "azure", "pymongo"):
         paquete = logging.getLogger(nombre)
         for atributo in ("handlers", "level", "propagate"):
@@ -266,9 +298,11 @@ def test_configurar_en_debug_silencia_debug_de_los_sdk(caplog, monkeypatch):
 
     with caplog.at_level(logging.DEBUG):
         registros.configurar(logging.DEBUG, io.StringIO())
-        for nombre in ("azure.servicebus", "pymongo.command"):
-            sdk = logging.getLogger(nombre)
-            sdk.debug("datos privados")
-            sdk.warning("aviso del SDK")
+        identidad = logging.getLogger("azure.identity")
+        identidad.warning("secreto-inventado")
+        identidad.error("Error de identidad")
+        mongo = logging.getLogger("pymongo.command")
+        mongo.debug("datos privados")
+        mongo.warning("Aviso de Mongo")
 
-    assert caplog.messages == ["aviso del SDK", "aviso del SDK"]
+    assert caplog.messages == ["Error de identidad", "Aviso de Mongo"]
