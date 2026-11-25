@@ -15,6 +15,8 @@ docker build -f servicios/workers/Dockerfile -t workers .
 docker build -f servicios/normalizacion/Dockerfile --target worker -t worker-normalizar .
 ```
 
+Sin `--target`, `servicios/normalizacion/Dockerfile` sigue dando el job `normalizar` de antes.
+
 En Azure, las imágenes se fijan por digest (`…@sha256:…`), no por etiqueta: un proceso abierto fija las versiones del normalizador y del modelo, y una imagen que cambia debajo de él da `VersionNoCoincide` o una ficha de otra versión.
 
 ## Configuración de cada job
@@ -24,13 +26,15 @@ En Azure, las imágenes se fijan por digest (`…@sha256:…`), no por etiqueta:
 | apertura | `orquestar-worker apertura` | cola `procesos-listos` | 1 | comunes + OneLake | `ESTADO_MONGO_URL` |
 | normalizar | `orquestar-worker normalizar` | cola `normalizar` | 2 (`paralelo_normalizar`) | comunes + OneLake | `ESTADO_MONGO_URL` |
 | clasificar | `orquestar-worker clasificar` | cola `clasificar` | 1 | comunes + `CLASIFICADOR=falso`, `CLASIFICADOR_CSV` | `ESTADO_MONGO_URL` |
-| extraer | `extraer-worker --hilos 3` | cola `extraer` | **1**: el tope de 3 llamadas al LLM vale para todo el proceso solo si no hay otra ejecución, tampoco una manual ni la de un despliegue | `SERVICEBUS_NAMESPACE`, `ALMACEN_BLOB_CUENTA`, `EXTRACCION_MODELO` (`mcp`), las del LLM y las del MCP | `AZURE_OPENAI_API_KEY`, `MCP_API_KEY` |
+| extraer | `extraer-worker --hilos 3` | cola `extraer` | **1**: el tope de 3 llamadas al LLM vale para todo el proceso solo si no hay otra ejecución, tampoco una manual ni la de un despliegue | `SERVICEBUS_NAMESPACE`, `ALMACEN_BLOB_CUENTA`, `EXTRACCION_MODELO` (`mcp`), `AZURE_OPENAI_ENDPOINT`, `AZURE_OPENAI_DEPLOYMENT`, `MCP_URL` | `AZURE_OPENAI_API_KEY`, `MCP_API_KEY` |
 | escalar-fallas | `orquestar-operar escalar-fallas` | horario, cada hora | 1 | `ESTADO_MONGO_URL` | `ESTADO_MONGO_URL` |
 | reenviar-errores | `orquestar-operar reenviar-errores <cola>` | manual, lo corre operación | 1 | `SERVICEBUS_NAMESPACE` | — |
 
 **Variables comunes:** `SERVICEBUS_NAMESPACE` (el nombre completo del namespace), `ESTADO_MONGO_URL`, `ALMACEN_BLOB_CUENTA` (solo el nombre de la cuenta), `AZURE_CLIENT_ID` (la identidad administrada asignada por el usuario). Opcionales: `COLAS_PREFIJO` (por defecto `evaluacion-ofertas-`), `ESTADO_MONGO_BASE`, `ESTADO_MONGO_COLECCION`, `ALMACEN_BLOB_CONTENEDOR` (por defecto `evaluacion-ofertas`). **OneLake:** `ONELAKE_WORKSPACE` y `ONELAKE_LAKEHOUSE`. `apertura` los usa cuando el aviso no trae la lista de archivos.
 
-Si falta una variable obligatoria, el worker sale con código 2 sin tocar la cola, y nombra las variables, nunca sus valores. No cae a las versiones locales.
+Si falta una variable obligatoria, el worker sale con código 2 sin tocar la cola, y nombra las variables, nunca sus valores. No cae a las versiones locales ni lee un `.env`. `normalizar` también sale con 2 si no encuentra LibreOffice, y `clasificar` si el CSV no es válido.
+
+Los workers del orquestador corren un mensaje a la vez; la concurrencia de `normalizar` la dan las ejecuciones del job.
 
 **Para todos los jobs:**
 
@@ -46,7 +50,7 @@ Los asigna quien tenga Owner o User Access Administrator (`pendientes-azure.md`,
 
 | Job | Service Bus | Blob (`Storage Blob Data Contributor`, solo el contenedor) | OneLake | Key Vault (`Key Vault Secrets User`, por secreto) |
 |---|---|---|---|---|
-| apertura | Receiver en `procesos-listos`, Sender en `normalizar` | sí | lectura | `ESTADO_MONGO_URL` |
+| apertura | Receiver y Sender en `procesos-listos` (reintentos), Sender en `normalizar` | sí | lectura | `ESTADO_MONGO_URL` |
 | normalizar | Receiver en `normalizar`, Sender en `normalizar` (reintentos) y `clasificar` | sí | lectura | `ESTADO_MONGO_URL` |
 | clasificar | Receiver en `clasificar`, Sender en `clasificar` y `extraer` | sí (lee el CSV y las lecturas) | — | `ESTADO_MONGO_URL` |
 | extraer | Receiver en `extraer`, Sender en `extraer` y `resultados` | sí | — | `AZURE_OPENAI_API_KEY`, `MCP_API_KEY` |
@@ -67,4 +71,4 @@ Con los registros en Log Analytics (solo identificadores, principio 6):
 
 ## `resultados`, mientras no tenga consumidor
 
-El manejador de `resultados` es de la entrega 2 del orquestador y todavía no existe. Mientras tanto los sobres se acumulan en la cola `resultados` y, a los 14 días, pasan a su cola de errores. Para probar en desarrollo se leen con *peek* desde el portal o con el SDK. Los resultados también quedan guardados en el almacén, en `extraccion/<id_proceso>/<entrega>/`, así que no se pierden. Antes de procesar documentos reales hace falta ese consumidor.
+El manejador de `resultados` es de la entrega 2 del orquestador y todavía no existe. Mientras tanto los sobres se acumulan en la cola `resultados` y, a los 14 días, pasan a su cola de errores. Para probar en desarrollo se leen con *peek* desde el portal o con el SDK. Los `ok`, `no_corresponde` y `error_entrada` también quedan guardados en el almacén, en `extraccion/<id_proceso>/<entrega>/`, así que no se pierden. Los `error_proceso` no se guardan: van solo en el sobre. Antes de procesar documentos reales hace falta ese consumidor.

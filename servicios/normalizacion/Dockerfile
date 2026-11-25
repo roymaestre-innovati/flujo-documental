@@ -35,6 +35,7 @@ ENV DEBIAN_FRONTEND=noninteractive \
     PYTHONUNBUFFERED=1 \
     UV_COMPILE_BYTECODE=1 \
     UV_LINK_MODE=copy \
+    UV_NO_CACHE=1 \
     UV_PYTHON=/usr/bin/python3.12 \
     UV_PYTHON_DOWNLOADS=never \
     UV_PROJECT_ENVIRONMENT=/opt/venv \
@@ -81,23 +82,6 @@ RUN uv sync --frozen
 CMD ["pytest", "-q", "-p", "no:cacheprovider"]
 
 # ---------------------------------------------------------------------------
-FROM base AS job
-
-RUN uv sync --frozen --no-dev --no-install-project
-COPY servicios/normalizacion/src ./src
-RUN uv sync --frozen --no-dev --no-editable \
-    && /usr/bin/python3.12 -m pip uninstall -y --break-system-packages uv
-
-# Usuario sin privilegios. LibreOffice usa un perfil temporal por conversión, en /tmp.
-RUN useradd --uid 10001 --create-home --home-dir /home/normalizador normalizador
-USER normalizador
-ENV HOME=/home/normalizador
-WORKDIR /home/normalizador
-
-ENTRYPOINT ["normalizar"]
-CMD ["--help"]
-
-# ---------------------------------------------------------------------------
 FROM base AS worker
 
 ENV ORQUESTADOR_CONTRATOS=/app/contracts
@@ -118,3 +102,21 @@ WORKDIR /home/normalizador
 
 ENTRYPOINT ["orquestar-worker"]
 CMD ["normalizar"]
+
+# La última etapa es la de `docker build` sin `--target`: el job `normalizar`, como antes.
+# ---------------------------------------------------------------------------
+FROM base AS job
+
+RUN uv sync --frozen --no-dev --no-install-project
+COPY servicios/normalizacion/src ./src
+RUN uv sync --frozen --no-dev --no-editable \
+    && /usr/bin/python3.12 -m pip uninstall -y --break-system-packages uv
+
+# Usuario sin privilegios. LibreOffice usa un perfil temporal por conversión, en /tmp.
+RUN useradd --uid 10001 --create-home --home-dir /home/normalizador normalizador
+USER normalizador
+ENV HOME=/home/normalizador
+WORKDIR /home/normalizador
+
+ENTRYPOINT ["normalizar"]
+CMD ["--help"]

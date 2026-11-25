@@ -119,7 +119,7 @@ Pruebas: orquestador 507 (58 saltadas).
 
 ### T05
 
-`orquestar-worker apertura|normalizar|clasificar [--hilos 1] [--tomar-mensajes-s 1500] [--soffice <ruta>]` (`orquestador/workers.py`).
+`orquestar-worker apertura|normalizar|clasificar [--tomar-mensajes-s 1500] [--soffice <ruta>]` (`orquestador/workers.py`). Un solo hilo por ejecución (decisión 4; `--hilos` se quitó en la revisión).
 
 - Configura los registros en JSON por stderr (también los de `mensajeria`), arma las piezas con `piezas_desde_entorno` (OneLake solo para `apertura` y `normalizar`), crea una cola para publicar y una por hilo para recibir, y vacía la cola con `mensajeria.worker.vaciar` bajo `atender_senales`. Devuelve el código de salida de `informar`.
 - `clasificar` exige `CLASIFICADOR=falso` y `CLASIFICADOR_CSV` (ruta dentro del almacén), y revisa antes de recibir que el CSV exista, sea válido y tenga filas. `ClasificadorFalso` acepta ahora el contenido del CSV (`texto=`) además de una ruta.
@@ -188,13 +188,17 @@ Primero, cada worker sobre su cola vacía: tiene que salir con 0 en unos segundo
 export SERVICEBUS_NAMESPACE=<namespace>.servicebus.windows.net ALMACEN_BLOB_CUENTA=<cuenta>
 export ESTADO_MONGO_URL='<cadena de conexión>' ONELAKE_WORKSPACE=<workspace> ONELAKE_LAKEHOUSE=<lakehouse>
 cd servicios/orquestador
-uv run orquestar-worker apertura; echo $?
-uv run orquestar-worker normalizar; echo $?
-CLASIFICADOR=falso CLASIFICADOR_CSV=config/clasificacion.csv uv run orquestar-worker clasificar; echo $?
-uv run orquestar-operar escalar-fallas; echo $?
+uv run orquestar-worker apertura; echo $?      # recibir en procesos-listos, Mongo, Blob
+uv run orquestar-worker normalizar; echo $?    # recibir en normalizar, LibreOffice local
+CLASIFICADOR=falso CLASIFICADOR_CSV=config/clasificacion.csv uv run orquestar-worker clasificar; echo $?  # además, leer Blob
+uv run orquestar-operar escalar-fallas; echo $?  # Mongo
+cd ../extraccion
+export EXTRACCION_MODELO=mcp MCP_URL=<url> MCP_API_KEY='<clave>'
+export AZURE_OPENAI_ENDPOINT=<endpoint> AZURE_OPENAI_API_KEY='<clave>' AZURE_OPENAI_DEPLOYMENT=<deployment>
+uv run extraer-worker; echo $?                 # recibir en extraer
 ```
 
-`clasificar` sale con 2 si no está el CSV en el almacén: subir antes uno inventado (`id_oferente,ruta_origen,pagina_inicio,pagina_fin,tipo_documental,confianza,subtipo` y una fila). Con los cuatro en 0 queda probado el acceso. Una corrida con documentos va después, con un evento de prueba del módulo 1 y datos inventados, cuando cumplimiento lo permita (S2).
+`clasificar` sale con 2 si no está el CSV en el almacén: subir antes uno inventado (`id_oferente,ruta_origen,pagina_inicio,pagina_fin,tipo_documental,confianza,subtipo` y una fila). Con los cinco en 0 queda probado recibir de cada cola, Mongo, la lectura de Blob y la configuración. No prueba enviar (a `normalizar`, `clasificar`, `extraer` ni `resultados`), escribir en Blob ni leer OneLake: con las colas vacías no se publica nada. Eso lo prueba la corrida con un evento. Una corrida con documentos va después, con un evento de prueba del módulo 1 y datos inventados, cuando cumplimiento lo permita (S2).
 
 ### T12
 
@@ -211,3 +215,41 @@ Lo encontrado en la pieza:
 Queda fuera, como estaba previsto: el manejador de `resultados` (spec de la entrega 2), el clasificador real (A-5), gpt-5.4 con identidad y la definición de los jobs en la infraestructura.
 
 Pruebas al cerrar: mensajería 18, normalización 643 (23 saltadas), orquestador 524 (58 saltadas), extracción 239.
+
+### Revisión de Astra
+
+Corregido:
+
+- **Reserva:** `estados.cambiar(..., respetar_reserva=True, dueno=)` revisa la reserva sobre la misma versión que reemplaza. Lo usan el paso a `procesando` y `al_fallar`, que ya no pisan una reserva tomada entre la lectura y la escritura. Si otra ejecución terminó la entrega antes de reservar, es un mensaje repetido y no un bug.
+- **Envíos de varios hilos:** `ColaServiceBus.publicar` lleva un candado; el emisor del SDK no acepta envíos a la vez.
+- **Registros:** `contexto_de` solo pone identificadores que son texto corto de una línea. Una solicitud mal formada no lleva datos del documento a los registros.
+- **Extracción:**
+  - si el segmento se extrajo y falló su publicación en todos los intentos, `al_fallar` publica ese resultado y no una `FALLA_INTERNA`;
+  - un 429 vuelve al bucle con la espera efectiva, también sin `Retry-After`, y un `Retry-After: 0` cuenta como 1 s;
+  - la espera que pide Blob llega al bucle;
+  - el sobre de error lleva el gasto del último intento;
+  - el worker lee solo el entorno del job (no el `.env`), exige `MCP_URL` y `MCP_API_KEY` con `mcp` y no nombra el deployment rechazado;
+  - el cliente del LLM se cierra;
+  - `ResultadosEnAlmacen` no devuelve el sobre de otra clave con la misma ruta.
+- **Arranque del orquestador:**
+  - `normalizar` busca LibreOffice al arrancar;
+  - el CSV del clasificador rechaza filas cortas, confianzas fuera de 0 a 1 y rangos inválidos;
+  - el cliente de Mongo se cierra si `EstadoMongo` falla;
+  - `Parametros` conserva el orden por posición de antes (los campos nuevos, solo por nombre);
+  - se quitó `--hilos`.
+- **`AlmacenBlob`:** el cierre se revisa bajo el mismo candado con que se crea el cliente del hilo. `AlmacenLocal` traduce las URI mal formadas a `UriInvalida`.
+- **Worker:** `FALLA` gana en el resumen.
+- **Pruebas:** las de hilos se ordenan con eventos, y la de la cola usa su fábrica real.
+- **Imágenes:** `docker build` sin `--target` vuelve a dar el job `normalizar`, y `uv` no deja su caché: la liviana pasa de 1,31 GB a 833 MB.
+- **Documentación:** `apertura` necesita Sender en `procesos-listos` para sus reintentos, y la guía de T11 suma `extraer-worker` y dice qué prueba cada paso.
+
+Anotado, sin cambiar:
+
+- **Dos copias de la misma solicitud a la vez se extraen dos veces.** Solo pasa con duplicados simultáneos, y quien consuma `resultados` deduplica por la clave. Evitarlo pide una reserva por clave: se decide con el manejador de `resultados` (entrega 2).
+- **Un dueño que perdió la reserva puede reescribir los archivos de la entrega antes de notarlo.** En un job no pasa: la reserva (2400 s) dura más que la réplica (1800 s). Solo en una corrida manual de más de 40 minutos.
+- **Un `error_proceso` que no se arregla repitiendo no se guarda**, así que una reentrega vuelve a llamar al LLM. Cuesta, pero no cambia el resultado. Se decide con el consumidor de `resultados`.
+- **Un `SIGTERM` durante la espera de `receive_messages`** deja procesar el mensaje que llegue en esa espera (5 s como máximo). Si Azure corta antes, Service Bus lo vuelve a entregar.
+- **Un sobre 0.2 válido puede pasar de 248 000 bytes.** `ColaServiceBus` lo rechaza con `ErrorCola` antes de enviarlo. Falta medir el mayor de la muestra real (T11). La prueba de punta a punta usa cola y estado en memoria, no el Service Bus falso ni `mongomock`.
+- **`OrigenOneLake` no registra el cierre de su credencial ni de sus clientes por hilo.** El proceso termina enseguida, así que no hay fuga que importe.
+
+Pruebas después de la revisión: mensajería 22, normalización 646 (23 saltadas), orquestador 535 (58 saltadas), extracción 249.
