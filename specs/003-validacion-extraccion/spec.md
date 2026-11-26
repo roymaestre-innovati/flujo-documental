@@ -254,7 +254,7 @@ La numeración sigue la de la entrega 1.
 | ¿Qué dato se captura? | Los campos de cada tipo documental. Muchos son personales: nombres, cédulas, tarjetas profesionales y firmas. La ficha marca cuáles |
 | ¿Para qué requisito? | El que cita cada campo en la matriz (habilitantes jurídicos, financieros, técnicos y factores de puntaje) |
 | ¿Quién puede verlo? | El orquestador y el módulo 4, como servicios. El evaluador ve los campos de su tarea de revisión. Ningún oferente ve datos de otro |
-| ¿Dónde se procesa? | El contenido del segmento se manda a un modelo de lenguaje en la nube. Hoy está fuera de Colombia (S2 / HD-10, sin respuesta) |
+| ¿Dónde se procesa? | El contenido del segmento se manda a un modelo de lenguaje en la nube. Hoy está fuera de Colombia. Para pruebas está autorizado (2026-11-10, ver "Respuestas" del checklist); para producción, S2 / HD-10 sigue por confirmar |
 | ¿Cuánto se conserva? | El resultado se conserva como la evidencia del proceso (S1). No se guardan las imágenes que se le mandaron al modelo ni su conversación |
 | Registros (logs) | Solo identificadores, conteos, tiempos, tokens y códigos de error. Nunca valores, citas ni texto del documento |
 | Pruebas | Solo con documentos inventados y con un modelo de lenguaje falso que responde con los ejemplos del contrato |
@@ -281,7 +281,7 @@ Hoy el evaluador copia a mano los datos de cada documento a la hoja de evaluaci�
 
 | # | Pregunta | Qué se supone mientras tanto |
 |---|---|---|
-| S2 / HD-10 | ¿Se acepta procesar documentos en Estados Unidos? | Nada real sale de la máquina del usuario sin su autorización |
+| S2 / HD-10 | ¿Se acepta procesar documentos en Estados Unidos? | Pruebas autorizadas (2026-11-10): las corre el usuario en su máquina. Producción, por confirmar |
 | S1 / HD-8 | ¿Bastan 30 días de traza? | No se guarda traza: solo el resultado y los registros sin datos |
 | R1 | Identificador estable de regla | Provisional: `<id_tecnico>.r<n>`, en el orden en que el modelo de lenguaje las reporta |
 | O2 | Forma final de las referencias a archivos | URI `file://` del almacén local, resueltas por lo que va después de `almacen/` |

@@ -8,7 +8,7 @@ Lo que queda abierto:
 
 1. **A9:** el usuario corre `medir-gold` con TD-16 y TD-29 (comando en el README del servicio) después de autorizar que esos documentos vayan a gpt-5.4, y pega los conteos. Si un campo baja frente a `lote.py`, no se usa la versión de una vuelta con documentos reales hasta corregirlo.
 2. **`describir_modelo` con versión**, en el modelo semántico: tarea escrita en `~/GEB/modelo-semantico/docs/tarea-version-en-describir-modelo.md`. Sin ella, con `--modelo mcp` la extracción se detiene cuando se publique la v22.
-3. **Cumplimiento (S2, HD-10 y HD-5):** sigue sin respuesta. Ver abajo.
+3. **Cumplimiento:** el 2026-11-10 el equipo respondió que la autorización de habeas data se obtiene cuando los oferentes cargan sus documentos, así que **las pruebas con documentos reales están autorizadas** (también con gpt-5.4). Para producción quedan por confirmar HD-4, HD-5, HD-10 y los puntos de uso en la nube. Ver "Respuestas" en `specs/003-validacion-extraccion/checklist-habeas-data.md`.
 4. **Trabajo del modelo semántico** (`id_regla`, ámbito, validadores y `td_probado` en la matriz): sigue pendiente. Mientras tanto todo va a revisión por `TD_NO_PROBADO`.
 5. **Lo que sigue en el diseño:** la entrega 2 del orquestador (recibir los resultados en la cola `resultados`, tareas de revisión de campos), Azure (Service Bus, Container App, Blob para O2), las trazas de 30 días (D23) y el gate de regresión con los gold (D24, que puede partir de `medir-gold`).
 
@@ -77,7 +77,7 @@ En producción será un Container App que consume la cola `extraer` y publica en
 
 ### Antes de tocar documentos reales: cumplimiento
 
-Extraer manda el contenido de los documentos (cédulas, RUT) a gpt-5.4 y al MCP en eastus, Estados Unidos. Eso es la pregunta **S2** (HD-10 del checklist `specs/003-validacion-extraccion/checklist-habeas-data.md`), con HD-5 (Microsoft como encargado) para el uso en la nube. No hay respuestas todavía.
+Extraer manda el contenido de los documentos (cédulas, RUT) a gpt-5.4 y al MCP en eastus, Estados Unidos. Eso es la pregunta **S2** (HD-10 del checklist `specs/003-validacion-extraccion/checklist-habeas-data.md`), con HD-5 (Microsoft como encargado) para el uso en la nube. **Actualización 2026-11-10:** las pruebas con documentos reales están autorizadas (ver el estado al principio de este archivo); lo de este apartado sigue valiendo para producción.
 
 Hasta tenerlas: se construye y se prueba con documentos inventados y con un modelo falso que responde con los ejemplos del contrato. Correr gpt-5.4 sobre la muestra real o los gold solo si el usuario lo autoriza de forma explícita, y lo corre él (ver "Cómo trabaja el usuario").
 
